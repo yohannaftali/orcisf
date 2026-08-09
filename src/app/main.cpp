@@ -5,10 +5,19 @@
 
 #include "app/Application.h"
 
+// gl3w must be included before any other header that pulls in GL/gl.h
+// (GLFW included with GLFW_INCLUDE_NONE below, so this is the only GL
+// header in the whole program) -- it provides every core-profile GL
+// function ViewportPanel's renderer needs (framebuffers, VAOs/VBOs,
+// shaders) as loaded function pointers, avoiding a hand-rolled loader.
+#include <GL/gl3w.h>
+
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <nfd.h>
 
 #include <cstdio>
 
@@ -47,6 +56,13 @@ int main(int, char**) {
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // vsync
 
+    if (gl3wInit() != 0) {
+        std::fprintf(stderr, "Failed to initialize gl3w (OpenGL function loader)\n");
+        glfwDestroyWindow(window);
+        glfwTerminate();
+        return 1;
+    }
+
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -57,6 +73,8 @@ int main(int, char**) {
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
+
+    NFD_Init();
 
     orcisf::app::Application app;
 
@@ -79,6 +97,8 @@ int main(int, char**) {
 
         glfwSwapBuffers(window);
     }
+
+    NFD_Quit();
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();

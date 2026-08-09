@@ -273,3 +273,72 @@ history only; don't duplicate current-state description here.
   the substitute for now) and finer-grained mid-dispatch cancellation
   (cancellation is currently checked between generations, same as before
   #4, not mid-`RunOnLanes`).
+
+## 2026-08-10 — #5: 3D viewport + example-folder loader
+
+- New `src/gui/viewport/` subsystem: `Math3D.h` (minimal Vec3/Mat4, no GLM
+  dependency), `Camera.{h,cpp}` (orbit camera: target/distance/yaw/pitch,
+  mouse-drag orbit/pan, scroll zoom, arrow-key orbit + keyboard zoom),
+  `SceneModel.{h,cpp}` (builds a render-ready joints/members/restraints
+  snapshot from `engine::StructureData` + an optional `MemberResult` list;
+  `PickMember()` does ray-vs-segment picking, pure geometry with no GL
+  involved), `SceneRenderer.{h,cpp}` (owns an offscreen FBO + a flat-lit
+  shader + a unit-cube mesh reused for both member boxes and joint/
+  restraint markers, renders into a texture `ViewportPanel` displays via
+  `ImGui::Image`).
+- New engine addition `src/engine/{include/engine,src}/MemberResults.h/.cpp`:
+  `ComputeMemberResults()` mirrors `WriteFinalResults()`'s per-member
+  design-calculation loop (`PeriksaBatang`/`IsiElemenBalokFields`/
+  `ElemenLapangan`/`ElemenTumpuan`/`DesignBeam`/`IsiElemenKolomFields`/
+  `DesignColumn`) but captures the results (dimensions, demand/capacity,
+  per-check `kendala`) into a `std::vector<MemberResult>` instead of
+  writing text — feeds the viewport's dimension-scaled/constraint-colored
+  member rendering and the Properties panel's per-member data display.
+  `orcisf_cli optimize` now also prints a `MEMBER_RESULTS` section using
+  it (verified sane output against `Apl1-1`: 4 beams + 4 columns, correct
+  dimensions/cost, `kendala=0` for a converged run).
+- `ViewportPanel`/`PropertiesPanel` got their first real implementation
+  (previously issue #2 placeholders): orbit/pan/zoom camera + click-to-pick
+  a member (drag-vs-click distinguished by accumulated mouse-delta
+  magnitude, not just mouse-up), Properties panel shows the selected
+  member's dimensions and, once an optimization has run, demand/capacity
+  per check region + pass/fail coloring. `Toolbar`'s "File > Open
+  Folder..." is wired to a native folder dialog (NFD) that scans the
+  chosen folder for a case-insensitive `.inp` file to resolve the generic
+  dataset path, then calls `engine::LoadDatasetForViewing` (geometry only)
+  or, after a `RunPanel` run completes, `Application` calls
+  `ComputeMemberResults` on the finished `StructureData` and rebuilds the
+  scene with full results.
+- Added the `gl3w` vcpkg dependency (core-profile OpenGL function loader,
+  initialized once in `main.cpp` after `glfwMakeContextCurrent`) — chosen
+  over hand-rolling ~40 function pointers or a heavier loader; every other
+  new file includes `<GL/gl3w.h>` per-translation-unit as gl3w requires.
+- **Validation, and what could not be automated:** no Borland/legacy
+  binary exists to compare 3D rendering against (it never had one), and
+  this environment can't script clicks through a native OS folder dialog
+  or a live GLFW window reliably (Windows' foreground-focus protections
+  block a background process from stealing focus from the terminal/
+  browser). What *was* verified: (1) `PickMember()`'s ray-vs-segment math
+  against a standalone synthetic-scene test program (not checked in) —
+  correct hits/misses for straight and angled rays; (2) the full load →
+  build-scene → render pipeline end-to-end via a temporary environment-
+  variable-gated debug hook in `Application`'s constructor (removed before
+  commit), screenshotted while running: correctly renders `Apl1-1`'s 4
+  columns with orange restraint markers at the base joints, in the right
+  docked-panel layout; (3) `MEMBER_RESULTS` CLI output sanity-checked
+  against `Apl1-1` (see above). Camera drag/orbit/pan and the live
+  Open-Folder/Run→viewport-refresh flow are implemented but not
+  interactively exercised end-to-end in this environment — reasoned
+  through carefully but flagged here for anyone who *can* click through it.
+- **Unrelated environment bug found and fixed while testing:** launching
+  `orcisf_gui.exe` failed with "Entry Point Not Found: clock_gettime64...
+  libstdc++-6.dll" — root cause was `C:\Program Files\PostgreSQL\17\bin\`
+  (also on this machine's PATH) shipping its own, ABI-incompatible
+  `libwinpthread-1.dll` that could shadow the MinGW toolchain's matching
+  copy depending on PATH order, breaking `libstdc++-6.dll`'s own runtime
+  dependency resolution. Fixed generally (not just worked around) by
+  having `CMakeLists.txt` copy the compiler's own runtime DLLs next to
+  `orcisf_gui.exe` post-build on MinGW (see `AGENTS.md`'s `gui/viewport/`
+  section) — makes the app directory's copies win regardless of PATH,
+  which is also just correct practice for distributing a MinGW-built exe.
+  No-op on the MSVC/x64-windows triplet CI uses.

@@ -7,6 +7,7 @@ add_library(orcisf_engine STATIC
     src/LegacyIO.cpp
     src/Optimizer.cpp
     src/Engine.cpp
+    src/MemberResults.cpp
 )
 
 target_include_directories(orcisf_engine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

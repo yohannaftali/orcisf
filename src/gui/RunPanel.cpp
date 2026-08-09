@@ -24,6 +24,10 @@ RunPanel::~RunPanel() {
 
 void RunPanel::SetLogSink(std::function<void(std::string)> sink) { log_sink_ = std::move(sink); }
 
+void RunPanel::SetOnResult(std::function<void(engine::StructureData, std::string)> callback) {
+    on_result_ = std::move(callback);
+}
+
 bool RunPanel::IsRunning() const { return running_.load(); }
 
 void RunPanel::StartRun() {
@@ -87,13 +91,14 @@ void RunPanel::Draw(bool* open) {
     }
 
     bool running = IsRunning();
-    if (was_running_ && !running && log_sink_) {
+    if (was_running_ && !running) {
         if (has_error_) {
-            log_sink_("Optimization run stopped with an error: " + last_error_);
+            if (log_sink_) log_sink_("Optimization run stopped with an error: " + last_error_);
         } else if (cancel_.load()) {
-            log_sink_("Optimization run cancelled.");
+            if (log_sink_) log_sink_("Optimization run cancelled.");
         } else {
-            log_sink_("Optimization run finished.");
+            if (log_sink_) log_sink_("Optimization run finished.");
+            if (on_result_) on_result_(result_sd_, std::string(dataset_path_));
         }
     }
     was_running_ = running;

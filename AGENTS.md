@@ -124,36 +124,97 @@ dialogs, **libharu (HPDF)** for PDF export — dependency-managed via
 by `$env{VCPKG_ROOT}`). CI: `.github/workflows/build-src.yml` matrix-builds
 all three OS targets on every push/PR touching `src/`.
 
-**Current state (#2 scaffold + #3 engine port + #4 threaded core land; #5–#9 not started):**
+**Current state (#2 scaffold + #3 engine port + #4 threaded core + #5 3D
+viewport land; #6–#9 not started):**
 ```
 src/
 ├── vcpkg.json / CMakeLists.txt / CMakePresets.json
 ├── app/
-│   ├── main.cpp             # GLFW/OpenGL3/ImGui bootstrap + render loop
-│   └── Application.{h,cpp}  # docking layout (Viewport | Properties/RunPanel / Log)
+│   ├── main.cpp             # GLFW/OpenGL3/ImGui bootstrap + render loop;
+│   │                        # also: gl3w init, NFD_Init/Quit
+│   └── Application.{h,cpp}  # docking layout (Viewport | Properties/RunPanel / Log);
+│                            # owns the shared SceneModel + selected-member state,
+│                            # File > Open Folder... (NFD) and Run-completion wiring
 ├── gui/
-│   ├── Toolbar.{h,cpp}          # menu bar — placeholder items only
-│   ├── ViewportPanel.{h,cpp}    # 3D view — placeholder, real work is #5
-│   ├── PropertiesPanel.{h,cpp}  # selection editor — placeholder, #6/#7
+│   ├── Toolbar.{h,cpp}          # menu bar; "File > Open Folder..." wired (#5),
+│   │                            # rest still placeholders
+│   ├── ViewportPanel.{h,cpp}    # #5: offscreen OpenGL render of a SceneModel,
+│   │                            # orbit/pan/zoom camera, click-to-pick a member
+│   ├── PropertiesPanel.{h,cpp}  # #5: shows the selected member's dimensions +
+│   │                            # (if available) demand/capacity/kendala;
+│   │                            # numeric *editing* is still #6/#7
 │   ├── RunPanel.{h,cpp}         # #4: dataset/options form, worker-thread-count
-│   │                            # slider, Run/Cancel, live progress bar — runs
+│   │                            # slider, Run/Cancel, live progress bar -- runs
 │   │                            # engine::RunFullOptimization on a background
-│   │                            # std::thread so the UI never blocks
-│   └── LogPanel.{h,cpp}         # run/status log — functional; detailed
-│                                # calc log to disk is done, see engine/
-└── engine/                      # #3/#4: headless analysis/design/optimizer
+│   │                            # std::thread so the UI never blocks; on success
+│   │                            # (#5) hands the finished StructureData to
+│   │                            # Application to refresh the viewport
+│   ├── LogPanel.{h,cpp}         # run/status log -- functional; detailed
+│   │                            # calc log to disk is done, see engine/
+│   └── viewport/                # #5: rendering/camera/scene-data, no ImGui
+│       │                        # dependency except ViewportPanel.cpp itself
+│       ├── Math3D.h             # minimal Vec3/Mat4 (no GLM dependency)
+│       ├── Camera.{h,cpp}       # orbit camera (target/distance/yaw/pitch)
+│       ├── SceneModel.{h,cpp}   # engine::StructureData (+ optional
+│       │                        # MemberResult list) -> render-ready
+│       │                        # joints/members snapshot; PickMember()
+│       │                        # (ray-vs-segment, no GL involved)
+│       └── SceneRenderer.{h,cpp} # owns the FBO/shader/cube-mesh GL objects,
+│                                  # draws a SceneModel from a Camera into a
+│                                  # texture for ViewportPanel's ImGui::Image
+└── engine/                      # #3/#4/#5: headless analysis/design/optimizer
     ├── README.md                # full architecture + validation writeup — read before touching this dir
     ├── include/engine/*.h, src/*.cpp   # one pair per ported legacy file, see README's table
+    │   (MemberResults.h/.cpp is #5's addition: per-member final-design
+    │   results captured into memory, mirroring WriteFinalResults' loop --
+    │   see its header comment before changing WriteFinalResults itself)
     └── tools/orcisf_cli.cpp     # headless CLI: `info`/`equilibrium`/`optimize [worker_threads] [rng_seed] [quiet]`
+                                  # (optimize also prints a MEMBER_RESULTS section)
 ```
-`ViewportPanel`/`PropertiesPanel`/`Toolbar` are intentionally inert
-placeholders — **do not build real features into them under issue #2**;
-that belongs to their respective linked issues (#5–#9). `RunPanel` (#4) is
-the first GUI panel that actually calls into `orcisf_engine`. Read the
-relevant issue before starting work here — each has detailed acceptance
-criteria. As each sub-issue lands, extend this section (new subsystems,
-data model, how the engine/GUI/export layers connect) rather than
-replacing it wholesale, per the Change Log Policy.
+`Toolbar`/`ViewportPanel`/`PropertiesPanel` had inert placeholders under
+issue #2; #5 gave `ViewportPanel`/`PropertiesPanel` (and Toolbar's "Open
+Folder...") their first real implementation. **Interactive editing (drag,
+numeric entry, add/remove members) is still #6/#7** — don't build that
+into `ViewportPanel`/`PropertiesPanel` under issue #5's banner; #5 is
+view-only (load + render + inspect). Read the relevant issue before
+starting work here — each has detailed acceptance criteria. As each
+sub-issue lands, extend this section (new subsystems, data model, how the
+engine/GUI/export layers connect) rather than replacing it wholesale, per
+the Change Log Policy.
+
+**`gui/viewport/` (issue #5) — three things worth knowing before touching it:**
+- **Member cross-section thickness/orientation is a schematic
+  approximation, not the legacy local-axis convention.** `SceneRenderer`
+  orients each member's box via `Cross()`-derived basis vectors from the
+  member's own direction (picking world-Y, or world-Z if near-vertical, as
+  a reference), *not* the legacy `R11..R33` rotation matrices
+  `StructuralAnalysis.cpp` computes during `Struktur()`. This was a
+  deliberate simplification to keep rendering independent of whether an
+  analysis has actually run (geometry-only views load fine with no
+  `Struktur()` call) — don't "fix" it to match `R11..R33` without checking
+  whether that still holds.
+- **Normals skip a proper normal matrix on purpose.** See the comment
+  above `kVertexShaderBody` in `SceneRenderer.cpp` for the (specific to
+  this exact case: unit-cube axis-aligned normals + positive-diagonal-scale
+  model matrices) derivation of why `mat3(uModel) * aNormal` is correct
+  here without `transpose(inverse(model))` — don't copy that shortcut
+  into a renderer with non-axis-aligned meshes or negative scale.
+- **`PickMember()` (`SceneModel.cpp`) is pure geometry (ray-vs-segment,
+  Ericson's closest-point algorithm with one side unbounded), independent
+  of OpenGL** — verified with a standalone test program (not checked in)
+  against synthetic scenes before wiring it into `ViewportPanel`'s click
+  handling, since a live click-through-the-3D-view test isn't automatable
+  in this environment.
+- **MinGW/local-dev-only:** `CMakeLists.txt` copies the compiler's own
+  `libstdc++-6.dll`/`libgcc_s_seh-1.dll`/`libwinpthread-1.dll` next to
+  `orcisf_gui.exe` post-build when `MINGW` is true (no-op on the MSVC/
+  x64-windows triplet CI actually uses). This was necessary because
+  another installed program's bin directory (PostgreSQL, in this case)
+  shipped an ABI-incompatible `libwinpthread-1.dll` earlier in PATH,
+  causing an "Entry Point Not Found: clock_gettime64" launch failure that
+  had nothing to do with this project's own code — a real hazard for any
+  MinGW-based Windows dev environment with other MSYS2/MinGW-adjacent
+  tools installed, not just this one.
 
 **`engine/` (issue #3) — read
 [`src/engine/README.md`](src/engine/README.md) before touching it.** It's a
@@ -440,7 +501,7 @@ for skills that apply to the current task and follow them.
 | #2 | feat(src): choose GUI stack & scaffold cross-platform CMake build (Win/macOS/Linux) | closed | 2026-08-09 |
 | #3 | feat(src): port structural-analysis + RC-design + Flexible-Polyhedron engine as a headless library | closed | 2026-08-09 |
 | #4 | feat(src): multi-threaded optimization core with configurable core count + cancellable progress | closed | 2026-08-10 |
-| #5 | feat(src): 3D viewport + example-folder loader (render structure & per-member results) | open | 2026-08-09 |
+| #5 | feat(src): 3D viewport + example-folder loader (render structure & per-member results) | closed | 2026-08-10 |
 | #6 | feat(src): interactive 3D structure editor (import, drag-and-drop edit, numeric entry) | open | 2026-08-09 |
 | #7 | feat(src): load (pembebanan) input GUI (toolbar-driven, CAD-style 3D placement) | open | 2026-08-09 |
 | #8 | feat(src): reinforcement detailing drawings per beam/column | open | 2026-08-09 |

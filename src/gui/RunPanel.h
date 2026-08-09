@@ -30,6 +30,13 @@ public:
     // be surfaced to the user, e.g. wired to LogPanel::AddLine by Application.
     void SetLogSink(std::function<void(std::string)> sink);
 
+    // Called (from the UI thread, inside Draw()) once, right after a run
+    // finishes successfully (not cancelled, no error) -- with a *copy* of
+    // the finished StructureData (so RunPanel's own result_sd_ stays valid
+    // for the next run) and the dataset path that produced it. Wired by
+    // Application to refresh the 3D viewport with the new results (#5).
+    void SetOnResult(std::function<void(engine::StructureData, std::string)> callback);
+
     void Draw(bool* open);
 
 private:
@@ -38,6 +45,7 @@ private:
     bool IsRunning() const;
 
     std::function<void(std::string)> log_sink_;
+    std::function<void(engine::StructureData, std::string)> on_result_;
 
     // ---- Run configuration (edited on the UI thread only) ----
     char dataset_path_[512] = "";

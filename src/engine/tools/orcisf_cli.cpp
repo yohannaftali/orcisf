@@ -8,6 +8,7 @@
 #include <string>
 
 #include "engine/Engine.h"
+#include "engine/MemberResults.h"
 #include "engine/StructuralAnalysis.h"
 
 using namespace orcisf::engine;
@@ -133,6 +134,12 @@ int CmdOptimize(const std::string& dataset, float harga_beton, float harga_besi,
             for (int j = 0; j < 5; ++j) std::cout << sd.var_k[i][j + 5 * k] << ",";
         }
         std::cout << "\n";
+    }
+
+    std::cout << "MEMBER_RESULTS\n";
+    for (const MemberResult& r : ComputeMemberResults(sd)) {
+        std::cout << "batang=" << r.no_batang << " type=" << (r.is_beam ? "balok" : "kolom") << " w=" << r.width
+                   << " h=" << r.height << " harga=" << r.harga << " kendala=" << r.Kendala() << "\n";
     }
     return 0;
 }

@@ -4,10 +4,14 @@
 
 namespace orcisf::gui {
 
+void Toolbar::SetOnOpenFolder(std::function<void()> callback) { on_open_folder_ = std::move(callback); }
+
 void Toolbar::Draw() {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
-            ImGui::MenuItem("Open Folder...", nullptr, false, false);
+            if (ImGui::MenuItem("Open Folder...")) {
+                if (on_open_folder_) on_open_folder_();
+            }
             ImGui::MenuItem("Save", nullptr, false, false);
             ImGui::MenuItem("Export PDF...", nullptr, false, false);
             ImGui::MenuItem("Export Text...", nullptr, false, false);
