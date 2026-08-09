@@ -2,6 +2,7 @@
 
 #include "gui/LogPanel.h"
 #include "gui/PropertiesPanel.h"
+#include "gui/RunPanel.h"
 #include "gui/Toolbar.h"
 #include "gui/ViewportPanel.h"
 
@@ -23,10 +24,12 @@ private:
     gui::ViewportPanel viewport_panel_;
     gui::PropertiesPanel properties_panel_;
     gui::LogPanel log_panel_;
+    gui::RunPanel run_panel_;
 
     bool viewport_open_ = true;
     bool properties_open_ = true;
     bool log_open_ = true;
+    bool run_open_ = true;
     bool dockspace_initialized_ = false;
 };
 

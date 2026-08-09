@@ -87,7 +87,8 @@ int CmdEquilibrium(const std::string& dataset) {
 }
 
 int CmdOptimize(const std::string& dataset, float harga_beton, float harga_besi, float selimut_kolom,
-                 float selimut_balok, float finalti, int iter_mak, int fak_plus, int fak_kali) {
+                 float selimut_balok, float finalti, int iter_mak, int fak_plus, int fak_kali,
+                 unsigned int worker_threads, unsigned int rng_seed, bool quiet) {
     StructureData sd;
     OptimizationOptions opt;
     opt.harga_beton = harga_beton;
@@ -98,19 +99,41 @@ int CmdOptimize(const std::string& dataset, float harga_beton, float harga_besi,
     opt.j_iterasi_mak = iter_mak;
     opt.fak_plus = fak_plus;
     opt.fak_kali = fak_kali;
+    opt.worker_threads = worker_threads;
+    opt.rng_seed = rng_seed;
 
-    ProgressCallback cb = [](const ProgressInfo& info) -> bool {
-        std::printf("gen %d/%d  fitness=%.6g  harga=%.6g  kendala=%.6g  t=%.2fs%s\n", info.generation,
-                     info.max_generation, info.best_fitness, info.best_harga, info.best_kendala,
-                     info.elapsed_seconds, info.converged ? "  [CONVERGED]" : "");
+    ProgressCallback cb = [quiet](const ProgressInfo& info) -> bool {
+        if (!quiet) {
+            std::printf("gen %d/%d  fitness=%.6g  harga=%.6g  kendala=%.6g  t=%.2fs%s\n", info.generation,
+                         info.max_generation, info.best_fitness, info.best_harga, info.best_kendala,
+                         info.elapsed_seconds, info.converged ? "  [CONVERGED]" : "");
+        }
         return true;
     };
 
     RunFullOptimization(sd, dataset, opt, cb);
 
-    std::cout << "Done. JVD=" << sd.JVD << " JSTD=" << sd.JSTD << "\n";
+    std::cout << "Done. JVD=" << sd.JVD << " JSTD=" << sd.JSTD << " worker_threads=" << worker_threads
+              << " rng_seed=" << rng_seed << "\n";
     std::cout << "Best fitness=" << sd.fitstr[sd.JSTD - 1] << " harga=" << sd.hargastr[sd.JSTD - 1]
               << " kendala=" << sd.kendalastr[sd.JSTD - 1] << "\n";
+
+    // Dump every population slot's fitness + design variables so two runs
+    // (e.g. worker_threads=1 vs N with the same rng_seed) can be diffed
+    // for exact equality -- see engine/README.md's threading validation.
+    std::cout << "POPULATION_DUMP\n";
+    for (int i = 0; i < sd.JSTD; ++i) {
+        std::cout << i << " fit=" << sd.fitstr[i] << " kdl=" << sd.kendalastr[i] << " hrg=" << sd.hargastr[i]
+                  << " b=";
+        for (int b = 0; b < sd.jum_balok; ++b) {
+            for (int j = 0; j < 12; ++j) std::cout << sd.var_b[i][j + 12 * b] << ",";
+        }
+        std::cout << " k=";
+        for (int k = 0; k < sd.jum_kolom; ++k) {
+            for (int j = 0; j < 5; ++j) std::cout << sd.var_k[i][j + 5 * k] << ",";
+        }
+        std::cout << "\n";
+    }
     return 0;
 }
 
@@ -122,7 +145,8 @@ int main(int argc, char** argv) {
                   << "  orcisf_cli info <dataset-generic-path>\n"
                   << "  orcisf_cli equilibrium <dataset-generic-path>\n"
                   << "  orcisf_cli optimize <dataset-generic-path> <harga_beton> <harga_besi> <selimut_kolom> "
-                     "<selimut_balok> <finalti> <iter_mak> <fak_plus> <fak_kali>\n";
+                     "<selimut_balok> <finalti> <iter_mak> <fak_plus> <fak_kali> [worker_threads] [rng_seed] "
+                     "[quiet:0|1]\n";
         return 2;
     }
 
@@ -141,9 +165,12 @@ int main(int argc, char** argv) {
                 std::cerr << "optimize needs 9 args after dataset\n";
                 return 2;
             }
+            unsigned int worker_threads = (argc > 11) ? static_cast<unsigned int>(std::stoul(argv[11])) : 1u;
+            unsigned int rng_seed = (argc > 12) ? static_cast<unsigned int>(std::stoul(argv[12])) : 0u;
+            bool quiet = (argc > 13) && std::string(argv[13]) == "1";
             return CmdOptimize(dataset, std::stof(argv[3]), std::stof(argv[4]), std::stof(argv[5]),
                                 std::stof(argv[6]), std::stof(argv[7]), std::stoi(argv[8]), std::stoi(argv[9]),
-                                std::stoi(argv[10]));
+                                std::stoi(argv[10]), worker_threads, rng_seed, quiet);
         }
         std::cerr << "Unknown command: " << cmd << "\n";
         return 2;

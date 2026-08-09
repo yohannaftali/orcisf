@@ -124,28 +124,32 @@ dialogs, **libharu (HPDF)** for PDF export — dependency-managed via
 by `$env{VCPKG_ROOT}`). CI: `.github/workflows/build-src.yml` matrix-builds
 all three OS targets on every push/PR touching `src/`.
 
-**Current state (#2 scaffold + #3 engine port land; #4–#9 not started):**
+**Current state (#2 scaffold + #3 engine port + #4 threaded core land; #5–#9 not started):**
 ```
 src/
 ├── vcpkg.json / CMakeLists.txt / CMakePresets.json
 ├── app/
 │   ├── main.cpp             # GLFW/OpenGL3/ImGui bootstrap + render loop
-│   └── Application.{h,cpp}  # docking layout (Viewport | Properties / Log)
+│   └── Application.{h,cpp}  # docking layout (Viewport | Properties/RunPanel / Log)
 ├── gui/
 │   ├── Toolbar.{h,cpp}          # menu bar — placeholder items only
 │   ├── ViewportPanel.{h,cpp}    # 3D view — placeholder, real work is #5
 │   ├── PropertiesPanel.{h,cpp}  # selection editor — placeholder, #6/#7
+│   ├── RunPanel.{h,cpp}         # #4: dataset/options form, worker-thread-count
+│   │                            # slider, Run/Cancel, live progress bar — runs
+│   │                            # engine::RunFullOptimization on a background
+│   │                            # std::thread so the UI never blocks
 │   └── LogPanel.{h,cpp}         # run/status log — functional; detailed
 │                                # calc log to disk is done, see engine/
-└── engine/                      # #3: headless analysis/design/optimizer
+└── engine/                      # #3/#4: headless analysis/design/optimizer
     ├── README.md                # full architecture + validation writeup — read before touching this dir
     ├── include/engine/*.h, src/*.cpp   # one pair per ported legacy file, see README's table
-    └── tools/orcisf_cli.cpp     # headless CLI: `info`/`equilibrium`/`optimize`
+    └── tools/orcisf_cli.cpp     # headless CLI: `info`/`equilibrium`/`optimize [worker_threads] [rng_seed] [quiet]`
 ```
 `ViewportPanel`/`PropertiesPanel`/`Toolbar` are intentionally inert
 placeholders — **do not build real features into them under issue #2**;
-that belongs to their respective linked issues (#4–#9, `orcisf_gui` now
-links `orcisf_engine` but nothing calls into it from the GUI yet). Read the
+that belongs to their respective linked issues (#5–#9). `RunPanel` (#4) is
+the first GUI panel that actually calls into `orcisf_engine`. Read the
 relevant issue before starting work here — each has detailed acceptance
 criteria. As each sub-issue lands, extend this section (new subsystems,
 data model, how the engine/GUI/export layers connect) rather than
@@ -168,10 +172,30 @@ things every future agent touching it must know:
   `engine/README.md`'s "Deliberate deviations" section first** — they're
   characteristics of the 1999 algorithm, not oversights in the port, and
   "fixing" them would silently change numerical output.
-- **Multi-threading is issue #4's scope, not #3's** —
-  `OptimizationOptions::worker_threads` exists but `RunOptimization()` is
-  currently single-threaded; parallelizing the population-evaluation loop
-  needs each worker to own its own `StructureData` scratch state.
+- **Multi-threading (#4) is a fork-join per hot loop, not a persistent pool.**
+  `RunOptimization()` builds `options.worker_threads - 1` extra
+  `StructureData` clones once (each worker needs its own scratch state —
+  `Inersia`/`Struktur`/design/constraint functions all mutate fields like
+  `SFF`/`SM`/`AM` on whichever `StructureData` they're given), then spawns
+  `std::thread`s per generation via `RunOnLanes` for two loops:
+  `EvaluatePopulationParallel` (the initial population, `JSTD` candidates,
+  once) and `CariBaruParallel` (`cari_baru()`'s trial search, every
+  generation). **Do not resurrect a full `StructureData` copy inside the
+  per-generation sync path** — that was tried and measured ~3x *slower*
+  than single-threaded (a `StructureData` is ~14MB; copying it every
+  generation dwarfs the actual trial-search work for modest structures).
+  `SyncSearchState()` copies only the JVD-sized fields a trial actually
+  reads instead. Below `kMinTrialsPerWorker` trials/lane,
+  `CariBaruParallel` falls back to the identical sequential `CariBaru()` —
+  for the bundled `Example/` datasets (M≈21 members) `TrialCount()` is
+  almost always in the low single digits, so most generations take that
+  fallback; this is expected, not a bug, and real wall-clock speedup should
+  be expected mainly on larger structures than what's bundled here.
+  Determinism is verified (bit-identical `POPULATION_DUMP` output between
+  `worker_threads=1` and `worker_threads=8` for the same `rng_seed`, with
+  the fallback threshold temporarily forced low to actually exercise the
+  parallel merge path rather than only the sequential fallback) — see
+  `engine/README.md`'s Validation section for the exact commands.
 - **Never point the CLI/GUI's output at `Optimasi Beton/Example/` directly**
   — output filenames are case-insensitive-colliding with the checked-in
   reference files on Windows (`GEDUNG.opt` == `gedung.opt`). Always use a
@@ -414,8 +438,8 @@ for skills that apply to the current task and follow them.
 |----|-------|--------|--------------|
 | #1 | epic(src): port ORCISF to a modern cross-platform GUI application | open | 2026-08-09 |
 | #2 | feat(src): choose GUI stack & scaffold cross-platform CMake build (Win/macOS/Linux) | closed | 2026-08-09 |
-| #3 | feat(src): port structural-analysis + RC-design + Flexible-Polyhedron engine as a headless library | ready-for-review | 2026-08-09 |
-| #4 | feat(src): multi-threaded optimization core with configurable core count + cancellable progress | open | 2026-08-09 |
+| #3 | feat(src): port structural-analysis + RC-design + Flexible-Polyhedron engine as a headless library | closed | 2026-08-09 |
+| #4 | feat(src): multi-threaded optimization core with configurable core count + cancellable progress | closed | 2026-08-10 |
 | #5 | feat(src): 3D viewport + example-folder loader (render structure & per-member results) | open | 2026-08-09 |
 | #6 | feat(src): interactive 3D structure editor (import, drag-and-drop edit, numeric entry) | open | 2026-08-09 |
 | #7 | feat(src): load (pembebanan) input GUI (toolbar-driven, CAD-style 3D placement) | open | 2026-08-09 |

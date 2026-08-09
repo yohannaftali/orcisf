@@ -24,13 +24,26 @@ struct OptimizationOptions {
     int fak_kali = 0;
 
     // New in this port (issue #4): how many worker threads to use for the
-    // per-generation population evaluation. 0/1 = single-threaded (matches
-    // the legacy program's behavior exactly, including RNG call order).
-    // >1 parallelizes the embarrassingly-parallel per-candidate evaluation
-    // loop (each candidate's analysis+design is independent once the
-    // initial random population/search-direction bookkeeping -- which is
-    // inherently sequential -- has been decided).
+    // "heavy iteration" evaluation loops -- the initial-population build
+    // (generation 0) and, more importantly, cari_baru()'s per-generation
+    // trial search (Baru.hpp), which is what actually dominates wall-clock
+    // time across a full run. 0/1 = single-threaded (identical code path
+    // to before this option existed). >1 spawns `worker_threads - 1`
+    // additional threads, each with its own private StructureData clone
+    // (see Optimizer.cpp's "Parallel evaluation" section for why a private
+    // clone per thread is required for correctness, not just performance).
+    // Numeric results for a given `rng_seed` are identical regardless of
+    // worker_threads (verified: see engine/README.md's Validation section)
+    // -- more threads only changes wall-clock time, not the answer.
     unsigned int worker_threads = 1;
+
+    // 0 = seed the initial population's RNG from std::random_device (the
+    // default -- matches "randomize()"'s intent, a different population
+    // every run). Any other value seeds std::mt19937 directly, making a
+    // run fully reproducible -- used to verify that worker_threads doesn't
+    // change the result, and available to callers that want reproducible
+    // runs for testing/debugging.
+    unsigned int rng_seed = 0;
 };
 
 struct ProgressInfo {

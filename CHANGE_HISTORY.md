@@ -216,3 +216,60 @@ history only; don't duplicate current-state description here.
   population evaluation (#4 — `OptimizationOptions::worker_threads` exists
   as a documented no-op for now), and wiring any of this into the actual
   GUI (#4–#9).
+
+## 2026-08-09 — #4: multi-threaded optimization core + GUI run/cancel panel
+
+- `Optimizer.cpp`'s two hot loops now fork-join across
+  `options.worker_threads - 1` extra `std::thread`s per call, each with its
+  own private `StructureData` clone (required for correctness — every
+  analysis/design/constraint function mutates shared scratch fields like
+  `SFF`/`SM`/`AM` on whichever `StructureData` it's given):
+  `EvaluatePopulationParallel` (initial `JSTD`-candidate population, once
+  per run) and `CariBaruParallel` (`cari_baru()`'s trial search, every
+  generation — the loop that actually dominates wall-clock time). A new
+  `RunOnLanes` helper partitions an index range across lanes (lane 0 = the
+  calling thread) and returns the per-lane ranges used, so callers can
+  merge worker results back precisely.
+- **Performance fix found and applied during this work:** the first
+  `CariBaruParallel` implementation synced each worker via a full
+  `StructureData = StructureData` copy (~14MB) every generation, which
+  measured ~3x *slower* than single-threaded on the bundled `Data01`
+  dataset (8 threads: 2.6s vs. 1 thread: 0.9s for 2000 generations) —
+  per-generation copy cost vastly exceeded the actual trial-search work.
+  Fixed with `SyncSearchState()` (copies only the ~10 JVD-sized fields a
+  trial actually reads: `TM`/`TS`/`arah`/`no_TS_terjauh`/`var_b_jelek`/
+  `var_k_jelek`) plus a `kMinTrialsPerWorker` threshold that falls back to
+  the identical sequential `CariBaru()` when there isn't enough work per
+  lane to justify thread-spawn overhead. Re-verified after the fix:
+  1-thread and 8-thread timings at parity, and bit-identical
+  `POPULATION_DUMP` output for the same `rng_seed` (see
+  `engine/README.md`'s new Threading determinism section for the exact
+  methodology — including re-running the diff with the fallback threshold
+  temporarily forced to 1, to prove the parallel merge path itself is
+  correct and not just the sequential fallback).
+- `TrialCount()` (trials for a given generation) is almost always 1–6 for
+  the bundled `Data01` dataset (M=21 members), rarely spiking to ~65 early
+  in a run — meaning the bundled example datasets are too small for
+  `worker_threads>1` to show meaningful wall-clock speedup here; this is a
+  property of the example structures, not a threading-design flaw. The
+  architecture is sized for larger structures where per-candidate
+  analysis+design cost is large enough to amortize thread overhead.
+- New GUI panel `src/gui/RunPanel.{h,cpp}`: dataset path + cost/design
+  parameter fields, a worker-thread-count slider (default
+  `hardware_concurrency() - 1`, satisfying #4's settings-control
+  criterion), Run/Cancel buttons, and a live progress bar (generation,
+  best fitness/harga/kendala, elapsed time, converged flag). Runs
+  `engine::RunFullOptimization` on a background `std::thread` so the ImGui
+  frame loop never blocks; the engine's progress callback (called on that
+  worker thread) writes into a mutex-guarded `ProgressInfo` that `Draw()`
+  (UI thread) reads back each frame — the only cross-thread state shared.
+  Cancel sets an `std::atomic<bool>` checked both by the progress
+  callback's return value and by `RunFullOptimization`'s `cancel` pointer.
+  Wired into `Application` (new dock alongside Properties) with its log
+  sink forwarding to `LogPanel`.
+- Not yet addressed (left for a future pass, not blocking #4's core
+  acceptance criteria): a dedicated ThreadSanitizer CI run (MinGW doesn't
+  support `-fsanitize=thread`; the empirical determinism proof above is
+  the substitute for now) and finer-grained mid-dispatch cancellation
+  (cancellation is currently checked between generations, same as before
+  #4, not mid-`RunOnLanes`).

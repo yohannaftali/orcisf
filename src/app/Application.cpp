@@ -4,12 +4,15 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
+#include <utility>
+
 namespace orcisf::app {
 
 Application::Application() {
     log_panel_.AddLine("ORCISF GUI scaffold started (issue #2).");
-    log_panel_.AddLine("Viewport/Properties/Log panels are placeholders -- "
-                        "see issues #5, #6/#7, #3 for real implementations.");
+    log_panel_.AddLine("Viewport/Properties panels are placeholders -- "
+                        "see issues #5, #6/#7 for real implementations.");
+    run_panel_.SetLogSink([this](std::string line) { log_panel_.AddLine(std::move(line)); });
 }
 
 void Application::BuildDockspace() {
@@ -34,6 +37,7 @@ void Application::BuildDockspace() {
 
     ImGui::DockBuilderDockWindow("Viewport", dock_main);
     ImGui::DockBuilderDockWindow("Properties", dock_right);
+    ImGui::DockBuilderDockWindow("Run Optimization", dock_right);
     ImGui::DockBuilderDockWindow("Log", dock_bottom);
 
     ImGui::DockBuilderFinish(dockspace_id);
@@ -45,6 +49,7 @@ void Application::OnFrame() {
 
     viewport_panel_.Draw(&viewport_open_);
     properties_panel_.Draw(&properties_open_);
+    run_panel_.Draw(&run_open_);
     log_panel_.Draw(&log_open_);
 }
 

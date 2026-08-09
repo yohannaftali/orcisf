@@ -23,6 +23,7 @@ add_executable(orcisf_gui
     gui/Toolbar.cpp
     gui/ViewportPanel.cpp
     gui/PropertiesPanel.cpp
+    gui/RunPanel.cpp
     gui/LogPanel.cpp
 )
 

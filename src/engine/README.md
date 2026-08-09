@@ -110,6 +110,49 @@ case-*insensitive* on Windows (`GEDUNG.opt` and `gedung.opt` are the same
 file), so running against the real archive folder will silently overwrite
 the checked-in reference `.opt`/`.str`/`.kdl`/`.inf`/`.his` files.
 
+### Threading determinism (issue #4)
+
+`OptimizationOptions::worker_threads` controls how many `std::thread`s the
+optimizer's two hot loops (`EvaluatePopulationParallel`, `CariBaruParallel`
+in `Optimizer.cpp`) fork per call. Numeric output must be identical
+regardless of `worker_threads` for a fixed `rng_seed` — more threads only
+changes wall-clock time. Verified via `orcisf_cli optimize`'s
+`POPULATION_DUMP` section (every population slot's fitness/kendala/harga +
+full design-variable vector), diffed between a `worker_threads=1` and a
+`worker_threads=8` run against the same scratch dataset copy and the same
+`rng_seed`:
+
+```sh
+orcisf_cli optimize <scratch-dataset> 250000 5000 50 50 1e10 200 3 1 1 12345 1 > run_1t.out
+orcisf_cli optimize <scratch-dataset> 250000 5000 50 50 1e10 200 3 1 8 12345 1 > run_8t.out
+diff run_1t.out run_8t.out   # only the "worker_threads=" label line should differ
+```
+
+`CariBaruParallel` falls back to the sequential `CariBaru()` below
+`kMinTrialsPerWorker` trials per lane (avoids thread-spawn/sync overhead
+that isn't worth paying — see `Optimizer.cpp`'s comment above the
+constant). On the bundled `Data01` (`M=21`), `TrialCount()` is almost
+always 1–6 (rare spikes to ~65 early in a run), so most generations take
+that fallback and never actually exercise the parallel merge/reduce code
+path. **The diff above alone does not prove the parallel path is
+correct** if it only ever hit the fallback — when validating a change to
+`CariBaruParallel`/`SyncSearchState`, temporarily force `kMinTrialsPerWorker`
+down to `1`, rebuild, and re-run the same diff to confirm the merge logic
+itself (not just the fallback) reproduces sequential output exactly, then
+revert the constant. This was done for the initial #4 implementation:
+bit-identical `POPULATION_DUMP` output with the parallel path forced on
+for every generation.
+
+Because `TrialCount()` is small for every dataset bundled in this repo,
+wall-clock speedup from `worker_threads>1` is negligible-to-nonexistent
+here (thread-spawn overhead roughly cancels out the saved work) — this is
+a property of the bundled example structures being modest (M≈21 members),
+not a flaw in the threading design. The architecture (private per-worker
+`StructureData`, targeted `SyncSearchState` instead of a full struct copy,
+minimum-work threshold) is sized for larger structures where a single
+candidate's analysis+design cost is large enough to amortize thread
+overhead.
+
 ## Building / running the CLI
 
 ```sh

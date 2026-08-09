@@ -1,8 +1,11 @@
 #include "engine/Optimizer.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <random>
+#include <thread>
+#include <utility>
 
 #include "engine/BeamDesign.h"
 #include "engine/ColumnDesign.h"
@@ -378,57 +381,80 @@ void PeriksaBatas(StructureData& sd) {
     }
 }
 
+// One trial of cari_baru()'s search loop, extracted so it can be driven
+// either sequentially (CariBaru, below) or in parallel across independent
+// `iterasi_var` values (CariBaruParallel). Each `iterasi_var` maps
+// deterministically to one candidate (varnew_f/varnew depend only on
+// iterasi_var, sd.varnew_asli/arah/TS/no_TS_terjauh, none of which change
+// across trials within one cari_baru() call), so trials have no
+// inter-iteration data dependency -- the only thing that made the
+// original loop "sequential" was accumulating a single running best,
+// which is a plain reduction. `valid=false` mirrors the legacy `lompat`
+// early-`continue` (candidate identical to the midpoint TM): the caller
+// must not treat it as a candidate for the running best.
+struct TrialResult {
+    bool valid = false;
+    float fitcb = 0.f;
+};
+
+TrialResult EvaluateTrial(StructureData& sd, int iterasi_var) {
+    sd.varplus[sd.no_TS_terjauh] = iterasi_var + 1.f;
+    sd.varnew_f[sd.no_TS_terjauh] =
+        sd.varnew_asli[sd.no_TS_terjauh] + sd.varplus[sd.no_TS_terjauh] * sd.arah[sd.no_TS_terjauh];
+
+    for (int icb = 0; icb < sd.JVD; ++icb) {
+        if (icb == sd.no_TS_terjauh) {
+            continue;
+        }
+        if (sd.TS[sd.no_TS_terjauh] != 0) {
+            sd.varplus[icb] = std::fabs(sd.TS[icb] / sd.TS[sd.no_TS_terjauh] * sd.varplus[sd.no_TS_terjauh]);
+            sd.varnew_f[icb] = sd.varnew_asli[icb] + sd.varplus[icb] * sd.arah[icb];
+        } else {
+            sd.varnew_f[icb] = sd.varnew_asli[icb] + (iterasi_var + 1.f) * sd.arah[icb];
+        }
+    }
+
+    for (int icb = 0; icb < sd.JVD; ++icb) {
+        sd.varnew[icb] = Konversi(sd.varnew_f[icb]);
+    }
+
+    bool lompat = true;
+    for (int ilp = 0; ilp < sd.JVD; ++ilp) {
+        if (sd.varnew[ilp] != sd.TM[ilp]) {
+            lompat = false;
+            break;
+        }
+    }
+    if (lompat) {
+        return {};
+    }
+
+    PeriksaBatas(sd);
+    Unnormalisasi(sd, sd.varnew, sd.var_b_cb, sd.var_k_cb);
+    float fitcb = KendalaHarga(sd, sd.var_b_cb, sd.var_k_cb);
+    return {true, fitcb};
+}
+
+// Legacy trial count: `do{...iterasi_var++;}while(iterasi_var<X)` (X =
+// fabs(TS[no_TS_terjauh])*3) runs iterasi_var = 0,1,...,ceil(X)-1 (or
+// exactly once if X<=0, since a do-while always runs its body once before
+// the first check).
+int TrialCount(const StructureData& sd) {
+    float x = std::fabs(sd.TS[sd.no_TS_terjauh]) * 3.f;
+    return std::max(1, static_cast<int>(std::ceil(x)));
+}
+
 void CariBaru(StructureData& sd) {
     sd.iterasi_var = 0;
     NormalisasiInt(sd, sd.varnew_asli, sd.var_b_jelek, sd.var_k_jelek);
     sd.fitcb_best = 0.f;
 
-    do {
-        sd.varplus[sd.no_TS_terjauh] = sd.iterasi_var + 1.f;
-        sd.varnew_f[sd.no_TS_terjauh] =
-            sd.varnew_asli[sd.no_TS_terjauh] + sd.varplus[sd.no_TS_terjauh] * sd.arah[sd.no_TS_terjauh];
-
-        for (int icb = 0; icb < sd.JVD; ++icb) {
-            if (icb == sd.no_TS_terjauh) {
-                continue;
-            }
-            if (sd.TS[sd.no_TS_terjauh] != 0) {
-                sd.varplus[icb] = std::fabs(sd.TS[icb] / sd.TS[sd.no_TS_terjauh] * sd.varplus[sd.no_TS_terjauh]);
-                sd.varnew_f[icb] = sd.varnew_asli[icb] + sd.varplus[icb] * sd.arah[icb];
-            } else {
-                sd.varnew_f[icb] = sd.varnew_asli[icb] + (sd.iterasi_var + 1.f) * sd.arah[icb];
-            }
-        }
-
-        for (int icb = 0; icb < sd.JVD; ++icb) {
-            sd.varnew[icb] = Konversi(sd.varnew_f[icb]);
-        }
-
-        sd.lompat = 0;
-        for (int ilp = 0; ilp < sd.JVD; ++ilp) {
-            if (sd.varnew[ilp] == sd.TM[ilp]) {
-                if (ilp == sd.JVD - 1) {
-                    sd.lompat = 1;
-                }
-            } else {
-                sd.lompat = 0;
-                break;
-            }
-        }
-
-        if (sd.lompat == 1) {
-            sd.lompat = 0;
-            sd.iterasi_var++;
-            continue;
-        }
-
-        PeriksaBatas(sd);
-        Unnormalisasi(sd, sd.varnew, sd.var_b_cb, sd.var_k_cb);
-
-        sd.fitcb = KendalaHarga(sd, sd.var_b_cb, sd.var_k_cb);
-
-        if (sd.fitcb > sd.fitcb_best) {
-            sd.fitcb_best = sd.fitcb;
+    int n_trials = TrialCount(sd);
+    for (int iterasi_var = 0; iterasi_var < n_trials; ++iterasi_var) {
+        sd.iterasi_var = iterasi_var;
+        TrialResult result = EvaluateTrial(sd, iterasi_var);
+        if (result.valid && result.fitcb > sd.fitcb_best) {
+            sd.fitcb_best = result.fitcb;
             for (int icb = 0; icb < sd.jum_balok; ++icb) {
                 for (int jcb = 0; jcb < 12; ++jcb) {
                     sd.var_b_cb_best[jcb + 12 * icb] = sd.var_b_cb[jcb + 12 * icb];
@@ -440,8 +466,226 @@ void CariBaru(StructureData& sd) {
                 }
             }
         }
-        sd.iterasi_var++;
-    } while (sd.iterasi_var < std::fabs(sd.TS[sd.no_TS_terjauh]) * 3);
+    }
+    sd.iterasi_var = n_trials;
+}
+
+// ---- Parallel evaluation (issue #4) ----
+//
+// `workers` holds `worker_threads - 1` extra StructureData clones (the
+// caller's `sd` itself is always lane 0). Every analysis/design function
+// mutates shared scratch state on its StructureData argument (SFF, SM,
+// SMRT, AM, DF, the per-element B/H/DIA*/sisi/... scalars, kendala_*,
+// harga, ...), so two candidates cannot be evaluated concurrently against
+// the *same* StructureData without racing -- hence one full private copy
+// per lane. A plain `StructureData` copy (all members are std::vector-
+// backed) is a correct, if not maximally cache-friendly, way to give each
+// lane an independent, consistent snapshot of the read-only problem
+// definition (geometry/loads/discrete tables) and the current population/
+// search state; at ~10-15 MB per copy this is negligible next to the
+// per-generation trial-evaluation work it unlocks.
+
+// Splits `count` independent items [0, count) across `1 + workers.size()`
+// lanes (lane 0 = the calling thread using `sd` directly, lanes 1.. =
+// worker threads using their own clone), running `work(laneStructureData,
+// item)` for each item, then joins every thread before returning. Returns
+// the per-lane [lo,hi) ranges actually used (ranges[0] is lane 0's,
+// handled by the calling thread) so the caller can merge results back
+// knowing exactly which lane computed which items.
+template <typename Work>
+std::vector<std::pair<int, int>> RunOnLanes(StructureData& sd, std::vector<StructureData>& workers, int count,
+                                             Work&& work) {
+    int n_lanes = 1 + static_cast<int>(workers.size());
+    n_lanes = std::max(1, std::min(n_lanes, count));
+
+    int chunk = (count + n_lanes - 1) / n_lanes;
+    std::vector<std::pair<int, int>> ranges(static_cast<size_t>(n_lanes));
+    for (int lane = 0; lane < n_lanes; ++lane) {
+        int lo = lane * chunk;
+        int hi = std::min(count, lo + chunk);
+        ranges[static_cast<size_t>(lane)] = {lo, hi};
+    }
+
+    if (n_lanes <= 1) {
+        for (int i = ranges[0].first; i < ranges[0].second; ++i) {
+            work(sd, i);
+        }
+        return ranges;
+    }
+
+    std::vector<std::thread> threads;
+    threads.reserve(static_cast<size_t>(n_lanes) - 1);
+    for (int lane = 1; lane < n_lanes; ++lane) {
+        auto [lo, hi] = ranges[static_cast<size_t>(lane)];
+        StructureData& local = workers[static_cast<size_t>(lane) - 1];
+        threads.emplace_back([&work, &local, lo, hi]() {
+            for (int i = lo; i < hi; ++i) {
+                work(local, i);
+            }
+        });
+    }
+    for (int i = ranges[0].first; i < ranges[0].second; ++i) {
+        work(sd, i);
+    }
+    for (auto& th : threads) {
+        th.join();
+    }
+    return ranges;
+}
+
+// Copies one candidate slot's design variables + evaluation results from
+// `src` to `dst` (used to merge a worker lane's results back into the
+// master after RunOnLanes joins).
+void CopyCandidateSlot(StructureData& dst, const StructureData& src, int slot) {
+    dst.fitstr[slot] = src.fitstr[slot];
+    dst.kendalastr[slot] = src.kendalastr[slot];
+    dst.hargastr[slot] = src.hargastr[slot];
+    for (int b = 0; b < dst.jum_balok; ++b) {
+        for (int j = 0; j < 12; ++j) {
+            dst.var_b[slot][j + 12 * b] = src.var_b[slot][j + 12 * b];
+        }
+    }
+    for (int k = 0; k < dst.jum_kolom; ++k) {
+        for (int j = 0; j < 5; ++j) {
+            dst.var_k[slot][j + 5 * k] = src.var_k[slot][j + 5 * k];
+        }
+    }
+}
+
+// Parallel version of `for (iop = lo; iop < hi; ++iop) EvaluateCandidateFull(sd, iop);`.
+void EvaluatePopulationParallel(StructureData& sd, std::vector<StructureData>& workers, int lo, int hi) {
+    if (workers.empty() || hi - lo <= 1) {
+        for (int iop = lo; iop < hi; ++iop) {
+            EvaluateCandidateFull(sd, iop);
+        }
+        return;
+    }
+
+    for (auto& w : workers) {
+        w = sd; // full sync: problem definition + current population state
+    }
+
+    auto ranges =
+        RunOnLanes(sd, workers, hi - lo, [lo](StructureData& local, int i) { EvaluateCandidateFull(local, lo + i); });
+
+    // ranges[0] was computed by `sd` itself -- nothing to merge for it.
+    for (size_t lane = 1; lane < ranges.size(); ++lane) {
+        const StructureData& local = workers[lane - 1];
+        for (int i = ranges[lane].first; i < ranges[lane].second; ++i) {
+            CopyCandidateSlot(sd, local, lo + i);
+        }
+    }
+}
+
+// Parallel version of cari_baru()'s trial-search loop (Baru.hpp): each
+// `iterasi_var` in [0, TrialCount(sd)) is evaluated independently (see
+// EvaluateTrial's comment), so this partitions that range across lanes and
+// reduces each lane's local best into the global fitcb_best/
+// var_b_cb_best/var_k_cb_best -- this is the "heavy iteration" loop that
+// dominates wall-clock time (it runs every generation, potentially many
+// trials each), unlike the population evaluation above which only runs
+// once (generation 0) plus a single extra candidate per later generation.
+// Copies *only* what a worker's EvaluateTrial() calls actually read beyond
+// what was already fixed for the whole run at worker-pool creation time
+// (geometry/loads/discrete tables/nvb/nvk/JVD/JSTD/jum_balok/jum_kolom --
+// none of which change generation to generation): this generation's search
+// direction (TM/TS/arah/no_TS_terjauh, all JVD-sized) and var_b_jelek/
+// var_k_jelek (from which each worker locally re-derives varnew_asli, one
+// cheap JVD-sized loop, rather than also syncing varnew_asli itself).
+//
+// Deliberately *not* a full `dst = src` struct copy: that was measured to
+// cost far more than the trial-search work it was protecting for datasets
+// where TrialCount() is small (every field on StructureData, including the
+// large mak*mak scratch matrices no trial actually needs synced -- each
+// worker fully overwrites its own SFF/SM/SMRT/AM/etc. from scratch inside
+// Inersia()/Struktur(), so their *previous* contents are irrelevant).
+void SyncSearchState(StructureData& dst, const StructureData& src) {
+    for (int i = 0; i < src.JVD; ++i) {
+        dst.TM[i] = src.TM[i];
+        dst.TS[i] = src.TS[i];
+        dst.arah[i] = src.arah[i];
+    }
+    dst.no_TS_terjauh = src.no_TS_terjauh;
+    for (int b = 0; b < src.jum_balok; ++b) {
+        for (int j = 0; j < 12; ++j) {
+            dst.var_b_jelek[j + 12 * b] = src.var_b_jelek[j + 12 * b];
+        }
+    }
+    for (int k = 0; k < src.jum_kolom; ++k) {
+        for (int j = 0; j < 5; ++j) {
+            dst.var_k_jelek[j + 5 * k] = src.var_k_jelek[j + 5 * k];
+        }
+    }
+    dst.fitcb_best = 0.f;
+}
+
+// Below this many trials per worker lane, thread-spawn + sync overhead
+// isn't worth paying even with the cheap targeted sync above -- fall back
+// to the sequential path (identical result either way).
+constexpr int kMinTrialsPerWorker = 8;
+
+void CariBaruParallel(StructureData& sd, std::vector<StructureData>& workers) {
+    int n_trials = TrialCount(sd);
+    int n_lanes = 1 + static_cast<int>(workers.size());
+
+    if (workers.empty() || n_trials < n_lanes * kMinTrialsPerWorker) {
+        CariBaru(sd); // identical result, no threading overhead worth paying
+        return;
+    }
+
+    sd.iterasi_var = 0;
+    NormalisasiInt(sd, sd.varnew_asli, sd.var_b_jelek, sd.var_k_jelek);
+    sd.fitcb_best = 0.f;
+
+    for (auto& w : workers) {
+        SyncSearchState(w, sd);
+        NormalisasiInt(w, w.varnew_asli, w.var_b_jelek, w.var_k_jelek);
+    }
+
+    // Each lane tracks its own local best directly on its StructureData
+    // (fitcb_best/var_b_cb_best/var_k_cb_best, already zeroed by the sync
+    // above), exactly like the sequential path -- no shared mutable state
+    // touched during dispatch.
+    RunOnLanes(sd, workers, n_trials, [](StructureData& local, int iterasi_var) {
+        local.iterasi_var = iterasi_var;
+        TrialResult result = EvaluateTrial(local, iterasi_var);
+        if (result.valid && result.fitcb > local.fitcb_best) {
+            local.fitcb_best = result.fitcb;
+            for (int icb = 0; icb < local.jum_balok; ++icb) {
+                for (int jcb = 0; jcb < 12; ++jcb) {
+                    local.var_b_cb_best[jcb + 12 * icb] = local.var_b_cb[jcb + 12 * icb];
+                }
+            }
+            for (int icb = 0; icb < local.jum_kolom; ++icb) {
+                for (int jcb = 0; jcb < 5; ++jcb) {
+                    local.var_k_cb_best[jcb + 5 * icb] = local.var_k_cb[jcb + 5 * icb];
+                }
+            }
+        }
+    });
+
+    // Reduce: lane 0 is `sd` itself (already holds its own local best);
+    // fold in each worker's local best if it beats the running one.
+    auto fold_in = [&sd](const StructureData& local) {
+        if (local.fitcb_best > sd.fitcb_best) {
+            sd.fitcb_best = local.fitcb_best;
+            for (int icb = 0; icb < sd.jum_balok; ++icb) {
+                for (int jcb = 0; jcb < 12; ++jcb) {
+                    sd.var_b_cb_best[jcb + 12 * icb] = local.var_b_cb_best[jcb + 12 * icb];
+                }
+            }
+            for (int icb = 0; icb < sd.jum_kolom; ++icb) {
+                for (int jcb = 0; jcb < 5; ++jcb) {
+                    sd.var_k_cb_best[jcb + 5 * icb] = local.var_k_cb_best[jcb + 5 * icb];
+                }
+            }
+        }
+    };
+    for (auto& w : workers) {
+        fold_in(w);
+    }
+
+    sd.iterasi_var = n_trials;
 }
 
 void GantiBaru(StructureData& sd) {
@@ -505,14 +749,21 @@ void PrepareOptimization(StructureData& sd, const OptimizationOptions& options) 
 
 void RunOptimization(StructureData& sd, const OptimizationOptions& options, const ProgressCallback& on_progress,
                       const DetailLogCallback& on_detail, const std::atomic<bool>* cancel) {
-    (void)options; // worker_threads is issue #4's scope; single-threaded here (see Optimizer.h).
-
-    Rng rng(std::random_device{}());
+    Rng rng(options.rng_seed != 0 ? options.rng_seed : std::random_device{}());
     AcakVariabel(sd, rng);
 
-    for (int iop = 0; iop < sd.JSTD; ++iop) {
-        EvaluateCandidateFull(sd, iop);
+    // `workers` holds worker_threads-1 extra StructureData clones; `sd`
+    // itself is always lane 0. Created once (not per-generation) since a
+    // clone already contains the full population -- see EvaluatePopulation/
+    // CariBaruParallel's "full sync" comments for why a per-generation
+    // *sync* (cheap, ~10-15MB memcpy-equivalent) is still needed even
+    // though the clones themselves are created just this once.
+    std::vector<StructureData> workers;
+    if (options.worker_threads > 1) {
+        workers.assign(options.worker_threads - 1, sd);
     }
+
+    EvaluatePopulationParallel(sd, workers, 0, sd.JSTD);
     Sort(sd, sd.JSTD);
     if (on_detail) {
         on_detail(0, sd);
@@ -525,7 +776,7 @@ void RunOptimization(StructureData& sd, const OptimizationOptions& options, cons
 
     do {
         Penelusuran(sd);
-        CariBaru(sd);
+        CariBaruParallel(sd, workers);
 
         if (sd.fitcb_best > sd.fitstr[0]) {
             sd.jum_susut = 0;
