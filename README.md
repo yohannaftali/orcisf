@@ -56,10 +56,11 @@ orcisf/
 └── Optimasi Beton/         # the original 1998-1999 thesis deliverable
     ├── BacaSaya.txt                 # original Indonesian user manual
     ├── orcisf.exe / cw3230.dll      # compiled Win32 console binary + runtime
-    ├── Optimasi Struktur Beton.doc  # condensed paper/summary (2006)
+    ├── Optimasi Struktur Beton.doc  # (2006) — empty, no recoverable content
     ├── Source/                      # Borland C++ 5.02 source code
     ├── Example/                     # sample input/output datasets
     └── Teori/                       # full thesis manuscript (Indonesian, .doc/.pdf)
+        └── latex/                   # LaTeX transcription of the thesis (see AGENTS.md)
 ```
 
 See [`AGENTS.md`](AGENTS.md) for the full breakdown of the source modules, the
@@ -105,6 +106,12 @@ The full thesis manuscript (Indonesian, legacy MS Word `.doc` format) is under
 - `Lampiran/` — 38 appendices, largely source-code listings and result tables.
 - `Optimasi Polyhedron.pdf` / `Optimasi Polyhedron Naftali.pdf` — condensed
   PDF summaries of the optimization method.
+- `latex/` — a LaTeX transcription of the thesis (title page through
+  bibliography), built by extracting the `.doc` text and reconstructing
+  formulas that were embedded as MathType objects by cross-referencing the
+  C++ source. `latex/main.pdf` is the compiled result;
+  `latex/LEGACY_TRANSCRIPTION_NOTES.md` documents exactly what's verbatim
+  vs. reconstructed vs. unrecoverable (figures).
 
 ## License
 

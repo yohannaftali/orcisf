@@ -1,0 +1,340 @@
+\chapter{VALIDASI DAN APLIKASI PROGRAM OPTIMASI}
+\label{bab:validasi}
+
+\section{Validasi Program Optimasi}
+
+Dalam melakukan validasi program optimasi, digunakan hasil perhitungan
+beton bertulang pada struktur portal yang dikerjakan oleh Ir. Harsoyo
+dalam bukunya berjudul Gedung Bertingkat II (Harsoyo, 1976), seri bina
+bangunan konstruksi beton bertulang. Geometri bangunan yang dimodelkan
+sebagai struktur portal bidang digambarkan dalam gambar 4-1.
+
+\gambarhilang{Geometri struktur portal bidang menurut Harsoyo (1976) yang
+dipakai sebagai kasus validasi.}{Geometri Struktur Portal Bidang}
+
+Langkah pertama dalam analisa struktur setelah memodelkan struktur adalah
+melakukan penomoran titik dan batang, dalam kasus ini terdapat 16 titik
+kumpul dan 21 batang yang terdiri dari 12 kolom dan 9 balok. Penomoran
+titik dan batang dapat dilihat dalam gambar 4-2.
+
+\gambarhilang{Penomoran titik kumpul (1--16) dan batang (1--21, terdiri
+dari 12 kolom dan 9 balok) pada struktur portal bidang validasi.}{Penomoran Titik Kumpul dan Batang Portal Bidang}
+
+Beban yang bekerja pada struktur portal bidang tersebut berupa beban
+merata pada balok dan beban akibat tekanan angin pada titik 5, 9, 13 ke
+arah $-x$, besarnya beban merata pada batang diperlihatkan dalam tabel
+4-1. Sedangkan besarnya beban akibat tekanan angin diperlihatkan dalam
+tabel 4-2.
+
+\begin{table}[htbp]
+\centering
+\caption{Beban Merata Pada Struktur Portal Bidang}
+\label{tab:4-1}
+\begin{tabular}{cccc}
+\toprule
+Nomor Batang & Beban Merata Total (t/m) & Berat Sendiri (t/m) & Beban Luar (t/m) \\
+\midrule
+13 & 4,100 & 0,360 & 3,740 \\
+14 & 3,491 & 0,360 & 3,131 \\
+15 & 4,100 & 0,360 & 3,740 \\
+16 & 4,100 & 0,360 & 3,740 \\
+17 & 3,491 & 0,360 & 3,131 \\
+18 & 4,100 & 0,360 & 3,740 \\
+19 & 1,762 & 0,300 & 1,462 \\
+20 & 1,447 & 0,300 & 1,147 \\
+21 & 1,762 & 0,300 & 1,462 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Beban Tekanan Angin}
+\label{tab:4-2}
+\begin{tabular}{cc}
+\toprule
+Nomor Titik & Beban Tekanan Angin (kg) \\
+\midrule
+5  & 400 \\
+9  & 800 \\
+13 & 800 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Dalam tugas akhir ini struktur portal bidang pada gambar 4-1 dioptimasi
+dengan program optimasi beton bertulang pada struktur portal ruang, dan
+hasil optimasinya dibandingkan dengan hasil yang telah dikerjakan oleh
+Ir. Harsoyo D. (1976), semua data masukan dapat dilihat dalam lampiran
+24, dengan menggunakan mutu beton 17,5 MPa dan mutu baja tulangan 240
+MPa, tekuk pada kolom dianalisa. Perbandingan hasil akhir variabel desain
+antara hasil yang dikerjakan oleh Ir. Harsoyo dan hasil optimasi program
+optimasi beton bertulang pada struktur portal ruang disajikan pada tabel
+4-3.
+
+\begin{landscape}
+\begingroup
+\footnotesize
+\begin{longtable}{clcccc}
+\caption{Perbandingan Volume Beton dan Berat Besi}
+\label{tab:4-3}\\
+\toprule
+\textbf{Batang} & \textbf{Variabel Desain} & \multicolumn{2}{c}{\textbf{Harsoyo (1976)}} & \multicolumn{2}{c}{\textbf{Naftali (1999)}} \\
+\midrule
+\endfirsthead
+\multicolumn{6}{c}{\textit{(lanjutan Tabel 4-3)}}\\
+\toprule
+\textbf{Batang} & \textbf{Variabel Desain} & \multicolumn{2}{c}{\textbf{Harsoyo (1976)}} & \multicolumn{2}{c}{\textbf{Naftali (1999)}} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\bottomrule
+\endlastfoot
+1 & Lebar / Tinggi & \multicolumn{2}{c}{0,30 m / 0,75 m} & \multicolumn{2}{c}{0,41 m / 0,41 m} \\
+  & Volume beton & \multicolumn{2}{c}{0,9 m$^3$} & \multicolumn{2}{c}{0,6724 m$^3$} \\
+  & Tulangan utama & \multicolumn{2}{c}{$10\phi25/4\phi16$ (187,929 kg)} & \multicolumn{2}{c}{$8\phi25$ (136,8158 kg)} \\
+  & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--150} & \multicolumn{2}{c}{$\phi12$--300} \\
+2 & Lebar / Tinggi & \multicolumn{2}{c}{0,30 m / 0,75 m} & \multicolumn{2}{c}{0,41 m / 0,41 m} \\
+  & Volume beton & \multicolumn{2}{c}{0,9 m$^3$} & \multicolumn{2}{c}{0,6724 m$^3$} \\
+  & Tulangan utama & \multicolumn{2}{c}{$10\phi25/4\phi16$ (187,929 kg)} & \multicolumn{2}{c}{$8\phi22$ (109,0117 kg)} \\
+  & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--150} & \multicolumn{2}{c}{$\phi12$--300} \\
+3 & Lebar / Tinggi & \multicolumn{2}{c}{0,30 m / 0,75 m} & \multicolumn{2}{c}{0,40 m / 0,40 m} \\
+  & Volume beton & \multicolumn{2}{c}{0,9 m$^3$} & \multicolumn{2}{c}{0,64 m$^3$} \\
+  & Tulangan utama & \multicolumn{2}{c}{$10\phi25/4\phi16$ (187,929 kg)} & \multicolumn{2}{c}{$8\phi22$ (101,2778 kg)} \\
+  & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--150} & \multicolumn{2}{c}{$\phi8$--300} \\
+4 & Lebar / Tinggi & \multicolumn{2}{c}{0,30 m / 0,75 m} & \multicolumn{2}{c}{0,43 m / 0,43 m} \\
+  & Volume beton & \multicolumn{2}{c}{0,9 m$^3$} & \multicolumn{2}{c}{0,7396 m$^3$} \\
+  & Tulangan utama & \multicolumn{2}{c}{$10\phi25/4\phi16$ (187,929 kg)} & \multicolumn{2}{c}{$8\phi19$ (85,6326 kg)} \\
+  & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--150} & \multicolumn{2}{c}{$\phi12$--300} \\
+5 & Lebar / Tinggi & \multicolumn{2}{c}{0,30 m / 0,60 m} & \multicolumn{2}{c}{0,44 m / 0,44 m} \\
+  & Volume beton & \multicolumn{2}{c}{0,72 m$^3$} & \multicolumn{2}{c}{0,7744 m$^3$} \\
+  & Tulangan utama & \multicolumn{2}{c}{$10\phi22/4\phi16$ (137,3734 kg)} & \multicolumn{2}{c}{$8\phi20$ (93,7609 kg)} \\
+  & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--180} & \multicolumn{2}{c}{$\phi12$--300} \\
+6 & Lebar / Tinggi & \multicolumn{2}{c}{0,30 m / 0,60 m} & \multicolumn{2}{c}{0,44 m / 0,44 m} \\
+  & Volume beton & \multicolumn{2}{c}{0,72 m$^3$} & \multicolumn{2}{c}{0,7744 m$^3$} \\
+  & Tulangan utama & \multicolumn{2}{c}{$8\phi22/4\phi16$ (113,0698 kg)} & \multicolumn{2}{c}{$8\phi19$ (77,8014 kg)} \\
+  & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--180} & \multicolumn{2}{c}{$\phi8$--300} \\
+7 & Lebar / Tinggi & \multicolumn{2}{c}{0,30 m / 0,60 m} & \multicolumn{2}{c}{0,42 m / 0,42 m} \\
+  & Volume beton & \multicolumn{2}{c}{0,72 m$^3$} & \multicolumn{2}{c}{0,7056 m$^3$} \\
+  & Tulangan utama & \multicolumn{2}{c}{$8\phi22/4\phi16$ (113,0698 kg)} & \multicolumn{2}{c}{$8\phi19$ (85,1948 kg)} \\
+  & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--180} & \multicolumn{2}{c}{$\phi12$--300} \\
+8 & Lebar / Tinggi & \multicolumn{2}{c}{0,30 m / 0,60 m} & \multicolumn{2}{c}{0,42 m / 0,42 m} \\
+  & Volume beton & \multicolumn{2}{c}{0,72 m$^3$} & \multicolumn{2}{c}{0,7056 m$^3$} \\
+  & Tulangan utama & \multicolumn{2}{c}{$10\phi22/4\phi16$ (137,3734 kg)} & \multicolumn{2}{c}{$8\phi22$ (109,4494 kg)} \\
+  & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--180} & \multicolumn{2}{c}{$\phi12$--300} \\
+9 & Lebar / Tinggi & \multicolumn{2}{c}{0,30 m / 0,60 m} & \multicolumn{2}{c}{0,41 m / 0,41 m} \\
+  & Volume beton & \multicolumn{2}{c}{0,72 m$^3$} & \multicolumn{2}{c}{0,6724 m$^3$} \\
+  & Tulangan utama & \multicolumn{2}{c}{$6\phi22/4\phi16$ (88,73483 kg)} & \multicolumn{2}{c}{$8\phi20$ (92,4476 kg)} \\
+  & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--180} & \multicolumn{2}{c}{$\phi12$--300} \\
+10 & Lebar / Tinggi & \multicolumn{2}{c}{0,30 m / 0,60 m} & \multicolumn{2}{c}{0,45 m / 0,45 m} \\
+   & Volume beton & \multicolumn{2}{c}{0,72 m$^3$} & \multicolumn{2}{c}{0,81 m$^3$} \\
+   & Tulangan utama & \multicolumn{2}{c}{$6\phi22/4\phi16$ (88,73483 kg)} & \multicolumn{2}{c}{$8\phi29$ (86,5081 kg)} \\
+   & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--180} & \multicolumn{2}{c}{$\phi12$--300} \\
+11 & Lebar / Tinggi & \multicolumn{2}{c}{0,30 m / 0,60 m} & \multicolumn{2}{c}{0,46 m / 0,46 m} \\
+   & Volume beton & \multicolumn{2}{c}{0,72 m$^3$} & \multicolumn{2}{c}{0,8464 m$^3$} \\
+   & Tulangan utama & \multicolumn{2}{c}{$6\phi22/4\phi16$ (88,73483 kg)} & \multicolumn{2}{c}{$8\phi28$ (161,6033 kg)} \\
+   & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--180} & \multicolumn{2}{c}{$\phi8$--300} \\
+12 & Lebar / Tinggi & \multicolumn{2}{c}{0,30 m / 0,60 m} & \multicolumn{2}{c}{0,44 m / 0,44 m} \\
+   & Volume beton & \multicolumn{2}{c}{0,72 m$^3$} & \multicolumn{2}{c}{0,7744 m$^3$} \\
+   & Tulangan utama & \multicolumn{2}{c}{$6\phi22/4\phi16$ (88,73483 kg)} & \multicolumn{2}{c}{$4\phi25$ (76,5066 kg)} \\
+   & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--180} & \multicolumn{2}{c}{$\phi12$--300} \\
+13 & Lebar / Tinggi & \multicolumn{2}{c}{0,25 m / 0,65 m} & \multicolumn{2}{c}{0,33 m / 0,57 m} \\
+   & Volume beton & \multicolumn{2}{c}{0,975 m$^3$} & \multicolumn{2}{c}{1,1286 m$^3$} \\
+   & Tulangan utama & \multicolumn{2}{c}{$3\phi25/3\phi25/2\phi25/4\phi25/3\phi25/3\phi25$ (228,126 kg)} & \multicolumn{2}{c}{$2\phi25/3\phi28/3\phi25/2\phi22/2\phi25/3\phi28$ (212,9059 kg)} \\
+   & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--100} & \multicolumn{2}{c}{$\phi12$--130} \\
+14 & Lebar / Tinggi & \multicolumn{2}{c}{0,25 m / 0,65 m} & \multicolumn{2}{c}{0,33 m / 0,52 m} \\
+   & Volume beton & \multicolumn{2}{c}{0,65 m$^3$} & \multicolumn{2}{c}{0,6864 m$^3$} \\
+   & Tulangan utama & \multicolumn{2}{c}{$3\phi25/3\phi25/3\phi25/2\phi25/3\phi25/3\phi25$ (143,9139 kg)} & \multicolumn{2}{c}{$2\phi22/3\phi22/3\phi25/3\phi20/2\phi22/3\phi22$ (111,5333 kg)} \\
+   & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--100} & \multicolumn{2}{c}{$\phi12$--150} \\
+15 & Lebar / Tinggi & \multicolumn{2}{c}{0,25 m / 0,65 m} & \multicolumn{2}{c}{0,34 m / 0,55 m} \\
+   & Volume beton & \multicolumn{2}{c}{0,975 m$^3$} & \multicolumn{2}{c}{1,122 m$^3$} \\
+   & Tulangan utama & \multicolumn{2}{c}{$3\phi25/3\phi25/2\phi25/4\phi25/3\phi25/3\phi25$ (228,126 kg)} & \multicolumn{2}{c}{$2\phi22/3\phi28/3\phi22/2\phi22/2\phi22/3\phi28$ (190,1989 kg)} \\
+   & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--100} & \multicolumn{2}{c}{$\phi12$--140} \\
+16 & Lebar / Tinggi & \multicolumn{2}{c}{0,25 m / 0,65 m} & \multicolumn{2}{c}{0,31 m / 0,55 m} \\
+   & Volume beton & \multicolumn{2}{c}{0,975 m$^3$} & \multicolumn{2}{c}{1,023 m$^3$} \\
+   & Tulangan utama & \multicolumn{2}{c}{$3\phi25/3\phi25/2\phi25/4\phi25/3\phi25/3\phi25$ (228,126 kg)} & \multicolumn{2}{c}{$2\phi28/3\phi28/3\phi25/2\phi28/2\phi28/3\phi28$ (225,0688 kg)} \\
+   & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--100} & \multicolumn{2}{c}{$\phi12$--130} \\
+17 & Lebar / Tinggi & \multicolumn{2}{c}{0,25 m / 0,65 m} & \multicolumn{2}{c}{0,33 m / 0,52 m} \\
+   & Volume beton & \multicolumn{2}{c}{0,65 m$^3$} & \multicolumn{2}{c}{0,6864 m$^3$} \\
+   & Tulangan utama & \multicolumn{2}{c}{$3\phi25/3\phi25/3\phi25/2\phi25/3\phi25/3\phi25$ (143,9139 kg)} & \multicolumn{2}{c}{$2\phi25/3\phi25/3\phi20/2\phi25/2\phi25/3\phi25$ (111,4915 kg)} \\
+   & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--100} & \multicolumn{2}{c}{$\phi12$--170} \\
+18 & Lebar / Tinggi & \multicolumn{2}{c}{0,25 m / 0,65 m} & \multicolumn{2}{c}{0,34 m / 0,54 m} \\
+   & Volume beton & \multicolumn{2}{c}{0,975 m$^3$} & \multicolumn{2}{c}{1,1016 m$^3$} \\
+   & Tulangan utama & \multicolumn{2}{c}{$3\phi25/3\phi25/2\phi25/4\phi25/3\phi25/3\phi25$ (228,126 kg)} & \multicolumn{2}{c}{$2\phi20/3\phi28/3\phi22/2\phi25/2\phi20/3\phi28$ (191,4206 kg)} \\
+   & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--100} & \multicolumn{2}{c}{$\phi12$--140} \\
+19 & Lebar / Tinggi & \multicolumn{2}{c}{0,25 m / 0,50 m} & \multicolumn{2}{c}{0,33 m / 0,49 m} \\
+   & Volume beton & \multicolumn{2}{c}{0,75 m$^3$} & \multicolumn{2}{c}{0,9702 m$^3$} \\
+   & Tulangan utama & \multicolumn{2}{c}{$3\phi19/4\phi19/2\phi19/4\phi19/3\phi19/4\phi19$ (179,4247 kg)} & \multicolumn{2}{c}{$2\phi25/3\phi28/3\phi22/2\phi19/2\phi25/3\phi28$ (172,2049 kg)} \\
+   & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--100} & \multicolumn{2}{c}{$\phi12$--160} \\
+20 & Lebar / Tinggi & \multicolumn{2}{c}{0,25 m / 0,50 m} & \multicolumn{2}{c}{0,33 m / 0,49 m} \\
+   & Volume beton & \multicolumn{2}{c}{0,5 m$^3$} & \multicolumn{2}{c}{0,6468 m$^3$} \\
+   & Tulangan utama & \multicolumn{2}{c}{$3\phi19/2\phi19/3\phi19/2\phi19/3\phi19/2\phi19$ (91,3503 kg)} & \multicolumn{2}{c}{$2\phi22/3\phi22/3\phi25/2\phi28/2\phi22/3\phi22$ (110,299 kg)} \\
+   & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--100} & \multicolumn{2}{c}{$\phi12$--180} \\
+21 & Lebar / Tinggi & \multicolumn{2}{c}{0,25 m / 0,50 m} & \multicolumn{2}{c}{0,33 m / 0,51 m} \\
+   & Volume beton & \multicolumn{2}{c}{0,75 m$^3$} & \multicolumn{2}{c}{1,0098 m$^3$} \\
+   & Tulangan utama & \multicolumn{2}{c}{$3\phi19/4\phi19/2\phi19/4\phi19/3\phi19/4\phi19$ (179,4247 kg)} & \multicolumn{2}{c}{$2\phi22/3\phi20/3\phi25/2\phi19/2\phi22/3\phi20$ (151,9952 kg)} \\
+   & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--100} & \multicolumn{2}{c}{$\phi12$--170} \\
+\midrule
+\multicolumn{2}{l}{\textbf{Total Volume Beton}} & \multicolumn{2}{c}{\textbf{16,56 m$^3$}} & \multicolumn{2}{c}{\textbf{17,1624 m$^3$}} \\
+\multicolumn{2}{l}{\textbf{Total Berat Besi}} & \multicolumn{2}{c}{\textbf{3113,5654 kg}} & \multicolumn{2}{c}{\textbf{2693,1281 kg}} \\
+\end{longtable}
+\endgroup
+\end{landscape}
+
+Selanjutnya dengan menetapkan harga satuan beton Rp.\ 250.000,00/m$^3$ dan
+harga satuan besi Rp.\ 5.000,00/kg dapat dihitung harga struktur secara
+keseluruhan seperti yang diperlihatkan dalam tabel 4-4, dalam hal ini
+harga beton dan harga besi tersebut sudah termasuk biaya pemasangan
+seperti upah pekerja, kawat pengikat dan papan acuan (\textit{form
+work}).
+
+Dari tabel 4-4 ternyata harga struktur secara keseluruhan dapat dikurangi
+sebesar Rp.\ 1.951.587,00 atau sebesar 9,9~\% dengan melakukan optimasi.
+Proses optimasi menggunakan 168 variabel desain dan 171 struktur desain
+sebagai titik coba. Waktu proses optimasi yang diperlukan adalah 117
+detik menggunakan komputer dengan prosesor Pentium Celeron 333 MHz dan
+RAM 64 MB.
+
+\begin{table}[htbp]
+\centering
+\caption{Perbandingan Harga Struktur}
+\label{tab:4-4}
+\begin{tabular}{lccccc}
+\toprule
+Material & Harga Satuan (Rp.) & \multicolumn{2}{c}{Harsoyo (1976)} & \multicolumn{2}{c}{Naftali (1999)} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+ & & Pemakaian & Harga (Rp.) & Pemakaian & Harga (Rp.) \\
+\midrule
+Beton & 250.000,00/m$^3$ & 16,56 m$^3$ & 4.140.000 & 17,1624 m$^3$ & 4.290.600 \\
+Baja  & 5.000,00/kg      & 3113,5654 kg & 15.567.827 & 2693,1281 kg & 13.465.640 \\
+\midrule
+\textbf{Total} & & & \textbf{19.707.827} & & \textbf{17.756.240} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Aplikasi Program Optimasi}
+
+Suatu struktur portal ruang seperti pada gambar 4-3 terbuat dari beton
+bertulang memiliki data struktur sebagai berikut:
+\begin{enumerate}[label=\arabic*.]
+\item Jumlah batang 8 buah, terdiri dari 4 buah balok dan ditopang oleh 4
+      buah kolom.
+\item Tumpuan jepit pada titik kumpul 1, 2, 3, 4.
+\item Kuat desak karakteristik beton = 30 MPa.
+\item Kuat tarik baja tulangan memanjang = 400 MPa.
+\item Kuat tarik baja tulangan sengkang = 240 MPa.
+\item Selimut beton pada balok = 50 mm.
+\item Selimut beton pada kolom = 50 mm.
+\item Beban merata sebesar 35 kN/m pada semua balok.
+\item Variabel desain yang digunakan terdapat pada lampiran.
+\item Faktor penalti diambil $1\times10^{10}$.
+\item Jumlah struktur desain sebagai titik coba diambil sama dengan
+      jumlah variabel desain $+\,3$, jumlah variabel desain $\times\,2$
+      dan jumlah variabel desain $\times\,3$.
+\end{enumerate}
+
+\gambarhilang{Geometri struktur portal ruang untuk kasus aplikasi
+program.}{Geometri Struktur Portal Ruang}
+
+Penomoran titik kumpul (\textit{joint}) dan penomoran elemen batang
+diperlihatkan pada gambar 4-4, pada gambar 4-4 juga diperlihatkan
+pembebanan pada struktur.
+
+\gambarhilang{Penomoran titik kumpul dan elemen batang, serta pembebanan,
+pada struktur portal ruang kasus aplikasi.}{Penomoran Titik dan Batang Portal Ruang}
+
+Program dijalankan sebanyak 15 kali dengan 3 variasi jumlah struktur
+desain, yaitu jumlah variabel desain $+\,3$, jumlah variabel desain
+$\times\,2$, jumlah variabel desain $\times\,3$, masing-masing sebanyak
+5 kali, dengan menggunakan komputer dengan prosesor Pentium Celeron
+333 MHz dan RAM 64 MB, hasil optimasi disajikan dalam bentuk grafik pada
+gambar 4-5.
+
+\gambarhilang{Sumbu tegak: nilai fitness; sumbu datar: jumlah struktur
+desain sebagai titik coba (tiga variasi: $JVD+3$, $JVD\times2$,
+$JVD\times3$, masing-masing 5 pengulangan).}{Grafik Perbandingan Nilai Fitness}
+
+Grafik pada gambar 4-5 menunjukkan bahwa semakin banyak struktur desain
+yang digunakan, nilai fitness yang dicapai semakin tinggi, hal ini
+berarti untuk mendapatkan hasil yang makin optimal dibutuhkan jumlah
+struktur desain yang makin banyak, akan tetapi dengan bertambahnya jumlah
+struktur desain, waktu yang dibutuhkan untuk proses optimasi juga
+semakin banyak. Grafik perbandingan waktu proses optimasi yang
+dibutuhkan oleh masing-masing penambahan jumlah variabel desain
+ditunjukkan dalam grafik yang terdapat pada gambar 4-6.
+
+\gambarhilang{Sumbu tegak: waktu proses optimasi (detik); sumbu datar:
+jumlah struktur desain sebagai titik coba.}{Grafik Perbandingan Lama Proses Optimasi}
+
+Hasil terbaik untuk kasus portal ruang pada gambar 4-3 dengan nilai
+fitness $1174{,}59$ memerlukan waktu proses optimasi sebesar 74 detik.
+Fungsi sasarannya yaitu harga struktur, dengan mengambil harga beton
+Rp.\ 250.000,00/m$^3$ dan harga besi Rp.\ 5.000,00/kg adalah sebesar
+Rp.\ 8.535.430,00, hasilnya ditunjukkan pada tabel 4-5, sedangkan
+perhitungan rincian harga terdapat pada tabel 4-6.
+
+\begingroup
+\footnotesize
+\begin{longtable}{clcc}
+\caption{Dimensi Struktur Portal Ruang Hasil Optimasi}
+\label{tab:4-5}\\
+\toprule
+\textbf{Batang} & \textbf{Variabel Desain} & \multicolumn{2}{c}{\textbf{Penggunaan Material}} \\
+\midrule
+\endfirsthead
+\multicolumn{4}{c}{\textit{(lanjutan Tabel 4-5)}}\\
+\toprule
+\textbf{Batang} & \textbf{Variabel Desain} & \multicolumn{2}{c}{\textbf{Penggunaan Material}} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\bottomrule
+\endlastfoot
+1 & Lebar / Tinggi & \multicolumn{2}{c}{0,45 m / 0,45 m (1,0125 m$^3$)} \\
+  & Tulangan utama & \multicolumn{2}{c}{$8\phi19$ (102,4988 kg)} \\
+  & Tulangan sengkang & \multicolumn{2}{c}{$\phi10$--300} \\
+2 & Lebar / Tinggi & \multicolumn{2}{c}{0,50 m / 0,50 m (1,25 m$^3$)} \\
+  & Tulangan utama & \multicolumn{2}{c}{$8\phi22$ (134,7477 kg)} \\
+  & Tulangan sengkang & \multicolumn{2}{c}{$\phi10$--300} \\
+3 & Lebar / Tinggi & \multicolumn{2}{c}{0,50 m / 0,50 m (1,25 m$^3$)} \\
+  & Tulangan utama & \multicolumn{2}{c}{$8\phi28$ (208,6947 kg)} \\
+  & Tulangan sengkang & \multicolumn{2}{c}{$\phi10$--300} \\
+4 & Lebar / Tinggi & \multicolumn{2}{c}{0,45 m / 0,45 m (1,0125 m$^3$)} \\
+  & Tulangan utama & \multicolumn{2}{c}{$8\phi22$ (127,9512 kg)} \\
+  & Tulangan sengkang & \multicolumn{2}{c}{$\phi8$--300} \\
+5 & Lebar / Tinggi & \multicolumn{2}{c}{0,25 m / 0,60 m (0,9 m$^3$)} \\
+  & Tulangan utama & \multicolumn{2}{c}{$4\phi25/3\phi19/4\phi19/3\phi19/4\phi25/3\phi19$ (164,686 kg)} \\
+  & Tulangan sengkang & \multicolumn{2}{c}{$\phi10$--160} \\
+6 & Lebar / Tinggi & \multicolumn{2}{c}{0,30 m / 0,60 m (1,08 m$^3$)} \\
+  & Tulangan utama & \multicolumn{2}{c}{$2\phi25/4\phi22/4\phi22/3\phi29/2\phi25/4\phi22$ (195,3126 kg)} \\
+  & Tulangan sengkang & \multicolumn{2}{c}{$\phi10$--160} \\
+7 & Lebar / Tinggi & \multicolumn{2}{c}{0,35 m / 0,50 m (1,05 m$^3$)} \\
+  & Tulangan utama & \multicolumn{2}{c}{$2\phi19/3\phi25/4\phi28/2\phi22/2\phi19/3\phi25$ (171,1133 kg)} \\
+  & Tulangan sengkang & \multicolumn{2}{c}{$\phi10$--160} \\
+8 & Lebar / Tinggi & \multicolumn{2}{c}{0,30 m / 0,60 m (1,08 m$^3$)} \\
+  & Tulangan utama & \multicolumn{2}{c}{$2\phi28/2\phi22/2\phi28/3\phi29/2\phi28/2\phi22$ (170,3307 kg)} \\
+  & Tulangan sengkang & \multicolumn{2}{c}{$\phi10$--180} \\
+\midrule
+\multicolumn{2}{l}{\textbf{Total Volume Beton}} & \multicolumn{2}{c}{\textbf{8,635 m$^3$}} \\
+\multicolumn{2}{l}{\textbf{Total Berat Besi}} & \multicolumn{2}{c}{\textbf{1275,336 kg}} \\
+\end{longtable}
+\endgroup
+
+\begin{table}[htbp]
+\centering
+\caption{Rincian Harga Struktur Portal Ruang}
+\label{tab:4-6}
+\begin{tabular}{lccc}
+\toprule
+Material & Harga Satuan (Rp.) & Pemakaian Material & Harga (Rp.) \\
+\midrule
+Beton & 250.000,00/m$^3$ & 8,635 m$^3$   & 2.158.750 \\
+Baja  & 5.000,00/kg      & 1275,336 kg   & 6.376.680 \\
+\midrule
+\textbf{Total} & & & \textbf{8.535.430} \\
+\bottomrule
+\end{tabular}
+\end{table}

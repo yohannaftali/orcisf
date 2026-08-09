@@ -71,7 +71,7 @@ orcisf/
     ├── BacaSaya.txt                 # original Indonesian README / user manual
     ├── orcisf.exe / orcisf.ico      # compiled Win32 console binary + icon
     ├── cw3230.dll                   # Borland C++ runtime DLL required by the .exe
-    ├── Optimasi Struktur Beton.doc  # condensed paper/summary (2006)
+    ├── Optimasi Struktur Beton.doc  # (2006) — EMPTY, see note below
     ├── Source/                      # Borland C++ 5.02 source (see below)
     ├── Example/                     # sample input/output datasets (see below)
     └── Teori/                       # full thesis manuscript, Indonesian, *.doc/pdf
@@ -79,8 +79,32 @@ orcisf/
         ├── Daftar/                  # table of contents, list of figures/tables/refs
         ├── Isi/                     # BAB I–V chapters + Intisari (abstract) + Proposal
         ├── Lampiran/                # 38 appendices (mostly source-code listings)
-        └── *.pdf                    # "Optimasi Polyhedron[.Naftali].pdf" summaries
+        ├── *.pdf                    # "Optimasi Polyhedron[.Naftali].pdf" summaries
+        └── latex/                   # LaTeX transcription of the thesis — see below
 ```
+
+> **`Optimasi Struktur Beton.doc` has no recoverable content.** Verified by
+> both `antiword` and a manual parse of the Word binary FIB/piece-table
+> structure (`ccpText = 1`, i.e. only the trailing paragraph mark; no
+> embedded objects or images either) — this is not a guess. Despite the
+> filename, don't treat it as a "condensed paper" source; the real thesis
+> text lives in `Teori/Isi/*.doc`.
+
+### `Teori/latex/` — LaTeX transcription of the thesis
+
+A LaTeX build of the actual thesis manuscript (`Teori/Isi/BAB I.doc`
+through `BAB V.doc`, `Intisari.doc`, `Cover/*.doc`, `Daftar/*.doc`),
+produced by extracting text with `antiword` and reconstructing the
+formulas that were embedded as MathType/Equation Editor OLE objects (not
+plain text) by cross-referencing the surrounding prose against the actual
+C++ implementation in `Source/*.hpp`. **Read
+[`Teori/latex/LEGACY_TRANSCRIPTION_NOTES.md`](Optimasi%20Beton/Teori/latex/LEGACY_TRANSCRIPTION_NOTES.md)
+before trusting or extending any specific number/formula in it** — it
+documents exactly what was verbatim, what was reconstructed (and how), and
+what could not be recovered at all (figures, the Tabel 2-1 stiffness
+matrix image — reconstructed from the cited Weaver & Gere reference
+instead). `main.tex` compiles cleanly with Tectonic 0.17.0 (`main.pdf` is
+checked in); no `babel`/Indonesian language-pack dependency.
 
 ### `src/` (reserved, empty)
 

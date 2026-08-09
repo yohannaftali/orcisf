@@ -1,0 +1,472 @@
+\chapter{OPTIMASI BETON BERTULANG PADA STRUKTUR PORTAL RUANG}
+\label{bab:optimasi}
+
+\begin{quote}
+\small\itshape
+Catatan transkripsi: persamaan kendala \eqref{eq:3-1}--\eqref{eq:3-14} pada
+bab ini juga aslinya berupa objek \textit{Equation Native} (MathType).
+Bentuk persis setiap persamaan di bawah ini disusun ulang dengan mencocokkan
+teks naratif (yang menyebut nama variabel setiap kendala secara eksplisit)
+terhadap implementasi C++ yang mengimplementasikannya persis
+(\texttt{balok::analisa()}, \texttt{balok::sengkang\_balok()},
+\texttt{lendutan()} pada \texttt{Balok.hpp}; \texttt{kolom::rho()},
+\texttt{kolom::analisa()}, \texttt{kolom::jarak\_tulangan()},
+\texttt{kolom::kelangsingan()}, \texttt{kolom::sengkang\_kolom()} pada
+\texttt{Kolom.hpp}), sehingga isi matematisnya terjamin sama dengan yang
+benar-benar dihitung oleh program, walaupun nomor urut persamaan yang
+persis seperti naskah asli tidak dapat dipastikan 100\%.
+\end{quote}
+
+\section{Struktur Program}
+
+Program optimasi beton bertulang pada struktur portal ruang ini ditulis
+dengan menggunakan bahasa pemrograman C++. Kode Program ini ditulis pada
+beberapa file yaitu file utama yang berekstensi \texttt{cpp}, dan file
+pembantu berekstensi \texttt{hpp}. Di dalam file yang berekstensi
+\texttt{cpp} terdapat suatu fungsi bernama \texttt{main()}, fungsi ini akan
+dijalankan pertama kali oleh program, selanjutnya dari dalam fungsi ini
+akan dipanggil fungsi-fungsi lainnya sehingga membentuk suatu program yang
+utuh.
+
+Struktur program optimasi beton bertulang pada struktur portal ruang ini
+merupakan gabungan dari pemrograman terstruktur dan pemrograman
+berorientasi obyek.
+
+Pemrograman terstruktur memiliki kelebihan dalam pengorganisasian dalam
+membuat kode-kode program sehingga mudah dibaca dan mudah untuk dipahami,
+gagasan pemrograman terstruktur pertama kali dikemukakan oleh Profesor
+Edsger W. Dijkstra dari University of Eindhoven Nederland pada tahun 1965
+(Sutedjo dan Michael, 1997, halaman 1). Dalam tulisannya, beliau menyatakan
+bahwa pernyataan GOTO seharusnya jangan dipergunakan, namun pernyataan ini
+ditanggapi oleh HD. Mills yang beranggapan bahwa pemrograman terstruktur
+tidak hanya dihubungkan dengan pernyataan GOTO saja, tetapi pada struktur
+program itu sendiri yang menentukan apakah program tersebut terstruktur
+atau tidak, baik menggunakan pernyataan GOTO maupun tidak.
+
+Pemrograman berorientasi obyek diciptakan karena masih dirasakan adanya
+keterbatasan pada bahasa pemrograman tradisional, konsep pemrograman
+berorientasi obyek yaitu membagi masalah-masalah ke dalam obyek, sehingga
+data dan fungsi-fungsi yang akan dioperasikan digabung menjadi satu
+kesatuan disebut pengkapsulan (\textit{encapsulated}).
+
+Dalam bidang ilmu teknik, pemrograman terstruktur lebih banyak digunakan
+karena rumitnya masalah yang dikerjakan dan memerlukan kemudahan
+pemeriksaan (\textit{debugging}), dalam program ini struktur program utama
+menggunakan konsep pemrograman terstruktur, sedangkan konsep pemrograman
+berorientasi obyek digunakan pada analisis balok dan analisis kolom. Kelas
+balok dan kelas kolom akan dibangkitkan apabila diperlukan analisa balok
+atau analisa kolom dan apabila tidak diperlukan lagi kelas-kelas itu
+dihancurkan, sehingga penggunaan kelas ini dapat menghemat memori komputer.
+
+File yang terdapat pada program optimasi beton bertulang pada struktur
+portal ruang adalah:
+\begin{description}[style=nextline]
+\item[\texttt{ORCISF.CPP}] merupakan file yang memuat fungsi \texttt{main()}.
+\item[\texttt{BORLANDC.HPP}] file yang memuat header pustaka yang dibuat oleh Borland.
+\item[\texttt{HEADER.HPP}] berisi kumpulan header.
+\item[\texttt{PROTO.HPP}] berisi prototipe program.
+\item[\texttt{VARIABEL.HPP}] berisi deklarasi variabel global.
+\item[\texttt{INOUT.HPP}] berisi kumpulan sub program penanganan masalah masukan dan keluaran.
+\item[\texttt{STRUKTUR.HPP}] berisi kumpulan sub program analisa struktur dengan metoda kekakuan.
+\item[\texttt{SOLVER.HPP}] berisi sub program pembantu penanganan matrik.
+\item[\texttt{KOLOM.HPP}] berisi kelas kolom untuk analisa kolom biaksial bertulangan simetri.
+\item[\texttt{BALOK.HPP}] berisi kelas balok untuk analisa balok persegi bertulangan rangkap.
+\item[\texttt{ELEMEN.HPP}] berisi kumpulan sub program yang menangani elemen pada balok dan kolom.
+\item[\texttt{POLYHEDRON.HPP}] berisi sub program untuk optimasi dengan menggunakan metoda polihedron fleksibel.
+\item[\texttt{PENORMALAN.HPP}] berisi kumpulan sub program yang menangani perubahan variabel balok dan kolom menjadi variabel normal.
+\item[\texttt{PENGACAKAN.HPP}] berisi sub program yang mengacak nilai variabel.
+\item[\texttt{DISKRITISASI.HPP}] berisi kumpulan sub program yang merubah nilai kontinu menjadi diskrit.
+\item[\texttt{KENDALA.HPP}] berisi sub program untuk menghitung besarnya kendala yang terjadi pada struktur.
+\item[\texttt{TELUSUR.HPP}] berisi sub program untuk melakukan penelusuran variabel.
+\item[\texttt{BARU.HPP}] berisi sub program untuk menentukan struktur baru dalam metoda optimasi.
+\item[\texttt{PENGURUTAN.HPP}] berisi sub program untuk mengurutkan fitness struktur.
+\item[\texttt{TAMPILAN.HPP}] berisi sub program yang menangani masalah tampilan.
+\item[\texttt{CETAK.HPP}] berisi sub program yang menangani masalah pencetakan hasil akhir.
+\end{description}
+
+\section{Sub Program Masukan dan Keluaran}
+
+\subsection{Sub Program Untuk Menampilkan Menu Utama}
+
+Pada saat program dijalankan pertama kali akan muncul sebuah menu yang
+berisi pilihan untuk menjalankan program, menu utama program optimasi
+beton bertulang pada struktur portal ruang seperti diperlihatkan pada
+gambar 3-1.
+
+\begin{center}
+\fbox{\parbox{0.85\textwidth}{\footnotesize\ttfamily\raggedright\noindent
+*************************************************************************\\
+\hphantom{x}      Program Optimasi Beton Bertulang Pada Struktur Portal Ruang\\
+\hphantom{xxxxxxxxxxxxxxxxxxxxxxxxx}Oleh : Yohan Naftali\\
+\hphantom{xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}7712/TS\\
+*************************************************************************\\
+\hphantom{xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}Time : 23:09:48.10\\
+\hphantom{x} 1. Input data awal ke file\\
+\hphantom{x} 2. Input data beban ke file\\
+\hphantom{x} 3. Melihat isi file input\\
+\hphantom{x} 4. Mengoptimasi Struktur\\
+\hphantom{x} 5. Keluar\\
+\hphantom{x} Pilihan (1-5) = \_
+}}
+\captionof{figure}{Menu Utama Program (tangkapan layar konsol asli, direproduksi sebagai teks)}
+\end{center}
+
+Pilihan yang terdapat pada menu utama terdiri dari:
+\begin{enumerate}[label=\arabic*.]
+\item Input data awal ke file, untuk memasukkan data tentang informasi struktur.
+\item Input data beban ke file, untuk memasukkan data beban yang bekerja pada struktur.
+\item Melihat isi file input, untuk menampilkan data yang telah dimasukkan.
+\item Mengoptimasi struktur, untuk memulai proses optimasi beton bertulang pada struktur portal ruang.
+\item Keluar, untuk menghentikan program.
+\end{enumerate}
+Fungsi-fungsi yang digunakan untuk menampilkan menu utama yang terdapat
+pada file \texttt{TAMPILAN.HPP} terdiri dari:
+\begin{enumerate}[label=\arabic*.]
+\item \texttt{void menu\_utama()}, fungsi ini dipanggil dari fungsi
+      \texttt{void main()}, selanjutnya dari fungsi ini dipanggil
+      fungsi-fungsi lainnya.
+\item \texttt{void about()}, fungsi ini dipanggil untuk menampilkan
+      informasi program pada layar.
+\end{enumerate}
+
+\subsection{Sub Program Memasukkan Data}
+
+Untuk melakukan proses pemasukkan data (\textit{input}), dapat dilakukan
+dengan dua cara yaitu:
+\begin{enumerate}[label=\arabic*.]
+\item Mengikuti panduan yang disediakan oleh program.
+\item Mengedit teks ASCII dengan bantuan MS-DOS Editor atau Notepad.
+\end{enumerate}
+Memasukkan data melalui panduan program, maka pertama kali akan diminta
+nama file generik (tanpa ekstensi), nama file ini digunakan program untuk
+memberi nama file-file bentukan lainnya. Selanjutnya program meminta
+data-data struktur, mengedit teks ASCII dengan bantuan ASCII editor lebih
+mudah digunakan untuk mengedit data masukan yang telah ada.
+
+Sebelum memulai pemasukan data ke komputer, maka data-data struktur harus
+kita persiapkan terlebih dahulu supaya mempermudah proses pemasukan data,
+data-data struktur yang perlu kita persiapkan adalah:
+\begin{enumerate}[label=\arabic*.]
+\item Nama struktur
+\item Jumlah batang pada struktur
+\item Jumlah titik kumpul
+\item Jumlah pengekang tumpuan pada struktur
+\item Jumlah titik kumpul yang dikekang
+\item Koordinat titik kumpul
+\item Alokasi elemen batang pada struktur
+\item Pengekang titik kumpul
+\item Kuat desak beton karakteristik
+\item Kuat tarik tulangan utama
+\item Kuat tarik tulangan sengkang
+\item Beban yang mengenai struktur
+\item Data lebar dan tinggi balok
+\item Data sisi penampang kolom
+\item Data diameter tulangan utama
+\item Data diameter tulangan sengkang
+\item Data jumlah tulangan
+\item Data jarak antara tulangan sengkang
+\end{enumerate}
+Setelah data kita masukkan ke dalam komputer, selanjutnya diperiksa lagi
+data yang telah kita masukkan untuk memastikan bahwa data yang telah
+dimasukkan sudah benar, apabila ada kesalahan, maka data masukan dapat
+dikoreksi dengan mengedit file masukan.
+
+Struktur file masukan pada program optimasi beton bertulang pada struktur
+rangka ini adalah:
+\begin{enumerate}[label=\arabic*.]
+\item Data umum struktur terdapat pada file \texttt{generik.inp}
+\item Data beban yang bekerja pada struktur terdapat pada file \texttt{generik.bbn}
+\item Data diskrit mengenai ukuran penampang batang terdapat pada file \texttt{generik.isd}
+\item Data diskrit mengenai diameter tulangan utama terdapat pada file \texttt{generik.idl}
+\item Data diskrit mengenai diameter tulangan sengkang terdapat pada file \texttt{generik.ids}
+\item Data diskrit mengenai jumlah tulangan utama pada salah satu penampang terdapat pada file \texttt{generik.ijl}
+\item Data diskrit mengenai jarak antara tulangan sengkang terdapat pada file \texttt{generik.ijs}
+\end{enumerate}
+Fungsi-fungsi yang digunakan dalam proses masukan adalah:
+\begin{enumerate}[label=\arabic*.]
+\item \texttt{void input\_data()}, terdapat pada file \texttt{INOUT.HPP}, untuk menampilkan menu masukan
+\item \texttt{void input\_data\_umum()}, terdapat pada file \texttt{INOUT.HPP}, untuk memasukkan data umum struktur ke file
+\item \texttt{void input\_data\_diskrit()}, terdapat pada file \texttt{INOUT.HPP}, untuk memasukkan data elemen batang
+\item \texttt{void load\_data()}, terdapat pada file \texttt{PEMBEBANAN.HPP}, untuk memasukkan data beban yang bekerja pada struktur
+\end{enumerate}
+
+\subsection{Sub Program Untuk Membaca Data Masukan}
+
+Setelah data masukan diproses oleh komputer, dan diletakkan ke dalam
+file-file masukan, maka untuk dapat dilakukan proses optimasi maka data
+masukan tersebut perlu dibaca ulang, fungsi-fungsi yang digunakan untuk
+melakukan proses ini adalah:
+\begin{enumerate}[label=\arabic*.]
+\item \texttt{void baca\_data()}, terdapat pada file \texttt{INOUT.HPP}, untuk membaca data masukan
+\item \texttt{void baca\_beban()}, terdapat pada file \texttt{PEMBEBANAN.HPP}, untuk membaca data pembebanan.
+\end{enumerate}
+
+\section{Sub Program Inti}
+
+\subsection{Sub Program Analisa Struktur}
+
+Untuk menganalisa struktur portal ruang digunakan metoda kekakuan yang
+dikembangkan oleh Weaver dan Gere (1980). Secara umum proses dalam
+analisa struktur adalah sebagai berikut:
+\begin{enumerate}[label=\arabic*.]
+\item Pembentukan matrik rotasi
+\item Pembentukan matrik kekakuan batang
+\item Pembentukan vektor beban
+\item Perhitungan perpindahan pada titik kumpul
+\item Perhitungan gaya dan reaksi pada struktur
+\end{enumerate}
+Sub program analisa struktur terdapat pada file \texttt{STRUKTUR.HPP},
+\texttt{PEMBEBANAN.HPP}, dan \texttt{SOLVER.HPP}. File \texttt{STRUKTUR.HPP}
+berisi fungsi-fungsi untuk membentuk matrik rotasi, pembentukan matrik
+kekakuan batang, perhitungan perpindahan, dan perhitungan gaya dan reaksi
+pada struktur. Fungsi untuk membentuk vektor beban terdapat pada file
+\texttt{PEMBEBANAN.HPP}, sedangkan file \texttt{SOLVER.HPP} terdapat
+fungsi \texttt{void banfac()}, yang digunakan untuk melakukan faktorisasi
+matrik simetris berjalur dengan pendekatan Choleski yang dimodifikasi, dan
+terdapat pula fungsi \texttt{void bansol()}, yang digunakan untuk
+mengolah matrik berjalur.
+
+\subsection{Sub Program Analisa Balok Persegi Panjang}
+
+Sub program analisa balok persegi panjang terdapat pada file
+\texttt{BALOK.HPP}. Dalam file \texttt{BALOK.HPP} terdapat sebuah kelas
+yang bernama \texttt{class balok}. Kelas ini dibangkitkan untuk menghitung
+kendala yang terdapat pada setiap balok pada struktur.
+
+Persamaan perhitungan kendala-kendala balok yang terdapat pada kelas
+balok adalah:
+
+\begin{enumerate}[label=\arabic*.]
+\item \textbf{Kendala rasio tulangan maksimum}
+\begin{equation}
+\mathit{kendala\_rho\_b} = \max\!\left(\frac{\rho}{\rho_b} - 1,\; 0\right)
+\label{eq:3-1}
+\end{equation}
+pada persamaan di atas $\rho$ (\texttt{RHO}) adalah rasio penulangan,
+$\mathit{kendala\_rho\_b}$ adalah kendala rasio tulangan maksimum yang
+dibatasi oleh $\rho_b$ (\texttt{RHB}) yaitu rasio penulangan pada keadaan
+luluh dikalikan $0{,}75$ (persamaan \eqref{eq:2-21}--\eqref{eq:2-22}).
+
+\item \textbf{Kendala rasio penulangan minimum}
+\begin{equation}
+\mathit{kendala\_rho\_m} = \max\!\left(\frac{\rho_{min}}{\rho} - 1,\; 0\right),
+\qquad \rho_{min} = \frac{1{,}4}{f_y}
+\label{eq:3-2}
+\end{equation}
+pada persamaan di atas $\mathit{kendala\_rho\_m}$ adalah kendala rasio
+penulangan minimum, $\rho_{min}$ (\texttt{RMIN}) adalah rasio penulangan
+minimum.
+
+\item \textbf{Kendala momen lentur}
+\begin{equation}
+\mathit{kendala\_M} = \max\!\left(\frac{M_u}{\phi M_n} - 1,\; 0\right)
+\label{eq:3-3}
+\end{equation}
+pada persamaan di atas $\mathit{kendala\_M}$ merupakan kendala momen
+lentur, $M_u$ adalah momen yang bekerja pada struktur, $\phi M_n$
+(\texttt{FMU}) adalah momen yang dapat ditahan oleh balok (persamaan
+\eqref{eq:2-16}/\eqref{eq:2-20}).
+
+\item \textbf{Kendala lendutan}
+\begin{equation}
+\mathit{kendala\_lendutan} = \max\!\left(\frac{\mathit{Lendutan}}{\mathit{Lendutan}_{ijin}} - 1,\; 0\right)
+\label{eq:3-4}
+\end{equation}
+pada persamaan di atas $\mathit{kendala\_lendutan}$ adalah kendala
+lendutan, $\mathit{Lendutan}$ adalah lendutan yang terjadi,
+$\mathit{Lendutan}_{ijin}$ adalah lendutan ijin maksimum (dihitung
+menurut SK SNI T-15-1991-03 pasal 3.2.5, fungsi \texttt{lendutan()} pada
+\texttt{Balok.hpp}).
+
+\item \textbf{Kendala tulangan geser}
+\begin{equation}
+\mathit{kendala\_sb} = \max\!\left(\frac{Jarak\_S}{S_{maks}} - 1,\; 0\right)
+\label{eq:3-5}
+\end{equation}
+pada persamaan di atas $\mathit{kendala\_sb}$ adalah kendala tulangan
+geser, $Jarak\_S$ adalah jarak sengkang, $S_{maks}$ (\texttt{SmakS})
+adalah jarak antar sengkang maksimum.
+\end{enumerate}
+
+\subsection{Sub Program Analisa Kolom Biaksial}
+
+Sub program analisa kolom biaksial terdapat pada file \texttt{KOLOM.HPP}.
+Dalam file \texttt{KOLOM.HPP} terdapat sebuah kelas yang bernama
+\texttt{class kolom}. Kelas ini dibangkitkan untuk menghitung kendala
+yang terdapat pada setiap kolom pada struktur.
+
+Persamaan perhitungan kendala-kendala kolom yang terdapat pada kelas
+kolom adalah:
+
+\begin{enumerate}[label=\arabic*.]
+\item \textbf{Kendala rasio tulangan maksimum}
+\begin{equation}
+\mathit{kendala\_r\_mak} = \max\!\left(\frac{\rho}{0{,}08} - 1,\; 0\right)
+\label{eq:3-6}
+\end{equation}
+pada persamaan di atas $\rho$ (\texttt{RHO}) adalah rasio penulangan,
+$\mathit{kendala\_r\_mak}$ adalah kendala rasio tulangan maksimum yang
+dibatasi $0{,}08$ ($8\,\%$).
+
+\item \textbf{Kendala rasio penulangan minimum}
+\begin{equation}
+\mathit{kendala\_r\_min} = \max\!\left(\frac{0{,}01}{\rho} - 1,\; 0\right)
+\label{eq:3-7}
+\end{equation}
+pada persamaan di atas $\mathit{kendala\_r\_min}$ adalah kendala rasio
+penulangan minimum yang dibatasi sebesar $0{,}01$ ($1\,\%$).
+
+\item \textbf{Kendala gaya aksial minimum}
+\begin{equation}
+\mathit{kendala\_po} = \max\!\left(\frac{P_n}{P_o} - 1,\; 0\right),
+\qquad P_o = \phi\left(0{,}85 f_c' \,\mathit{sisi}^2 + AS_{tot} f_y\right)
+\label{eq:3-8}
+\end{equation}
+pada persamaan di atas $\mathit{kendala\_po}$ merupakan kendala gaya
+aksial minimum atau disebut juga kendala eksentrisitas minimum, $P_n$
+merupakan gaya aksial nominal dan $P_o$ merupakan batas gaya aksial yang
+dapat dipikul oleh kolom dikalikan faktor reduksi kekuatan untuk kolom
+berpengikat sengkang yaitu $0{,}8$.
+
+\item \textbf{Kendala gaya aksial}
+\begin{equation}
+\mathit{kendala\_pn} = \max\!\left(\frac{P_n}{P_{n,coba}} - 1,\; 0\right)
+\label{eq:3-9}
+\end{equation}
+pada persamaan di atas $\mathit{kendala\_pn}$ adalah kendala gaya aksial
+nominal, $P_n$ merupakan gaya aksial nominal yang terjadi pada struktur,
+$P_{n,coba}$ adalah gaya aksial yang mampu didukung oleh kolom,
+$P_{n,coba}$ dicari bersama-sama $M_{n,coba}$ berdasarkan eksentrisitas
+yang terjadi pada kolom dengan metoda \textit{false position} untuk
+menentukan letak garis netral (fungsi \texttt{kolom::hitung\_kolom()} pada
+\texttt{Kolom.hpp}).
+
+\item \textbf{Kendala momen ekivalen biaksial}\\
+Untuk $M_{nx} > M_{ny}$ digunakan persamaan:
+\begin{equation}
+\mathit{kendala\_mn} = \max\!\left(\frac{M_{ox}}{M_{n,coba}} - 1,\; 0\right)
+\label{eq:3-11a}
+\end{equation}
+untuk $M_{nx} \le M_{ny}$ digunakan persamaan:
+\begin{equation}
+\mathit{kendala\_mn} = \max\!\left(\frac{M_{oy}}{M_{n,coba}} - 1,\; 0\right)
+\label{eq:3-11b}
+\end{equation}
+pada persamaan di atas $\mathit{kendala\_mn}$ merupakan kendala momen
+ekivalen biaksial, $M_{ox}$ merupakan momen ekivalen biaksial pada sumbu
+$X$, $M_{oy}$ merupakan momen ekivalen biaksial pada sumbu $Y$ (persamaan
+\eqref{eq:2-23}--\eqref{eq:2-24}), $M_{n,coba}$ merupakan momen nominal
+pada arah sumbu biaksial yang ditinjau.
+
+\item \textbf{Kendala jarak tulangan minimum}
+\begin{equation}
+\mathit{kendala\_tul} = \max\!\left(\frac{jarak_{min}}{\mathit{jarak\_antar\_tulangan}} - 1,\; 0\right)
+\label{eq:3-12}
+\end{equation}
+pada persamaan di atas $\mathit{kendala\_tul}$ adalah kendala jarak antara
+tulangan minimum, $jarak_{min}$ adalah jarak minimum yang diijinkan
+($\max(1{,}5\,dia,\,40\text{ mm})$ dibalik: yang diambil adalah nilai
+terkecil dari $1{,}5\,dia$ dan $40$ mm), $\mathit{jarak\_antar\_tulangan}$
+adalah jarak antara tulangan utama.
+
+\item \textbf{Kendala kelangsingan kolom}
+\begin{equation}
+\mathit{kendala\_kelangsingan} = \max\!\left(\frac{\mathit{rasio\_kelangsingan}}{22} - 1,\; 0\right),
+\qquad \mathit{rasio\_kelangsingan} = \frac{K L}{\mathit{sisi}\sqrt{1/12}}
+\label{eq:3-13}
+\end{equation}
+pada persamaan di atas $\mathit{kendala\_kelangsingan}$ merupakan kendala
+kelangsingan pada kolom, $\mathit{rasio\_kelangsingan}$ merupakan rasio
+kelangsingan pada kolom (dengan $K=0{,}5$), yang dibatasi minimal $22$
+sesuai SK SNI T-15-1991-03 ($KL/r \le 22$).
+\end{enumerate}
+
+\subsection{Sub Program Metoda Optimasi Polihedron Fleksibel}
+
+Untuk melakukan proses optimasi digunakan metoda polihedron fleksibel,
+prosedur umum yang digunakan dalam program optimasi beton bertulang pada
+struktur portal ruang dengan metoda polihedron fleksibel adalah:
+\begin{enumerate}[label=\arabic*.]
+\item Penentuan variabel untuk struktur generasi pertama, yang dilakukan
+      dengan pengacakan, dalam program optimasi beton bertulang pada
+      struktur portal ruang ini penentuan variabel terdapat pada file
+      \texttt{PENGACAKAN.HPP} dalam melakukan pengacakan, sebuah struktur
+      dipilih supaya menggunakan elemen yang paling besar nilainya
+      supaya dalam salah satu struktur tersebut ada yang tidak memiliki
+      kendala, hal ini dimaksudkan supaya dalam proses optimasi tidak
+      terjebak kepada optimal lokal yang berkendala.
+\item Pembangkitan generasi pertama, sesudah seluruh struktur
+      dibangkitkan, nilai fitness, kendala, harga, dan variabel desain
+      disimpan dalam array.
+\item Seluruh struktur pada generasi pertama diurutkan berdasarkan
+      fitnessnya, pengurutan ini terdapat pada file
+      \texttt{PENGURUTAN.HPP}, metoda pengurutan yang digunakan adalah
+      metoda \textit{Bubble Sort}, metoda ini berasal dari sifat
+      gelembung air yang semakin ringan akan menuju ke permukaan air.
+\item Penentuan arah baru untuk melakukan penelusuran, terdapat pada
+      file \texttt{TELUSUR.HPP}.
+\item Menggantikan struktur terjelek dengan struktur baru hasil
+      penelusuran yang memiliki fitness lebih baik, apabila dalam
+      penelusuran tidak ditemukan struktur yang lebih baik dari pada
+      struktur terjelek, maka dilakukan penyusutan menuju struktur
+      terbaik.
+\item Selanjutnya dilakukan lagi pengurutan fitness, proses ini
+      dilakukan berulang-ulang sampai pada suatu batas konvergensi.
+\end{enumerate}
+
+Formulasi untuk fungsi penalti yang digunakan dalam program optimasi
+beton bertulang pada struktur portal ruang adalah \textit{exterior
+penalty function}, proses penelusuran dimulai dari daerah tidak layak,
+yang kemudian secara bertahap menuju daerah layak. Formulasi fungsi
+penalti untuk menyelesaikan masalah meminimumkan $f(x)$ yang memenuhi
+kendala $g_j(x) \le 0$, $j=1,2,3,\ldots,n_g$ adalah:
+\begin{equation}
+\phi(x) = f(x) + r \sum_{j=1}^{n_g} \max\bigl(g_j(x),\,0\bigr)
+\label{eq:3-14}
+\end{equation}
+dalam persamaan di atas $\phi$ merupakan fungsi penalti, $f(x)$ merupakan
+fungsi sasaran yang berupa harga struktur yang formulasinya terdapat pada
+persamaan \eqref{eq:1-12}, $r$ parameter penalti, $n_g$ jumlah kendala,
+dan $g_j(x)$ persamaan kendala yang telah dihitung dalam kelas balok dan
+kelas kolom (jumlah seluruh $\mathit{kendala\_*}$ dari persamaan
+\eqref{eq:3-1}--\eqref{eq:3-13}, dijumlahkan menjadi \texttt{kendala}
+pada konstruktor \texttt{balok()}/\texttt{kolom()}). Nilai fitness yang
+dipakai untuk mengurutkan struktur (\texttt{fitstr}, lihat
+\texttt{Kendala.hpp}/\texttt{Polyhedron.hpp}) dihitung sebagai
+$\mathit{finalti}/(\mathit{harga} + \mathit{finalti}\times\mathit{kendala})$,
+bentuk kebalikan dari fungsi penalti \eqref{eq:3-14} sehingga struktur
+termurah dan paling memenuhi kendala memberikan fitness tertinggi.
+
+Nilai $r$ harus cukup besar agar mampu mengarahkan proses penelusuran
+dekat dengan daerah layak, tetapi cukup kecil agar proses peminimuman
+tidak mengalami kesulitan.
+
+Dalam program optimasi beton bertulang pada struktur portal ruang
+konvergensi ditentukan sebagai berikut:
+\begin{enumerate}[label=\arabic*.]
+\item Jumlah iterasi melebihi batas yang telah ditentukan
+\item Terjadi penyusutan berturut yang menghasilkan fitness yang sama
+      sebanyak jumlah struktur desain
+\item Terdapat struktur berjumlah sama dengan jumlah variabel desain
+      yang memiliki nilai fitness sama.
+\end{enumerate}
+
+\subsection{Sub Program Mencetak Hasil Akhir Optimasi}
+
+Setelah suatu proses optimasi selesai, hasil optimasi berupa nilai-nilai
+variabel desain terbaik, harga, kendala dan hasil perhitungan struktur
+dicetak, sub program untuk mencetak hasil akhir tersebut ke dalam file
+adalah \texttt{void cetak\_akhir()} yang terdapat pada file
+\texttt{CETAK.HPP}.
+
+File-file hasil keluaran yang dicetak oleh program optimasi beton
+bertulang pada struktur portal ruang adalah:
+\begin{enumerate}[label=\arabic*.]
+\item \texttt{generik.opt} berisi dimensi balok dan kolom pada struktur
+      yang paling optimal.
+\item \texttt{generik.str} berisi hasil perhitungan gaya batang dengan
+      metoda kekakuan.
+\item \texttt{generik.kdl} berisi kendala yang terdapat pada struktur.
+\item \texttt{generik.inf} berisi informasi data masukan.
+\item \texttt{generik.his} berisi riwayat optimasi.
+\end{enumerate}

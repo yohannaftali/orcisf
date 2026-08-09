@@ -1,0 +1,41 @@
+% Tabel 2-1: Matriks Kekakuan Batang Portal Ruang
+%
+% The original "Tabel 2-1" was an embedded raster/vector image
+% (Isi/Tabel 2.doc contains only a single [pic] anchor, no extractable
+% text), so it could not be recovered from the .doc binary at all. The
+% matrix below is reconstructed from the standard 12x12 local-axis space
+% frame member stiffness matrix as published in Weaver, W. Jr. and Gere,
+% J.M., "Matrix Analysis of Framed Structures" (cited throughout this
+% chapter as the method's source), consistent with the degree-of-freedom
+% ordering (u,v,w,theta_x,theta_y,theta_z per end) used in Struktur.hpp /
+% Variabel.hpp (SM, SMRT arrays). VERIFY AGAINST THE ORIGINAL DOCUMENT
+% before relying on the exact sign convention for structural design.
+\begin{table}[htbp]
+\centering
+\caption{Matriks Kekakuan Batang Portal Ruang (direkonstruksi dari Weaver \& Gere, 1980)}
+\label{tab:2-1}
+\begin{align*}
+a&=\frac{EA}{L}, &
+t&=\frac{GJ}{L}\\
+b_z&=\frac{12EI_z}{L^3}, & c_z&=\frac{6EI_z}{L^2}, & d_z&=\frac{4EI_z}{L}, & e_z&=\frac{2EI_z}{L}\\
+b_y&=\frac{12EI_y}{L^3}, & c_y&=\frac{6EI_y}{L^2}, & d_y&=\frac{4EI_y}{L}, & e_y&=\frac{2EI_y}{L}
+\end{align*}
+\resizebox{\textwidth}{!}{$
+SM_i =
+\begin{array}{c|cccccccccccc}
+ & u_j & v_j & w_j & \theta_{xj} & \theta_{yj} & \theta_{zj} & u_k & v_k & w_k & \theta_{xk} & \theta_{yk} & \theta_{zk} \\ \hline
+u_j          &  a &    0 &    0 &  0 &    0 &    0 & -a &    0 &    0 &  0 &    0 &    0 \\
+v_j          &  0 &  b_z &    0 &  0 &    0 &  c_z &  0 & -b_z &    0 &  0 &    0 &  c_z \\
+w_j          &  0 &    0 &  b_y &  0 & -c_y &    0 &  0 &    0 & -b_y &  0 & -c_y &    0 \\
+\theta_{xj}  &  0 &    0 &    0 &  t &    0 &    0 &  0 &    0 &    0 & -t &    0 &    0 \\
+\theta_{yj}  &  0 &    0 & -c_y &  0 &  d_y &    0 &  0 &    0 &  c_y &  0 &  e_y &    0 \\
+\theta_{zj}  &  0 &  c_z &    0 &  0 &    0 &  d_z &  0 & -c_z &    0 &  0 &    0 &  e_z \\
+u_k          & -a &    0 &    0 &  0 &    0 &    0 &  a &    0 &    0 &  0 &    0 &    0 \\
+v_k          &  0 & -b_z &    0 &  0 &    0 & -c_z &  0 &  b_z &    0 &  0 &    0 & -c_z \\
+w_k          &  0 &    0 & -b_y &  0 &  c_y &    0 &  0 &    0 &  b_y &  0 &  c_y &    0 \\
+\theta_{xk}  &  0 &    0 &    0 & -t &    0 &    0 &  0 &    0 &    0 &  t &    0 &    0 \\
+\theta_{yk}  &  0 &    0 & -c_y &  0 &  e_y &    0 &  0 &    0 &  c_y &  0 &  d_y &    0 \\
+\theta_{zk}  &  0 &  c_z &    0 &  0 &    0 &  e_z &  0 & -c_z &    0 &  0 &    0 &  d_z
+\end{array}
+$}
+\end{table}

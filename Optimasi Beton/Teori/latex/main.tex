@@ -1,0 +1,126 @@
+% =============================================================================
+% OPTIMASI BETON BERTULANG PADA STRUKTUR PORTAL RUANG
+% Tugas Akhir Sarjana Strata Satu -- Yohan Naftali (07712/TSS), 1999
+% Universitas Atma Jaya Yogyakarta
+%
+% LaTeX transcription of "Optimasi Beton/Teori/*.doc" (legacy MS Word 97-2003
+% binary files). See LEGACY_TRANSCRIPTION_NOTES.md in this directory for the
+% transcription methodology, what was recovered verbatim, what was
+% reconstructed from the accompanying C++ source code, and what could not be
+% recovered at all (figures, scanned diagrams, the Tabel 2-1 matrix image).
+% =============================================================================
+\documentclass[12pt,a4paper]{report}
+
+% ---- Encoding / fonts ----
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{textcomp}
+
+% ---- Page layout (standard Indonesian thesis margins) ----
+\usepackage[a4paper,left=4cm,right=3cm,top=4cm,bottom=3cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% ---- Math / symbols ----
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+
+% ---- Tables / figures ----
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{multirow}
+\usepackage{rotating}
+\usepackage{pdflscape}
+
+% ---- Misc ----
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+
+% ---- Indonesian captions (no babel "bahasa" dependency assumed) ----
+\renewcommand{\contentsname}{DAFTAR ISI}
+\renewcommand{\listfigurename}{DAFTAR GAMBAR}
+\renewcommand{\listtablename}{DAFTAR TABEL}
+\renewcommand{\chaptername}{BAB}
+\renewcommand{\figurename}{Gambar}
+\renewcommand{\tablename}{Tabel}
+
+% ---- Chapter heading style: "BAB I" / "PENDAHULUAN" centered, like the original ----
+\titleformat{\chapter}[display]
+  {\centering\normalfont\bfseries}
+  {\chaptertitlename\ \Roman{chapter}}
+  {6pt}
+  {\Large}
+\titlespacing*{\chapter}{0pt}{0pt}{30pt}
+
+\titleformat{\section}{\normalfont\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalfont\bfseries}{\thesubsection}{1em}{}
+
+% ---- Header/footer ----
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+
+% ---- Placeholder box for figures/tables that were embedded images in the
+%      original .doc and could not be recovered from the binary format ----
+\newcommand{\gambarhilang}[2]{%
+  \begin{center}
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2cm}
+    \textit{[Gambar/citra asli tidak dapat dipulihkan dari berkas \texttt{.doc} --
+    sisipkan ulang dari sumber asli]}\\[0.5em]
+    \textbf{#1}\vspace{2cm}}}
+  \captionof{figure}{#2}
+  \end{center}
+}
+
+\begin{document}
+
+% =============================================================================
+% BAGIAN AWAL (FRONT MATTER) -- halaman diberi nomor angka Romawi kecil
+% =============================================================================
+\pagenumbering{roman}
+
+\input{depan/judul}
+\input{depan/pengesahan}
+\input{depan/motto}
+\input{depan/katahantar}
+
+\tableofcontents
+\clearpage
+\listoftables
+\clearpage
+\listoffigures
+\clearpage
+
+\input{depan/lambang}
+\input{depan/intisari}
+
+% =============================================================================
+% BAGIAN ISI (MAIN MATTER) -- halaman diberi nomor angka Arab, mulai dari BAB I
+% =============================================================================
+\clearpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\input{bab/bab1}
+\input{bab/bab2}
+\input{bab/bab3}
+\input{bab/bab4}
+\input{bab/bab5}
+
+\input{depan/pustaka}
+
+% Lampiran (appendices): the 38 appendices in Teori/Lampiran/ are mostly
+% verbatim source-code listings that already live, as real working code, in
+% Optimasi Beton/Source/*.hpp -- they are referenced here rather than
+% retranscribed. See LEGACY_TRANSCRIPTION_NOTES.md.
+
+\end{document}

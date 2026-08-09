@@ -1,0 +1,248 @@
+\chapter{PENDAHULUAN}
+\label{bab:pendahuluan}
+
+\section{Latar Belakang}
+
+Desain struktur merupakan salah satu bagian dari keseluruhan proses
+perencanaan bangunan. Proses desain dapat dibedakan menjadi dua tahap, tahap
+pertama yaitu desain umum yang merupakan peninjauan secara garis besar
+keputusan-keputusan desain, misalnya tata letak struktur, geometri atau
+bentuk bangunan, dan material, sedangkan tahap kedua adalah desain secara
+terinci yang antara lain meninjau tentang penentuan besar penampang balok
+dan kolom, luas dan penempatan tulangan yang dibutuhkan pada struktur beton
+bertulang dan sebagainya, untuk itu perlu dimodelkan struktur yang akan
+didesain sehingga dapat diperoleh besaran gaya dan informasi perpindahan
+yang diperlukan dalam menentukan luasan beton beserta penulangannya.
+
+Untuk memodelkan suatu struktur bangunan yang baik dapat dimodelkan sebagai
+portal ruang. Portal ruang merupakan suatu struktur yang pada tiap titiknya
+memiliki enam perpindahan yang mungkin terjadi, sehingga bukan lagi dua atau
+tiga seperti pada struktur rangka atau portal bidang.
+
+Dalam menentukan dimensi balok dan kolom pada struktur beton bertulang harus
+memperhatikan masalah kekuatan dan biaya, terutama pada saat ini dimana
+harga material semakin mahal, banyak orang yang menunda bahkan membatalkan
+proyeknya karena masalah biaya bahan bangunan yang mahal, oleh karena itu
+dalam merencanakan struktur bangunan sangat perlu diperhatikan masalah
+tersebut. Kekuatan yang dibutuhkan oleh suatu struktur beton bertulang dapat
+dicapai dengan memberikan luasan penampang beton dan tulangan yang cukup.
+Analisis perhitungan yang dilakukan diharapkan dapat memperoleh hasil yang
+aman dan ekonomis. Untuk mendapatkan hasil yang paling murah (optimal) dapat
+dicapai dengan menggunakan proses optimasi. Hasil yang didapat merupakan
+hasil yang mempunyai harga struktur yang paling murah tetapi tetap masih
+mampu mendukung beban struktur dengan aman.
+
+Metoda optimasi semakin berkembang seiring dengan perkembangan komputer.
+Dalam bidang teknik sipil, formulasi masalah optimasinya berupa formula
+tidak linear, oleh karena itu metoda optimasi yang berkembang dalam bidang
+teknik adalah metoda optimasi non-linear.
+
+Dalam menyelesaikan masalah optimasi non-linear, dapat diselesaikan dengan
+bantuan kalkulus yang memerlukan informasi turunan, hal ini dapat dilakukan
+apabila masalah yang ada belum begitu komplek, untuk masalah yang sangat
+komplek dikembangkan metoda yang idenya berasal dari alam, seperti metoda
+algoritma genetik yang berasal dari teori Darwin ``Survival to the
+fittest'', metoda \textit{simulated annealing} yang didasarkan pada proses
+mengerasnya logam, metoda \textit{flexible polyhedron} yang dalam prosesnya
+variabel desain akan membentuk suatu segi banyak yang makin lama semakin
+mengecil. Dari banyak metoda di atas, sampai saat ini belum ada metoda yang
+dapat digunakan untuk menyelesaikan segala kasus dengan memuaskan, karena
+masing-masing metoda memiliki keunggulan dan kerugiannya sendiri-sendiri.
+
+Oleh karena itu dalam tugas akhir ini, untuk melakukan optimasi beton
+bertulang pada struktur portal ruang digunakan metoda polihedron fleksibel.
+
+\section{Materi Tugas Akhir}
+
+\subsection{Rumusan Masalah}
+
+Proses optimasi adalah proses mencari nilai variabel desain yang memberikan
+nilai optimal yang berupa nilai maksimum ataupun nilai minimum dari fungsi
+sasaran tanpa melanggar kendala-kendala yang ada.
+
+Secara umum masalah optimasi dapat dirumuskan sebagai:
+\begin{equation}
+\text{minimumkan } f(x),\quad x \in X
+\label{eq:1-1}
+\end{equation}
+yang memenuhi kendala:
+\begin{align}
+g_j(x) &\leq 0, \quad j = 1,2,\ldots,n \label{eq:1-2}\\
+h_j(x) &= 0, \quad j = 1,2,\ldots,m \label{eq:1-3}
+\end{align}
+pada persamaan di atas $x$ menyatakan variabel desain, $X$ menyatakan ruang
+variabel desain, $f(x)$ adalah fungsi sasaran, $g(x)$ fungsi kendala
+pertaksamaan, $h(x)$ fungsi kendala persamaan, $n$ jumlah kendala
+pertaksamaan, $m$ jumlah kendala persamaan.
+
+Harga struktur yang minimum merupakan fungsi sasaran dalam optimasi ini,
+dengan variabel disainnya terdiri dari volume beton dan berat tulangan,
+dalam hal ini tulangan terdiri dari tulangan tarik dan desak untuk balok,
+tulangan geser untuk balok, tulangan kolom, tulangan geser untuk kolom.
+Kendala pertaksamaan yang harus dipenuhi berupa momen yang terjadi pada
+struktur harus lebih kecil atau sama dengan momen yang dapat didukung oleh
+masing-masing batang balok maupun kolom, gaya geser yang terjadi pada
+struktur harus lebih kecil atau sama dengan gaya geser yang didukung oleh
+beton dan tulangan geser pada masing-masing batang balok maupun kolom, gaya
+tekan maupun tarik yang terjadi harus lebih kecil atau sama dengan gaya
+tekan atau tarik yang didukung oleh kolom, serta lendutan yang terjadi harus
+lebih kecil atau sama dengan lendutan ijin.
+
+Optimasi beton bertulang pada struktur portal ruang ini dapat dirumuskan
+sebagai:
+
+\medskip\noindent
+\textbf{untuk balok}, minimumkan:
+\begingroup\footnotesize
+\begin{equation}
+\begin{aligned}
+f_1(&\mathit{lebar}, \mathit{tinggi}, \mathit{diatltrtm}, \mathit{ntltrtm}, \mathit{diatldstm}, \mathit{ntldstm},\\
+    &\mathit{diatltrlp}, \mathit{ntltrlp}, \mathit{diatldslp}, \mathit{ntldslp}, \mathit{diatlgs}, \mathit{jaraktlgs}) =\\[2pt]
+  &(\mathit{lebar} \times \mathit{tinggi} \times \mathit{panjang\ balok} \times \mathrm{Rp}(\text{harga beton})/\mathrm{m}^3)\\
+ +&\left(\tfrac14 \pi\, \mathit{diatltrtm}^2 \times \mathit{ntltrtm} \times 2 \times 0.25 \times \mathit{panjang\ balok} \times (\text{berat tulangan})_{\mathrm{kg/m}^3} \times \mathrm{Rp}(\text{harga tulangan})/\mathrm{kg}\right)\\
+ +&\left(\tfrac14 \pi\, \mathit{diatldstm}^2 \times \mathit{ntldstm} \times 2 \times 0.25 \times \mathit{panjang\ balok} \times (\text{berat tulangan})_{\mathrm{kg/m}^3} \times \mathrm{Rp}(\text{harga tulangan})/\mathrm{kg}\right)\\
+ +&\left(\tfrac14 \pi\, \mathit{diatltrlp}^2 \times \mathit{ntltrlp} \times 0.5 \times \mathit{panjang\ balok} \times (\text{berat tulangan})_{\mathrm{kg/m}^3} \times \mathrm{Rp}(\text{harga tulangan})/\mathrm{kg}\right)\\
+ +&\left(\tfrac14 \pi\, \mathit{diatldslp}^2 \times \mathit{ntldslp} \times 0.5 \times \mathit{panjang\ balok} \times (\text{berat tulangan})_{\mathrm{kg/m}^3} \times \mathrm{Rp}(\text{harga tulangan})/\mathrm{kg}\right)\\
+ +&\Big(\tfrac14 \pi\, \mathit{diatlgs}^2 \times \big(2(\mathit{lebar} - 2\,\mathit{selimut\ beton}) + 2(\mathit{tinggi} - 2\,\mathit{selimut\ beton})\big)\\
+   &\times (\mathit{panjang\ balok}/\mathit{jaraktlgs}) \times (\text{berat tulangan})_{\mathrm{kg/m}^3} \times \mathrm{Rp}(\text{harga tulangan})/\mathrm{kg}\Big)
+\end{aligned}
+\label{eq:1-4}
+\end{equation}
+\endgroup
+yang memenuhi kendala pertaksamaan:
+\begin{align}
+M_{\text{intern}} &\geq M_{\text{extern}} \label{eq:1-5}\\
+G_{\text{intern}} &\geq G_{\text{extern}} \label{eq:1-6}\\
+\mathit{Lendutan} &\leq \mathit{Lendutan}_{\text{ijin}} \label{eq:1-7}
+\end{align}
+pada persamaan di atas $f_1$ menyatakan harga balok pada struktur, $lebar$
+dan $tinggi$ menyatakan ukuran penampang balok. Variabel desainnya terdiri
+atas $diatltrtm$ menyatakan diameter tulangan tarik pada daerah tumpuan,
+$ntltrtm$ menyatakan jumlah tulangan tarik pada daerah tumpuan, $diatldstm$
+menyatakan diameter tulangan desak pada daerah tumpuan, $ntldstm$
+menyatakan jumlah tulangan desak pada daerah tumpuan, $diatltrlp$
+menyatakan diameter tulangan tarik pada daerah lapangan, $ntltrlp$
+menyatakan jumlah tulangan tarik pada daerah lapangan, $diatldslp$
+menyatakan diameter tulangan desak pada daerah lapangan, $ntldslp$
+menyatakan jumlah tulangan desak pada daerah lapangan, $diatlgs$ menyatakan
+diameter tulangan geser, $jaraktlgs$ menyatakan jarak antar tulangan geser.
+$M$ adalah momen dan $G$ adalah gaya geser.
+
+\medskip\noindent
+\textbf{untuk kolom}, minimumkan:
+\begingroup\footnotesize
+\begin{equation}
+\begin{aligned}
+f_2(B,H,dia,N,\mathit{diatlgskl},\mathit{jaraktlgskl}) =\;
+  &(B \times H \times \mathit{tinggi\ kolom} \times \mathrm{Rp}(\text{harga beton})/\mathrm{m}^3)\\
+ +&\left(\tfrac14 \pi\, dia^2 \times (4N-4) \times \mathit{tinggi\ kolom} \times (\text{berat tulangan})_{\mathrm{kg/m}^3} \times \mathrm{Rp}(\text{harga tulangan})/\mathrm{kg}\right)\\
+ +&\Big(\tfrac14 \pi\, \mathit{diatlgskl}^2 \times \big(2(B - \mathit{selimut\ beton}) + 2(H - \mathit{selimut\ beton})\big)\\
+   &\times (\mathit{tinggi\ kolom}/\mathit{jaraktlgskl}) \times (\text{berat tulangan})_{\mathrm{kg/m}^3} \times \mathrm{Rp}(\text{harga tulangan})/\mathrm{kg}\Big)
+\end{aligned}
+\label{eq:1-8}
+\end{equation}
+\endgroup
+yang memenuhi kendala persamaan:
+\begin{align}
+M_{\text{intern}} &\geq M_{\text{extern}} \label{eq:1-9}\\
+G_{\text{intern}} &\geq G_{\text{extern}} \label{eq:1-10}\\
+P_{\text{intern}} &\geq P_{\text{extern}} \label{eq:1-11}
+\end{align}
+pada persamaan di atas $f_2$ menyatakan harga kolom pada struktur, dengan
+variabel desain $B$ dan $H$ menyatakan ukuran penampang beton kolom, $dia$
+menyatakan diameter tulangan, $N$ merupakan jumlah tulangan yang digunakan,
+$diatlgskl$ merupakan diameter tulangan geser kolom, $jaraktlgskl$
+menyatakan jarak antara tulangan geser pada kolom. $M$ adalah momen, $G$
+adalah gaya geser, $P$ adalah gaya aksial pada kolom.
+
+Harga struktur portal seluruhnya dapat dihitung dengan
+\begin{equation}
+f = \sum_{b=1}^{nB} f_{1b} + \sum_{k=1}^{nK} f_{2k}
+\label{eq:1-12}
+\end{equation}
+pada persamaan di atas $f$ merupakan harga portal total, $f_{1b}$
+menyatakan harga balok $b$, $f_{2k}$ menyatakan harga kolom $k$, $nB$
+menyatakan jumlah balok, $nK$ menyatakan jumlah kolom.
+
+Untuk menyelesaikan masalah tersebut akan dibuat program komputer yang
+ditulis dalam bahasa pemrograman yang sudah banyak digunakan yaitu bahasa
+C++ dan menggunakan data diskrit serta menggunakan metoda optimasi
+polihedron fleksibel yang dapat digunakan untuk menangani masalah
+non-linear.
+
+\subsection{Batasan Masalah}
+
+Dalam melakukan optimasi beton bertulang pada struktur portal ruang ini
+perhitungan beton bertulang didasarkan pada peraturan yang berlaku di
+Indonesia yaitu Tata Cara Perhitungan Struktur Beton Untuk Bangunan Gedung
+SK SNI T-15-1991-03 (PU, 1991), sedangkan untuk melakukan perhitungan gaya
+pada struktur digunakan metoda kekakuan (Weaver, 1980). Mengingat luasnya
+permasalahan dan keterbatasan waktu, maka dalam tugas akhir ini diperlukan
+pembatasan masalah, yaitu:
+\begin{enumerate}[label=\alph*.]
+\item Analisa struktur portal ruang memakai metoda kekakuan
+\item Rigid-end offset diabaikan
+\item Beban yang bekerja pada struktur adalah beban gravitasi menerus
+\item Balok dan kolom berpenampang empat persegi panjang dan uniform
+      sepanjang bentangnya
+\item Tidak ada gelincir antara beton dengan tulangan baja
+\item Perencanaan kolom biaksial menggunakan metoda kontur beban
+\item Gaya puntir diabaikan
+\item Perencanaan beton bertulang menggunakan analisis ultimit
+\end{enumerate}
+
+\section{Maksud dan Tujuan Penulisan}
+
+Penulisan tugas akhir ini dimaksudkan untuk memenuhi syarat yudisium dalam
+mencapai tingkat kesarjanaan Strata 1 (S1) pada Program Studi Teknik Sipil,
+Fakultas Teknik, Universitas Atma Jaya Yogyakarta.
+
+Selain itu penulisan tugas akhir ini juga bertujuan untuk mengetahui lebih
+dalam tentang metoda-metoda optimasi yang sekarang ini mulai dirasakan
+manfaatnya dan mulai dikembangkan, terutama metoda yang dapat digunakan
+untuk melakukan optimasi biaya portal beton bertulang, yang memiliki
+permasalahan yang kompleks.
+
+Hasil dari penulisan tugas akhir ini adalah berupa program komputer yang
+ditulis dengan bahasa C++ yang dapat dikompilasi menggunakan Borland C++
+5.0 atau versi yang lebih tinggi pada sistem operasi Windows 32 bit menjadi
+sebuah perangkat lunak.
+
+\section{Kegunaan Penulisan}
+
+Perangkat lunak yang dihasilkan dalam penulisan ini berguna untuk
+merencanakan ukuran penampang balok dan kolom beserta penulangannya dengan
+memasukkan informasi tentang bentuk geometri portal ruang yang akan
+direncanakan.
+
+Selain itu program yang dibuat ini dapat dijadikan dasar pengembangan
+perangkat lunak untuk menyelesaikan masalah optimasi sehingga dapat
+tercipta sebuah program yang lebih baik lagi, sehingga akan didapatkan
+hasil yang lebih optimum lagi.
+
+\section{Metoda Penulisan}
+
+Dalam melakukan penulisan ini banyak langkah-langkah yang diambil sebelum
+mendapatkan sebuah perangkat lunak yang siap digunakan untuk melakukan
+optimasi.
+
+Tahap pertama, dilakukan studi pustaka mengenai optimasi beton bertulang
+pada portal ruang, metoda yang digunakan untuk menganalisis struktur
+digunakan metoda kekakuan, beton dianalisis dengan analisis ultimit,
+sedangkan kolom biaksial dianalisis menggunakan metoda kontur beban.
+
+Tahap kedua adalah membuat suatu listing program untuk melakukan analisa
+struktur menggunakan metoda kekakuan, juga membuat listing program untuk
+melakukan analisa balok menggunakan analisis ultimit, serta listing program
+untuk melakukan analisis kolom biaksial menggunakan metoda kontur beban.
+
+Tahap ketiga adalah menggabungkan listing program yang telah diuji
+validasinya masing-masing sebagai subrutin yang dipanggil oleh sebuah
+fungsi utama, dalam fungsi utama itu dilakukan proses optimasi.
+
+Tahap keempat adalah melakukan uji validasi dari perangkat lunak yang
+digunakan dengan hasil yang pernah dihitung tanpa menggunakan proses
+optimasi atau dengan perangkat lunak lain yang sudah jadi.
+
+Tahap terakhir adalah mencoba perangkat lunak untuk memecahkan kasus-kasus
+yang ada untuk melakukan penyusunan laporan tugas akhir secara lengkap.

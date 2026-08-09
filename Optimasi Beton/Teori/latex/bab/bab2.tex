@@ -1,0 +1,822 @@
+\chapter{TINJAUAN PUSTAKA}
+\label{bab:tinjauan}
+
+\begin{quote}
+\small\itshape
+Catatan transkripsi: sebagian besar persamaan bernomor pada bab ini
+(\eqref{eq:2-1}--\eqref{eq:2-25}) aslinya disisipkan sebagai objek OLE
+\textit{MathType/Equation Editor} di dalam \texttt{BAB II.doc}, bukan sebagai
+teks biasa, sehingga tidak dapat diambil langsung sebagai teks oleh
+\texttt{antiword}. Persamaan-persamaan tersebut disusun ulang di sini
+berdasarkan (a) teks naratif di sekitarnya yang tetap utuh, (b) kode sumber
+C++ yang menjadi hasil tugas akhir ini (\texttt{Struktur.hpp},
+\texttt{Solver.hpp}, \texttt{Balok.hpp}, \texttt{Kolom.hpp} pada
+\texttt{Optimasi Beton/Source/}), dan (c) rujukan standar yang memang
+disebut dalam teks (Weaver \& Gere 1980; SK SNI T-15-1991-03; Hulse \&
+Mosley 1986). Lihat \texttt{LEGACY\_TRANSCRIPTION\_NOTES.md} untuk detail
+metodologinya. Gambar 2-1 dan 2-2 (penampang dan diagram regangan) adalah
+citra asli yang tidak dapat dipulihkan.
+\end{quote}
+
+\section{Struktur Portal Ruang}
+
+\subsection{Tinjauan Umum}
+
+Langkah pertama dalam mendesain struktur beton bertulang adalah memperoleh
+informasi tentang momen, gaya geser, dan gaya aksial yang akan ditahan. Hal
+ini biasanya melibatkan perhitungan numerik yang rumit, oleh karena itu
+langkah terbaik adalah memprosesnya dengan program analisa struktur yang
+telah dibuat dalam komputer (Hulse dan Mosley, 1986, halaman 17).
+
+Dengan perkembangan komputer yang cukup pesat dan harganya relatif murah,
+sekarang telah beredar program-program struktur, baik hasil buatan sendiri
+maupun perangkat lunak yang diperdagangkan. Dengan perangkat ini suatu
+analisis struktur dapat diselesaikan jauh lebih cepat, dan respon sistem
+struktur dapat diperoleh. Saat ini analisis tiga dimensi telah umum
+digunakan (Wahyudi dan Rahim, 1997, halaman 17).
+
+Dalam menganalisa struktur rangka (\textit{framed structure}) dengan
+bantuan komputer dapat digunakan metoda matriks, baik dengan metoda gaya
+(\textit{flexibility}) maupun metoda kekakuan (\textit{stiffness}). Metoda
+kekakuan atau lebih dikenal sebagai metoda perpindahan lebih sesuai untuk
+diprogram dalam komputer, karena setelah model analisis struktur
+ditentukan, pertimbangan teknis yang lebih lanjut tidak lagi diperlukan, di
+sini terdapat perbedaan dengan metoda gaya, walaupun kedua metoda ini sama
+bentuk matematisnya, pada metoda gaya besaran yang tidak diketahui adalah
+gaya kelebihan (\textit{redundant}) yang dipilih secara sembarang,
+sebaliknya dalam metoda kekakuan, yang tidak diketahui adalah perpindahan
+titik kumpul yang tertentu secara otomatis. Jadi, jumlah yang tak diketahui
+dalam metoda kekakuan sama dengan derajat ketidaktentuan
+(\textit{indeterminacy}) kinematis struktur (Weaver dan Gere, 1980,
+halaman 1).
+
+Struktur rangka dibagi atas enam kategori: balok, rangka batang bidang,
+rangka batang ruang, portal bidang, balok silang (\textit{grid}) dan portal
+ruang, setiap struktur rangka terdiri dari batang-batang yang panjangnya
+jauh lebih besar dibandingkan ukuran penampang lintangnya. Titik kumpul
+struktur rangka adalah titik pertemuan batang-batang, termasuk tumpuan dan
+ujung bebas suatu batang. Tumpuan bisa merupakan jepitan, sendi, atau
+tumpuan rol, dalam kasus tertentu sambungan antara batang atau batang
+dengan tumpuan bisa bersifat elastis (atau semi-tegar). Beban pada struktur
+rangka bisa berupa gaya terpusat, beban tersebar, atau kopel (Weaver dan
+Gere, 1980, halaman 2).
+
+\subsection{Metoda Kekakuan}
+
+Metoda kekakuan pertama dikembangkan dari superposisi gaya untuk koordinat
+perpindahan bebas, kemudian metoda ini diformalisasi dan diperluas dengan
+memakai matriks kesepadanan (\textit{compatibility}) dan konsep kerja maya
+(\textit{virtual}). Pada pendekatan kerja maya, matriks kekakuan titik
+kumpul (\textit{joint stiffness}) yang lengkap dirakit dengan perkalian
+tiga matriks, walaupun versi formal tersebut menarik dan beraturan, tetapi
+membutuhkan matriks kesepadanan yang besar dan jarang (\textit{sparse}).
+Selain itu, elemen matriks ini tidak mudah dinilai dengan tepat. Baik cara
+pembentukan matriks di atas ataupun perakitan dengan proses perkalian tidak
+sesuai untuk diprogram pada komputer. Metodologi yang baik adalah menarik
+ide dari kedua pendekatan tersebut dan menambahkan beberapa teknik yang
+berorientasi pada komputer, sehingga didapatkan suatu cara yang disebut
+metoda kekakuan langsung (\textit{direct stiffness method}) yang lebih
+mudah untuk diprogram pada komputer (Weaver dan Gere, 1980, halaman 148).
+
+Wahyudi dan Rahim (1997, halaman 17) menyebutkan prosedur umum metoda
+kekakuan ataupun metoda elemen hingga dapat dibagi menjadi lima bagian
+yaitu:
+\begin{enumerate}[label=\arabic*.]
+\item Penyusunan vektor beban dan matriks kekakuan elemen.
+\item Penyusunan vektor beban dan matriks kekakuan global.
+\item Penyelesaian persamaan kekakuan yang menghasilkan perpindahan global.
+\item Perhitungan deformasi elemen dengan menggunakan transformasi koordinat.
+\item Penentuan tegangan atau gaya-gaya elemen.
+\end{enumerate}
+
+Kunci penyederhanaan proses perakitan matriks kekakuan titik $SJ$ ialah
+pemakaian matriks kekakuan batang untuk aksi dan perpindahan di kedua ujung
+setiap batang. Jika perpindahan batang didasarkan pada koordinat struktur
+global, maka ia akan berimpit dengan perpindahan titik kumpul. Dalam hal
+ini semua komplikasi geometris harus ditangani secara setempat, dan
+transfer informasi batang ke array struktur bersifat langsung, yaitu
+matriks kekakuan dan vektor beban ekivalen dapat dirakit dengan penjumlahan
+langsung sebagai ganti perkalian matriks. Dengan demikian, perakitan
+matriks kekakuan titik untuk $m$ batang dapat dituliskan sebagai:
+\begin{equation}
+SJ = \sum_{i=1}^{m} SMS_i
+\label{eq:2-1}
+\end{equation}
+dalam persamaan ini, simbol $SMS_i$ menyatakan matriks kekakuan batang
+ke-$i$ dengan gaya ujung dan perpindahan (untuk kedua ujung) yang dalam
+arah sumbu struktur. Agar dapat dijumlahkan, semua matriks kekakuan batang
+harus diperluas ke ukuran yang sama seperti $SJ$ dengan menambahkan baris
+dan kolom nol. Akan tetapi, operasi ini dapat dihindari dalam pembuatan
+program dengan meletakan elemen dari $SMS_i$ ke lokasi yang sesuai pada
+$SJ$. Demikian juga halnya, vektor beban ekivalen $AE$ dapat dibentuk dari
+kontribusi batang sebagai berikut:
+\begin{equation}
+AE = \sum_{i=1}^{m} AMS_i
+\label{eq:2-2}
+\end{equation}
+dalam hal ini $AMS_i$ adalah vektor gaya (aksi) jepit ujung dalam arah
+sumbu struktur di kedua ujung batang $i$. Seperti pada $SMS_i$, secara
+teoritis $AMS_i$ perlu diperbesar dengan bilangan nol agar dapat dijumlahkan
+secara matriks, tetapi langkah ini bisa dihindari dalam program. Beban
+titik tumpul ekivalen dalam persamaan \eqref{eq:2-2} kemudian dijumlahkan
+dengan beban sebenarnya yang diberikan di titik kumpul untuk membentuk
+vektor beban total atau gabungan.
+
+Untuk memisahkan suku yang berkaitan dengan perpindahan bebas struktur dari
+perpindahan pengekang tumpuan (\textit{support restraint}), matriks
+kekakuan dan beban harus ditata ulang (\textit{rearranged}) dan disekat
+(\textit{partitioned}). Penataan ulang suku-suku ini dapat dilakukan
+setelah perakitan selesai. Dalam program komputer, penataan ulang ini lebih
+mudah dilakukan bila informasi ditransfer dari array batang yang kecil ke
+array struktur yang besar.
+
+Setelah matriks kekakuan dan vektor beban ditata ulang (\textit{rearranged})
+dan disekat-sekat (\textit{partitioned}), maka penyelesaian dasar untuk
+perpindahan pada titik kumpul yang bebas akibat beban adalah:
+\begin{equation}
+DF = SFF^{-1} \, AFC
+\label{eq:2-3}
+\end{equation}
+dalam persamaan ini $AFC$ adalah vektor beban titik kumpul gabungan
+(sebenarnya dan ekivalen) yang selaras (\textit{correspond}) dengan $DF$.
+Walaupun secara simbolis penyelesaian dalam persamaan \eqref{eq:2-3} lebih
+mudah dituliskan sebagai hasil inversi matriks kekakuan $SFF$, tetapi
+perhitungan $SFF^{-1}$ dalam program komputer hakekatnya tidak efisien.
+Sebagai gantinya, matriks koefisien $SFF$ difaktorisasi dan penyelesaian
+untuk $DF$ diperoleh dari sapuan (\textit{sweep}) kemuka dan belakang --
+dalam program optimasi beton bertulang pada struktur portal ruang ini,
+faktorisasi tersebut dilakukan dengan pendekatan Choleski yang dimodifikasi
+oleh fungsi \texttt{banfac()} dan penyelesaian sapuan oleh fungsi
+\texttt{bansol()} pada \texttt{Solver.hpp}.
+
+Bagian lain yang hendak dicari adalah reaksi tumpuan dan gaya jepit ujung.
+Bila hanya pengaruh beban yang diperhitungkan, persamaan untuk reaksi
+adalah:
+\begin{equation}
+AR = SRF \, DF + ARC
+\label{eq:2-4}
+\end{equation}
+Selain itu gaya ujung batang dituliskan sebagai:
+\begin{equation}
+AM_i = SM_i \, DM_i + AML_i
+\label{eq:2-5}
+\end{equation}
+Banyak variasi dalam mengorganisasi metoda kekakuan bisa dilakukan untuk
+pemrograman. Tahapan analisa di atas merupakan pendekatan teratur yang
+memiliki beberapa segi menguntungkan bila berhadapan dengan masalah yang
+besar dan rumit (Weaver dan Gere, 1980, halaman 151).
+
+Untuk menganalisa struktur portal ruang digunakan matrik kekakuan batang
+yang terdapat pada tabel 2-1 dan dijelaskan pada bagian \ref{sec:kekakuan-batang}.
+
+\subsection{Kekakuan Batang Portal Ruang}
+\label{sec:kekakuan-batang}
+
+Untuk membentuk matriks kekakuan titik dengan proses penjumlahan yang
+ditunjukan oleh persamaan \eqref{eq:2-1}, matriks kekakuan batang yang
+lengkap dalam sumbu arah struktur perlu diturunkan dahulu. Selain itu,
+matriks kekakuan batang $SM_i$ untuk sumbu arah batang diperlukan dalam
+menghitung gaya ujung batang dengan persamaan \eqref{eq:2-5}. Kekakuan
+batang terhadap sumbu batang selalu dapat diperoleh dan ditransformasi ke
+sumbu struktur.
+
+Portal ruang merupakan kasus yang paling umum untuk struktur rangka,
+batang dapat mengalami sembarang kedua belas perpindahan, dengan demikian,
+matriks kekakuan batang ($SM_i$) untuk struktur portal ruang berordo
+$12 \times 12$ yang dapat dilihat dalam tabel 2-1, dan setiap kolom pada
+matriks menyatakan aksi akibat salah satu perpindahan satuan.
+
+Matriks kekakuan batang portal ruang diperlihatkan pada tabel 2-1, matriks
+ini disekat untuk memisahkan bagian yang berkaitan dengan kedua ujung
+batang, secara umum bentuknya adalah:
+\begin{equation}
+SM_i = \begin{bmatrix} SM_{jj} & SM_{jk} \\ SM_{kj} & SM_{kk} \end{bmatrix}
+\label{eq:2-6}
+\end{equation}
+pada persamaan di atas subskrip $j$ dan $k$ pada submatriks di atas
+menunjukan ujung batang (Weaver dan Gere, 1980, halaman 154).
+
+\input{bab/tabel2-1}
+
+\section{Struktur Beton Bertulang}
+
+\subsection{Tinjauan Umum}
+
+Beton bertulang telah digunakan sebagai material bangunan di setiap negara.
+Pada banyak negara seperti Amerika dan Kanada, beton bertulang merupakan
+material struktur yang dominan dalam konstruksi bangunan. Keuntungan dari
+penggunaan beton bertulang adalah tulangan baja dan bahan pembentuk beton
+tersedia di banyak tempat, hanya dibutuhkan kemampuan yang relatif rendah
+dalam konstruksi beton, dan dari segi ekonomi beton bertulang lebih
+menguntungkan dibandingkan bahan konstruksi lainnya (MacGregor, 1997,
+halaman 1).
+
+Pada struktur beton bertulang, balok utama yang langsung ditumpu oleh
+kolom dianggap menyatu secara kaku dengan kolom. Sistem kolom dan balok
+induk seperti ini dikatakan sebagai sistem portal. Sistem portal telah
+lama digunakan sebagai sistem bangunan yang dapat menahan beban vertikal
+gravitasi dan lateral akibat gempa. Sistem ini memanfaatkan kekakuan
+balok-balok utama dan kolom. Dengan demikian integritas antara balok utama
+dan kolom harus mendapat perhatian dan pendetailan tersendiri, karena di
+sekitar daerah ini timbul gaya geser dan momen yang besar yang dapat
+menyebabkan retak atau patahnya penampang (Wahyudi dan Rahim, 1997,
+halaman 14).
+
+\subsection{Balok}
+
+Balok adalah anggota struktur yang paling utama mendukung beban luar serta
+berat sendirinya oleh momen dan gaya geser (MacGregor, 1997, halaman 85).
+
+Dua hal utama yang dialami oleh suatu balok adalah kondisi tekan dan
+tarik, yang antara lain karena adanya pengaruh lentur ataupun gaya
+lateral. Padahal dari data percobaan diketahui bahwa kuat tarik beton
+sangatlah kecil, kira-kira 10\%, dibandingkan kekuatan tekannya. Bahkan
+dalam problema lentur, kuat tarik ini sering tidak diperhitungkan, sehingga
+timbul usaha untuk memasang baja tulangan pada bagian tarik guna mengatasi
+kelemahan beton tersebut, menghasilkan beton bertulang (Wahyudi dan Rahim,
+1997, halaman 39).
+
+Apabila penampang tersebut dikehendaki untuk menopang beban yang lebih
+besar dari kapasitasnya, sedangkan di lain pihak seringkali pertimbangan
+teknis pelaksanaan dan arsitektural membatasi dimensi balok, maka
+diperlukan usaha-usaha lain untuk memperbesar kuat momen penampang balok
+yang sudah tertentu dimensinya tersebut. Apabila hal demikian yang
+dihadapi, SK-SNI T-15-1991-03 pasal 3.3.3 ayat 4 memperbolehkan penambahan
+tulangan baja tarik lebih dari batas nilai $\rho_{maks}$ bersamaan dengan
+penambahan tulangan baja di daerah tekan penampang balok. Hasilnya adalah
+balok dengan penulangan rangkap dengan tulangan baja tarik dipasang di
+daerah tarik dan tulangan tekan di daerah tekan. Pada keadaan demikian
+berarti tulangan baja tekan bermanfaat untuk memperbesar kekuatan balok
+(Dipohusodo, 1994, halaman 85).
+
+Dalam praktek, sistem tulangan tunggal hampir tidak pernah dimanfaatkan
+untuk balok, karena pemasangan batang tulangan tambahan di daerah tekan,
+misalnya di tepi atas penampang tengah lapangan, akan mempermudah
+pengaitan sengkang (\textit{stirrup}) (Wahyudi dan Rahim, 1997, halaman
+60).
+
+\gambarhilang{Penampang balok bertulangan rangkap: tulangan tekan pada
+jarak $d'$ dari serat tekan terluar, tulangan tarik pada jarak (tinggi
+efektif) $d$.}{Penampang Tulangan Rangkap}
+
+\gambarhilang{Diagram regangan penampang: regangan serat tekan beton
+$\varepsilon_c = 0{,}003$; garis netral pada jarak $c$ dari serat tekan
+terluar.}{Diagram Regangan}
+
+Pada gambar 2-1 tampak suatu penampang dengan tulangan tekan yang
+ditempatkan dalam jarak $d'$ dari serat tekan terluar dan tulangan tarik
+dalam jarak tinggi efektif $d$. Diagram regangan yang terjadi dilukiskan
+dalam gambar 2-2, dengan regangan serat tekan beton dianggap telah mencapai
+regangan maksimum 0,003. Garis netral terletak pada jarak $c$ yang belum
+diketahui nilainya. Melalui perbandingan segitiga dalam diagram ini, dapat
+ditentukan besar regangan masing-masing tulangan, yaitu:
+\begin{align}
+\varepsilon_s' &= 0{,}003\,\frac{c-d'}{c} \label{eq:2-7}\\
+\varepsilon_s &= 0{,}003\,\frac{d-c}{c} \label{eq:2-8}
+\end{align}
+pada persamaan di atas $a = \beta_1 c$, dengan $a$ tinggi blok tegangan
+persegi ekivalen dan $\beta_1$ faktor reduksi tinggi blok tegangan (SK SNI
+T-15-1991-03 pasal 3.3.2 butir 7.(3): $\beta_1 = 0{,}85$ untuk $f_c' \le 30$
+MPa, berkurang $0{,}008$ untuk setiap kenaikan 1 MPa kuat beton, dengan
+batas bawah $\beta_1 \ge 0{,}65$ -- lihat \texttt{Balok::analisa()} pada
+\texttt{Balok.hpp}).
+
+Pertama-tama, kedua tulangan $AS$ dan $AS'$ diasumsikan telah mencapai
+tegangan leleh $f_y$, sehingga keseimbangan gaya horisontal
+$0{,}85f_c'ab + AS'f_y = AS f_y$ memberikan tinggi blok tegangan awal:
+\begin{equation}
+a = \frac{(AS-AS')f_y}{0{,}85\,f_c'\,b}
+\label{eq:2-9}
+\end{equation}
+dan substitusi $a=\beta_1 c$ ke dalam persamaan \eqref{eq:2-7} dan
+\eqref{eq:2-8} memberikan regangan pada trial pertama ini:
+\begin{align}
+\varepsilon_s' &= 0{,}003\,\frac{a-\beta_1 d'}{a} \label{eq:2-10}\\
+\varepsilon_s &= 0{,}003\,\frac{\beta_1 d - a}{a} \label{eq:2-10b}
+\end{align}
+Bila kedua kondisi persamaan regangan tersebut terpenuhi ($\varepsilon_s
+\ge \varepsilon_y$ dan $\varepsilon_s' \ge \varepsilon_y$, dengan
+$\varepsilon_y = f_y/E_s$), tegangan pada baja tulangan menjadi
+$f_s = f_s' = f_y$ dengan $f_s$ adalah tegangan pada baja tulangan tarik,
+$f_s'$ adalah tegangan pada baja tulangan tekan. Diagram tegangan
+internalnya dapat dianggap menjadi tiga bagian yaitu:
+\begin{align}
+\text{pada daerah tekan beton:} \quad & CC = 0{,}85\,f_c'\,a\,b \label{eq:2-11}\\
+\text{pada daerah tekan baja tulangan:} \quad & CS = AS'\,f_y \label{eq:2-12}\\
+\text{pada daerah tarik baja tulangan:} \quad & T = AS\,f_y \label{eq:2-13}
+\end{align}
+dengan $AS'$ dan $AS$ berturut-turut menyatakan luas baja tulangan tekan
+dan tarik. Berdasarkan keseimbangan horisontal gaya internal $CC+CS=T$,
+dihasilkan persamaan:
+\begin{equation}
+0{,}85\,f_c'\,a\,b + AS'\,f_y = AS\,f_y
+\label{eq:2-14}
+\end{equation}
+dengan tinggi blok tegangan adalah persamaan \eqref{eq:2-9}, dan momen
+tahanan nominal penampang adalah:
+\begin{equation}
+M_n = 0{,}85\,f_c'\,a\,b\left(d-\frac{a}{2}\right) + AS'\,f_y\,(d-d')
+\label{eq:2-16}
+\end{equation}
+Momen desain diperoleh dengan memberikan faktor reduksi $\phi$ tertentu,
+yang disarankan dalam SK SNI T-15-1991-03, ke dalam persamaan
+\eqref{eq:2-16} (Wahyudi dan Rahim, 1997, halaman 61--63). Standar SK SNI
+T-15-1991-03 pasal 2.2.3 ayat 2 memberikan faktor reduksi kekuatan $\phi$
+untuk berbagai mekanisme, antara lain:
+\begin{enumerate}[label=\alph*.]
+\item Lentur tanpa beban aksial \dotfill $\phi = 0{,}80$
+\item Geser dan puntir \dotfill $\phi = 0{,}60$
+\item Tarik aksial, tanpa dan dengan lentur (sengkang) \dotfill $\phi = 0{,}65$
+\item Tekan aksial, tanpa dan dengan lentur (spiral) \dotfill $\phi = 0{,}7$
+\item Tumpuan pada beton \dotfill $\phi = 0{,}70$
+\end{enumerate}
+Dengan demikian dapat dinyatakan bahwa kuat momen $M_R$ (kapasitas momen)
+sama dengan kuat momen ideal $M_n$ dikalikan faktor $\phi$ (Dipohusodo,
+1994, halaman 41) -- inilah yang dihitung sebagai variabel \texttt{FMU}
+pada \texttt{Balok::analisa()}.
+
+Bila persamaan regangan \eqref{eq:2-7} dan \eqref{eq:2-8} tidak dipenuhi,
+mungkin tegangan tulangan tekan ataupun tulangan tarik tidak mencapai
+tegangan leleh materialnya, sehingga dalam hal ini persamaan tersebut
+tidak berlaku lagi. Untuk dapat menentukan momen ketahanan penampang,
+regangan aktual harus dihitung terlebih dahulu, dengan tegangan baja
+sebagai fungsi regangan dikalikan modulus elastisitas $E_s = 2 \times
+10^5$ MPa:
+\begin{align}
+f_s' &= E_s\,\varepsilon_s' = 600\,\frac{a-\beta_1 d'}{a} \label{eq:2-17a}\\
+f_s &= E_s\,\varepsilon_s = 600\,\frac{\beta_1 d - a}{a} \label{eq:2-18a}
+\end{align}
+(dengan $f_s', f_s$ dibatasi pada rentang $-f_y \le f_s',f_s \le f_y$).
+Dengan mensubtitusi persamaan \eqref{eq:2-17a} dan \eqref{eq:2-18a} ke
+dalam keseimbangan gaya horisontal $0{,}85f_c'ab + AS'f_s' = AS f_s$
+(bentuk umum persamaan \eqref{eq:2-14} untuk tulangan yang belum tentu
+leleh), diperoleh persamaan kuadrat dalam $a$:
+\begin{equation}
+\bigl(0{,}85\,f_c'\,b\bigr)\,a^2 \;+\; \bigl(600\,AS' - AS\,f_y\bigr)\,a
+\;-\; 600\,\beta_1\,AS'\,d' \;=\; 0
+\label{eq:2-19}
+\end{equation}
+diselesaikan dengan rumus abc, diambil akar yang bernilai positif (fungsi
+\texttt{balok::analisa()} pada \texttt{Balok.hpp} menghitung persamaan ini
+lewat variabel bantu \texttt{ASOL,BSOL,CSOL,DSOL}). Sehingga, momen
+tahanan penampang menjadi:
+\begin{equation}
+M_n = 0{,}85\,f_c'\,a\,b\left(d-\frac{a}{2}\right) + AS'\,f_s'\,(d-d')
+\label{eq:2-20}
+\end{equation}
+dengan $a$ hasil penyelesaian persamaan \eqref{eq:2-19} dan $f_s'$ dari
+persamaan \eqref{eq:2-17a}.
+
+Momen desain dapat diperoleh dengan memberikan faktor reduksi tertentu,
+yang disarankan dalam SK SNI T-15-1991-03, ke dalam persamaan
+\eqref{eq:2-20} (Wahyudi dan Rahim, 1997, halaman 61--63).
+
+Seperti pada tulangan tunggal, keruntuhan tarik atau tekan dapat pula
+terjadi pada penampang tulangan rangkap. Bila hal tersebut terjadi,
+keruntuhan tarik dengan pelelehan tulangan lebih disukai daripada
+keruntuhan tekan dengan kehancuran beton yang mendadak. Keadaan ini dapat
+dikendalikan dengan memberikan batasan tertentu pada tulangan terpasang.
+SK SNI T-15-1991-03 pasal 3.3.3 menetapkan batasan:
+\begin{equation}
+\rho - \rho' \le 0{,}75\,\rho_b
+\label{eq:2-21}
+\end{equation}
+dengan $\rho_b$ adalah rasio imbang (\textit{balance ratio}) baja tulangan
+yang bersesuaian dengan penampang tulangan tunggal (Wahyudi dan Rahim,
+1997, halaman 64). Untuk menentukan rasio penulangan keadaan seimbang
+($\rho_b$) digunakan persamaan:
+\begin{equation}
+\rho_b = 0{,}85\,\beta_1\,\frac{f_c'}{f_y}\,\frac{600}{600+f_y}
+\label{eq:2-22}
+\end{equation}
+dengan $f_c'$ dan $f_y$ dalam MPa, $\beta_1$ adalah konstanta yang
+merupakan fungsi dari kelas kuat beton (Dipohusodo, 1994, halaman 37).
+Standar SK SNI T-15-1991-03 menetapkan nilai $\beta_1$ diambil $0{,}85$
+untuk $f_c' \le 30$ MPa, berkurang $0{,}008$ untuk setiap kenaikan 1 MPa
+kuat beton, dan nilai tersebut tidak boleh kurang dari $0{,}65$
+(Dipohusodo, 1994, halaman 31). Program mengimplementasikan persamaan
+\eqref{eq:2-21}--\eqref{eq:2-22} sebagai \texttt{RHB} dan
+\texttt{kendala\_rho\_b} pada \texttt{Balok.hpp}.
+
+\subsection{Kolom Biaksial}
+
+Kolom adalah batang tekan vertikal dari rangka (\textit{frame}) struktur
+yang memikul beban dari balok. Kolom meneruskan beban-beban dari elevasi
+atas ke elevasi yang lebih bawah hingga akhirnya sampai ke tanah melalui
+fondasi. Karena kolom merupakan komponen tekan, maka keruntuhan pada suatu
+kolom merupakan lokasi kritis yang dapat menyebabkan keruntuhan
+(\textit{collapse}) lantai yang bersangkutan, dan juga merupakan batas
+runtuh total (\textit{ultimate total collapse}) seluruh strukturnya. Oleh
+karena itu dalam merencanakan kolom perlu lebih teliti, yaitu dengan
+memberikan kekuatan cadangan yang lebih tinggi daripada yang dilakukan
+pada balok dan elemen struktur horisontal lainnya, terlebih lagi
+keruntuhan tekan tidak memberikan peringatan awal yang cukup jelas (Nawy,
+1990).
+
+SK SNI T-15-1991-03 (PU 1991) memberikan definisi, kolom adalah komponen
+struktur bangunan yang tugas utamanya menyangga beban tekan aksial dengan
+bagian tinggi yang tidak ditopang paling tidak tiga kali dimensi lateral
+terkecil. Sedangkan komponen struktur yang menahan beban aksial vertikal
+dengan rasio bagian tinggi dengan dimensi terkecil kurang dari tiga
+disebut pedestal (Dipohusodo, 1994, halaman 287).
+
+Bila eksentrisitas beban mempunyai harga kecil sehingga gaya aksial tekan
+menjadi penentu, dan juga bila dikehendaki suatu kolom beton dengan
+penampang lintang yang lebih kecil, maka umumnya distribusi tulangan
+lebih baik dibuat merata di sekeliling sisi penampang tersebut. Untuk
+distribusi tulangan semacam ini, baja tulangan yang terletak di bagian
+tengah penampang akan menerima tegangan yang lebih kecil dibandingkan
+tulangan lainnya. Ketika kapasitas ultimit kolom tersebut telah tercapai,
+tegangan pada baja tulangan belum tentu mencapai tegangan lelehnya,
+sedangkan baja tulangan yang berada di tepi kemungkinan besar sudah leleh
+(Wahyudi dan Rahim, 1997, halaman 215).
+
+Menurut Winter dan Nilson pada tahun 1994, mekanisme gaya aksial yang
+bekerja bersamaan dengan lentur pada kedua arah dari sumbu utama penampang
+terjadi pada kolom-kolom sudut bangunan, pada balok-balok yang membentuk
+rangka dengan kolom dan menyalurkan momen-momen ujungnya ke kolom dalam
+dua bidang yang tegak lurus. Keadaan yang sama juga dapat terjadi pada
+kolom-kolom sebelah dalam, khususnya pada tata letak kolom yang tidak
+teratur.
+
+Kolom-kolom seperti pada sudut bangunan pada struktur rangka memikul gaya
+aksial dan sekaligus momen dari dua sumbu aksis yang disebut kolom
+biaksial. Untuk menyelesaikan masalah kolom biaksial pada kolom persegi,
+dapat digunakan prosedur yang umum dipakai yaitu eksentrisitas biaksial,
+$e_x$ dan $e_y$, digantikan dengan eksentrisitas uniaksial ekivalen
+$e_{0x}$ atau $e_{0y}$, dan kolom didesain sebagai kolom uniaksial
+(MacGregor, 1997, halaman 466).
+
+Apabila eksentrisitas pada arah $x$ ($e_x$) dibagi dengan sisi pada arah
+$x$ lebih besar daripada eksentrisitas pada arah $y$ ($e_y$) dibagi sisi
+pada arah $y$, maka momen desain efektif dapat dihitung dengan:
+\begin{equation}
+M_{ox} = M_x + M_y\,\frac{1-\beta}{\beta}
+\label{eq:2-23}
+\end{equation}
+Dengan cara yang sama apabila eksentrisitas pada arah $y$ dibagi dengan
+sisi pada arah $y$ lebih besar daripada eksentrisitas arah $x$ dibagi sisi
+arah $x$, maka momen desain efektifnya adalah:
+\begin{equation}
+M_{oy} = M_y + M_x\,\frac{1-\beta}{\beta}
+\label{eq:2-24}
+\end{equation}
+dengan $M_x$ adalah momen yang terjadi pada arah $x$ dan $M_y$ adalah
+momen pada arah $y$, $b$ adalah sisi efektif pada arah $y$, $h$ adalah
+sisi efektif pada arah $x$, sedangkan $\beta$ adalah koefisien biaksial
+yang untuk kolom persegi dengan tulangan simetris dapat dihitung dengan
+rumus empiris (Hulse dan Mosley, 1986, halaman 163):
+\begin{equation}
+\beta = 0{,}3 + \frac{0{,}7}{0{,}6}\left(0{,}6 - \frac{P_u}{h\,b\,f_c'}\right)
+\label{eq:2-25}
+\end{equation}
+dengan $\beta$ tidak boleh lebih kecil daripada $0{,}3$, dan $P_u$ adalah
+gaya aksial. Persamaan \eqref{eq:2-23}--\eqref{eq:2-25} diimplementasikan
+sebagai \texttt{MOX}, \texttt{MOY}, dan \texttt{beta} pada
+\texttt{kolom::analisa()} di \texttt{Kolom.hpp}.
+
+\section{Metoda Optimasi Struktur}
+
+\subsection{Tinjauan Umum}
+
+Penggunaan metoda optimasi dalam perencanaan struktur sebenarnya bukanlah
+merupakan hal yang baru dan sudah banyak dikembangkan karena manfaatnya
+yang banyak dirasakan. Pada tahun 1890 Maxwell mengemukakan beberapa teori
+tentang desain yang rasional pada suatu struktur yang kemudian dikembangkan
+lebih lanjut oleh Michell pada tahun 1904 (Wu, 1986, halaman 1). Beberapa
+penelitian tentang optimasi struktur yang ditujukan untuk penggunaan
+praktis telah dilakukan sekitar tahun 1940 dan 1950. Pada tahun 1960
+Schmit mendemonstrasikan penggunaan teknik pemrograman non-linier untuk
+desain struktur dan menyebutnya dengan istilah ``sintesa struktur'' (Wu,
+1986, halaman 1). Komputer digital yang kemudian dibuat dan mampu untuk
+memecahkan masalah numeris dalam skala besar telah memberikan momentum
+yang besar untuk penelitian. Pada awal tahun 1970 optimasi struktur telah
+menjadi sesuatu yang penting dalam berbagai aspek perancangan suatu
+struktur (Wu, 1986, halaman 1).
+
+Ada dua pendekatan utama dalam optimasi struktur. Pendekatan yang satu
+menggunakan pemrograman matematika dan pendekatan yang lain menggunakan
+metoda kriteria optimal. Kedua pendekatan ini masing-masing mempunyai
+kelebihan dan kekurangan.
+
+Setiap struktur rangka memiliki empat hal pokok dengan empat hal ini
+dapat merupakan suatu variabel yang dapat diubah-ubah untuk mengoptimasi
+struktur tersebut (variabel desain). Empat hal ini adalah ukuran elemen,
+geometri struktur (posisi titik-titik kumpul), gambaran struktur
+(bagaimana titik-titik kumpul tersebut dihubungkan oleh elemen-elemen),
+dan material bangunan. Material bangunan biasanya ditentukan terlebih
+dahulu. Persyaratan-persyaratan yang harus dipenuhi oleh struktur disebut
+kendala. Dalam sebagian besar kasus, kendala berhubungan dengan kekuatan
+dan defleksi struktur.
+
+Dalam banyak kasus optimasi struktur yang telah dipecahkan sejauh ini,
+variabel desain diasumsikan dapat berubah secara kontinyu. Akan tetapi
+dalam desain yang sesungguhnya kadang-kadang dijumpai variabel desain
+diskrit yang terbatas. Balok baja dan balok beton bertulang hanya ada
+dalam ukuran standar. Untuk mengatasi masalah diskrit ini, beberapa usaha
+telah dilakukan untuk memecahkan kasus-kasus tertentu, antara lain
+menggunakan pendekatan \textit{branch-and-bound} (Wu, 1986, halaman 4).
+
+Keberhasilan optimasi struktur sejauh ini masih terbatas. Pada satu sisi,
+optimasi telah berhasil digunakan dalam perancangan berbagai jenis
+struktur seperti \textit{overhead cranes}, bangunan-bangunan standard,
+menara transmisi, girder dengan bentang pendek dan medium, dan bermacam-
+macam kendaraan termasuk pesawat terbang, mobil, dan kapal. Pada sisi
+lain, teknik-teknik optimasi masih kurang dapat diterapkan jika struktur
+sangat besar atau jika kendala-kendalanya terlalu kompleks, belum lagi
+jika ada pertimbangan-pertimbangan lain seperti standar produksi,
+pengaruh estetika struktur, dan praktek-praktek konvensional dalam
+industri (Wu, 1986, halaman 5).
+
+Kesulitan utama dari penggunaan praktis optimasi struktur adalah lamanya
+proses komputasi sehingga biaya perhitungan menjadi relatif tinggi. Akan
+tetapi belakangan ini biaya perhitungan telah turun secara drastis karena
+komputer pribadi makin cepat dan makin murah harganya. Dengan demikian
+optimasi struktur yang sangat tergantung pada komputer akan semakin luas
+aplikasinya.
+
+Formulasi masalah untuk optimasi struktur dengan variabel desain yang
+dapat berubah secara kontinyu dan menggunakan analisa struktur elastik
+adalah program non-linier. Pendekatan untuk pemecahannya menggunakan
+program linier sekuensial dan program non-linier (Wu, 1986, halaman 6).
+
+Pendekatan linier sekuensialnya adalah melinierkan fungsi kendala
+non-linier dan fungsi sasaran kemudian menyelesaikan masalah menggunakan
+program linier berulang-ulang. Romstad dan Wang pada tahun 1967 dan 1968
+memberikan penjelasan fisik tentang formulasi ini yaitu: yang tidak
+diketahui adalah penambahan variabel desain dari suatu titik dalam daerah
+layak yang diperoleh dari iterasi sebelumnya, dan kendala dari pendekatan
+linier ini adalah perpindahan ijin dari titik kumpul dan gaya-gaya yang
+terjadi pada elemen tidak boleh melebihi yang diijinkan. Pendekatan
+non-liniernya adalah menyelesaikan masalah optimasi dengan menggunakan
+program non-linier secara langsung. Akan tetapi persamaan analisa elastik
+menunjukkan masalah yang besar sebab tidak ada algoritma pada program
+non-linier yang dapat menangani kendala persamaan secara efisien. Teknik
+yang biasa digunakan untuk menangani masalah ini adalah menggunakan
+matriks untuk analisa struktur dalam algoritmanya (Wu, 1986, halaman 7).
+
+Formulasi masalah untuk optimasi struktur dengan variabel desain yang
+dapat berubah secara kontinyu dan menggunakan analisa struktur plastis
+(analisa batas) adalah program linier (Wu, 1986, halaman 8). Masalah ini
+dapat dipecahkan dengan mudah bahkan untuk struktur yang besar. Akan
+tetapi analisa batas belum dipakai secara luas dalam desain struktur. Di
+samping itu banyak kendala lain seperti defleksi tidak dapat dipenuhi
+jika perancangan didasarkan pada analisa batas.
+
+Optimasi struktur dengan sebagian atau seluruh variabel desain merupakan
+nilai diskrit yang terbatas dan menggunakan analisa struktur elastis
+memberikan formulasi masalahnya berupa masalah non-linier diskrit.
+Beberapa pendekatan untuk memecahkan masalah ini telah diusulkan termasuk
+program integer sekuensial, algoritma penelusuran arah variabel diskrit,
+dan lain-lain (Wu, 1986, halaman 8).
+
+Program integer sekuensial adalah ekstrapolasi dari program linier
+sekuensial ke program diskrit. Dalam setiap iterasi, program linier
+integer digunakan untuk menjamin penelusuran hanya berkisar dari satu
+titik diskrit ke yang lain. Toakley pada tahun 1968 menemukan bahwa
+pendekatan ini tidak efisien dan hasilnya tidak bisa diramalkan.
+Reinschmidt pada tahun 1971 juga mempunyai kesimpulan yang sama meskipun
+dia telah menunjukkan beberapa contoh kasus numerik yang dipecahkan
+dengan cara ini, termasuk desain elastis rangka batang yang terdiri atas
+9 elemen. Saglam pada tahun 1976 menggunakan pendekatan yang mirip dan
+telah memecahkan beberapa contoh rangka batang.
+
+Algoritma penelusuran arah variabel diskrit dikemukakan oleh Lai dan
+Achenbach (1973, halaman 119--131). Struktur portal, kantilever, dan
+pelat lantai dua lapis dengan kendala dinamis telah dioptimasi dengan
+metoda ini.
+
+Optimasi struktur dengan sebagian atau seluruh variabel desain merupakan
+harga diskrit yang terbatas dan menggunakan analisa struktur plastis,
+formulasi masalahnya adalah program integer atau program integer
+campuran. Toakley (1968, halaman 1219) merumuskan masalah desain plastis
+dengan variabel diskrit sebagai program integer dan telah dipecahkan. Fu
+dan You pada tahun 1976 menggunakan metoda complex, tetapi mereka
+menemukan metoda ini konvergen prematur, kadang-kadang jauh dari nilai
+optimum. Levey dan Fu (1979, halaman 363--368) menggunakan metoda
+complex-simplex. Lev (1977, halaman 365--371) mengusulkan algoritma
+\textit{branch-and-bound} untuk memecahkan masalah diskrit dengan kendala
+linier. Algoritma ini mengatasi keterbatasan dari beberapa algoritma
+program integer yang lain.
+
+Selama perkembangan optimasi struktur, para ilmuwan secara bertahap
+mengembangkan banyak cara yang lain untuk merumuskan dan memecahkan
+berbagai masalah sehingga banyak algoritma-algoritma yang diusulkan.
+Sementara situasi ini dikenal secara umum sebagai sesuatu yang tidak dapat
+dihindari dan harus dialami selama tahap awal perkembangan bidang
+teknologi, ada juga saran untuk optimasi struktur dengan pendekatan yang
+disatukan dan sistematis.
+
+Dalam pendekatan sistematis yang digambarkan oleh Morris dan kawan-kawan
+pada tahun 1982, algoritma dibagi dalam tiga bagian, tiap bagian mempunyai
+fungsi yang terdefinisi secara baik, dan program komputer untuk tiap
+bagian dapat dikembangkan dan diuji secara terpisah. Pendekatan ini
+memperbolehkan penggunaan program secara berdiri sendiri yang kemudian
+dapat dikumpulkan dengan cepat untuk persoalan desain yang spesifik.
+Pendekatan ini dapat juga digunakan sebagai bahan perbandingan untuk
+perkembangan langkah-langkah optimasi yang baru. Di samping itu,
+pendekatan sistematik ini dapat dengan mudah diterapkan pada masalah yang
+lebih kompleks di bidang teknik yang lain (Wu, 1986, halaman 10).
+
+Menurut Kirsch pada tahun 1981 biasanya dalam suatu perencanaan terdiri
+atas empat langkah yaitu:
+\begin{enumerate}[label=\arabic*.]
+\item Perumusan syarat-syarat fungsional, yaitu mencari dan merumuskan
+      syarat-syarat fungsional yang dalam beberapa kasus tidak terlihat
+      secara nyata.
+\item Perencanaan dasar, misalnya pemilihan topologi, tipe struktur dan
+      material.
+\item Proses optimasi, yaitu untuk memperoleh kemungkinan perencanaan
+      terbaik dengan kriteria, pertimbangan dan batas-batas yang ada.
+\item Pendetailan, setelah seluruh penyajian optimasi, hasil yang didapat
+      harus diperiksa dan dimodifikasi jika perlu.
+\end{enumerate}
+
+Berdasarkan berbagai kemajuan ilmu dan teknologi, perancangan struktur
+bangunan harus direncanakan secara optimal yaitu struktur yang paling
+ekonomis serta memenuhi segala persyaratan yang diinginkan. Oleh karena
+itu perlu dikembangkan suatu sistem yang mampu menangani berbagai masalah
+optimasi. Secara umum masalah optimasi ada empat jenis, yaitu:
+\begin{enumerate}[label=\arabic*.]
+\item Optimasi bentuk.
+\item Optimasi topologi.
+\item Optimasi geometri.
+\item Optimasi ukuran penampang.
+\end{enumerate}
+
+Dalam metoda optimasi terdapat tiga besaran utama, yaitu:
+\begin{enumerate}[label=\arabic*.]
+\item \textbf{Variabel desain.} Besaran yang tidak berubah nilainya
+      disebut parameter tetap, sedangkan yang nilai berubah selama proses
+      optimasi disebut variabel desain. Variabel desain merupakan
+      variabel yang dicari dalam masalah optimasi. Contohnya adalah
+      ukuran komponen struktur dan geometri struktur. Data variabel
+      desain ada dua macam, yaitu data diskrit dan data kontinu. Dalam
+      beberapa kasus, khususnya optimasi bentuk dan geometri, variabel
+      desain lebih sesuai dinyatakan sebagai variabel desain kontinu
+      dibandingkan variabel diskrit.
+\item \textbf{Fungsi kendala.} Fungsi kendala merupakan suatu fungsi yang
+      memberikan batasan daerah layak dan daerah tak layak. Dalam bidang
+      teknik terdapat dua macam kendala yaitu:
+      \begin{enumerate}[label=\alph*.]
+      \item Kendala rencana, yaitu kendala yang menentukan variabel
+            desain selain yang memberikan batasan berdasarkan sifat.
+            Kendala ini biasanya dapat dilihat secara nyata, misalnya
+            batasan karena masalah fungsional, fabrikasi atau keindahan.
+            Contoh kendala rencana adalah ketebalan plat, kemiringan
+            atap.
+      \item Kendala sifat, yaitu kendala yang didapat dari persyaratan
+            sifat. Biasanya kendala ini tidak dapat terlihat secara nyata
+            karena berhubungan dengan analisis struktur. Contoh kendala
+            sifat adalah batas tegangan maksimum, perpindahan
+            (\textit{displacements}) yang diijinkan, kekuatan tekuk.
+      \end{enumerate}
+\item \textbf{Fungsi sasaran.} Fungsi sasaran adalah suatu fungsi yang
+      mengandung kriteria dari struktur yang diinginkan, misalnya
+      struktur dengan berat paling ringan, dengan harga termurah, paling
+      aman atau paling efisien. Pemilihan fungsi sasaran merupakan hal
+      yang terpenting dalam proses optimasi agar dapat mencapai sasaran
+      yang sebenarnya sedekat mungkin. Dalam beberapa situasi fungsi
+      sasaran dapat terlihat jelas. Misalnya jika ingin mencari harga
+      yang termurah maka fungsi sasarannya dapat diasumsikan ke dalam
+      berat strukturnya. Namun terkadang sulit juga untuk menentukan
+      harga yang sebenarnya dari sebuah konstruksi, misalnya struktur
+      dengan berat paling ringan belum tentu yang termurah, karena
+      biasanya masalah harga minimum akan termasuk juga harga bahan,
+      fabrikasi, transportasi dan lain-lain. Masalah dalam optimasi dapat
+      dibedakan menjadi dua, yaitu:
+      \begin{enumerate}[label=\alph*.]
+      \item Masalah optimasi linier merupakan dasar dari metoda optimasi
+            secara matematis. Dalam masalah ini fungsi kendala dan fungsi
+            sasarannya semuanya dinyatakan dalam fungsi linier. Fungsi
+            kendala dapat berupa persamaan maupun pertidaksamaan, dan
+            fungsi sasarannya berupa meminimumkan dan memaksimumkan.
+      \item Masalah optimasi tak linier, yaitu bila fungsi kendala dan
+            fungsi sasarannya tak linier.
+      \end{enumerate}
+\end{enumerate}
+
+Masalah optimasi dalam bidang teknik, pada umumnya berupa masalah
+optimasi tak linier. Masalah yang tak linier ini juga dapat dilinierkan,
+tetapi memberikan hasil yang kurang akurat ditinjau dari segi teknik.
+Oleh karena itu terpaksa diselesaikan memakai program tak linier yang
+lebih sulit dipelajari dibandingkan program linier, karena memerlukan
+matematika yang kompleks.
+
+Penyelesaian masalah optimasi dapat dipakai dua cara yaitu:
+\begin{enumerate}[label=\arabic*.]
+\item \textbf{Metoda analisa.} Metoda ini menggunakan dasar teori
+      matematika yang dibuat oleh Maxwell pada tahun 1890 dan Michell
+      tahun pada 1904 dan memberikan hasil eksak namun hanya dapat
+      digunakan untuk masalah optimasi yang sederhana saja karena pada
+      beberapa masalah yang lebih kompleks pengolahan matematikanya
+      sangat tidak sederhana (Wibowo, 1996, halaman 2).
+\item \textbf{Metoda numerik.} Metoda optimasi numerik berkembang sejak
+      ditemukannya komputer sebagai alat bantu hitung. \textit{Dynamic
+      programming, integer programming, steepest descent, sequential
+      unconstraint minimization technique, gradient projection}, dan
+      \textit{penalty function} merupakan metoda optimasi numerik yang
+      sering dipakai untuk menyelesaikan masalah optimasi di bidang
+      sipil (Wibowo, 1996, halaman 3). Dalam metoda ini nilai yang akan
+      dicari didekati dengan cara iterasi dan proses iterasi dihentikan
+      apabila nilai yang dicari sudah cukup dekat dengan titik optimal
+      yang sesungguhnya (Kirsch, 1981, halaman 5).
+\end{enumerate}
+
+Metoda-metoda tersebut di atas mempunyai kelemahan, yaitu mempunyai
+peluang relatif besar untuk konvergen ke titik optimum lokal, bila
+dipakai untuk menyelesaikan masalah optimasi dengan jumlah titik optimum
+lebih dari satu. Hal ini dapat dimaklumi, karena penurunan perumusannya
+berdasarkan asumsi fungsi konveks. Selain itu juga memerlukan analisis
+struktur yang banyak, keharusan mengikutsertakan semua kendala dalam
+model matematikanya dan modifikasi variabel yang kurang efisien (Wibowo,
+1996, halaman 3).
+
+\subsection{Metoda Optimasi Polihedron Fleksibel}
+\label{sec:polihedron}
+
+Metoda polihedron fleksibel merupakan metoda pengembangan dari metoda
+\textit{simplex}, yang dikembangkan oleh Nelder-Mead (Haftka, 1991,
+halaman 64), dasar pemikiran metoda \textit{simplex} adalah menurunkan
+nilai fungsi sasaran secara kontinu dimulai dari suatu nilai fungsi awal
+sampai mencapai nilai fungsi minimum terpenuhi (Haftka, 1991, halaman
+64).
+
+Metoda ini bermanfaat untuk mencari harga-harga ekstrem suatu fungsi
+dengan banyak variabel, dengan turunan dari fungsi tersebut sulit untuk
+dicari. Metoda polihedron fleksibel menggunakan pencerminan
+(\textit{reflection}), ekspansi (\textit{expansion}) dan penyusutan
+(\textit{contraction}) dalam melakukan penelusuran.
+
+Polihedron Fleksibel menggunakan banyak titik coba, dengan jumlah titik
+coba $N_{titik}$ minimum sama dengan jumlah variabel desain $JVD$
+ditambah satu. $N_{titik} = JVD+1$ dipakai oleh Harb dan Mattews pada
+tahun 1987. Box mengusulkan $N_{titik} = 2 \cdot JVD$, sedangkan
+$N_{titik} = JVD+2$ diusulkan oleh Biles pada tahun 1983. Jumlah titik
+coba makin banyak dimaksudkan untuk mengurangi terjadinya konvergen
+prematur, tetapi memperlambat konvergensi.
+
+Masalah meminimumkan fungsi sasaran $f=f(x,y)$, dengan dua variabel
+desain $x$ dan $y$, dan memakai jumlah titik coba $N_{titik} = JVD+1 = 3$,
+prosedurnya adalah sebagai berikut:
+\begin{enumerate}[label=\arabic*.]
+\item Tentukan atau acak tiga buah titik di dalam ruang variabel disain,
+      kemudian hitung nilai fitnessnya. Titik terbaik disebut titik $B$
+      (\textit{best}) dengan koordinat $(X_B,Y_B)$, titik terjelek
+      disebut titik $W$ (\textit{worst}) dengan koordinat $(X_W,Y_W)$,
+      sedang titik lainnya disebut titik $G$ (\textit{good}) dengan
+      koordinat $(X_G,Y_G)$.
+\item Hitung titik pusat $M$ dengan koordinat $(X_M,Y_M)$ yang didapat
+      dengan merata-rata titik coba selain titik $W$, sehingga:
+      \begin{align}
+      X_M &= 0{,}5\,(X_B + X_G) \label{eq:2-26}\\
+      Y_M &= 0{,}5\,(Y_B + Y_G) \label{eq:2-27}
+      \end{align}
+\item Tentukan arah penelusuran, yaitu garis yang menghubungkan titik $W$
+      dan titik $M$ dan dinyatakan sebagai:
+      \begin{align}
+      X_S &= X_M - X_W \label{eq:2-28}\\
+      Y_S &= Y_M - Y_W \label{eq:2-29}
+      \end{align}
+\item Cari titik coba baru dalam arah $S$ (\textit{search}) yang
+      memberikan nilai fitness lebih baik daripada fitness di titik $W$,
+      titik coba ini tidak boleh identik dengan titik $M$. Titik coba
+      baru $T$ (\textit{try}) dengan koordinat $X_T,Y_T$ adalah:
+      \begin{align}
+      X_T &= X_W + \alpha\,X_S \label{eq:2-30}\\
+      Y_T &= Y_W + \alpha\,Y_S \label{eq:2-31}
+      \end{align}
+      $\alpha$ adalah koefisien refleksi. Kalau tidak ditemukan titik
+      coba baru yang lebih baik dari titik $W$ maka dilakukan penyusutan
+      menuju $B$, besarnya penyusutan sama dengan setengah jaraknya
+      terhadap titik $B$, sehingga titik $W$ baru adalah:
+      \begin{align}
+      X_W^{\text{baru}} &= 0{,}5\,(X_W + X_B) \label{eq:2-32}\\
+      Y_W^{\text{baru}} &= 0{,}5\,(Y_W + Y_B) \label{eq:2-33}
+      \end{align}
+      dan titik $G$ baru adalah
+      \begin{align}
+      X_G^{\text{baru}} &= 0{,}5\,(X_W + X_G) \label{eq:2-34}\\
+      Y_G^{\text{baru}} &= 0{,}5\,(Y_W + Y_G) \label{eq:2-35}
+      \end{align}
+      Kemudian diperiksa apakah sudah konvergen atau belum, kalau sudah
+      maka berhenti, kalau belum ulangi ke langkah dua lagi.
+      Pemeriksaan konvergensi dapat menggunakan persamaan-persamaan yang
+      ada di bawah ini:
+      \begin{align}
+      |X_B - X_G| &\le \varepsilon \label{eq:2-36a}\\
+      |X_B - X_W| &\le \varepsilon \label{eq:2-36b}\\
+      |X_W - X_G| &\le \varepsilon \label{eq:2-36c}\\
+      |Y_B - Y_G| &\le \varepsilon \label{eq:2-36d}\\
+      |Y_B - Y_W| &\le \varepsilon \label{eq:2-36e}\\
+      |Y_W - Y_G| &\le \varepsilon \label{eq:2-36f}
+      \end{align}
+      dengan $\varepsilon$ adalah suatu nilai konvergensi dan diambil
+      sekecil mungkin, misalnya $0{,}0003$.
+\end{enumerate}
+
+Secara umum metoda ini membuat sebuah segi banyak dalam ruang variabelnya
+yang terus diiterasi sehingga segi banyak itu makin lama makin mengecil,
+dan akan didapatkan hasil yang optimum begitu segi banyak itu menjadi
+sangat kecil sekali, yang ditentukan nilainya sebagai suatu nilai
+konvergensi.

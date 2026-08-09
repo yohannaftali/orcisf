@@ -25,9 +25,11 @@ history only; don't duplicate current-state description here.
 
 ## 2006 — Follow-up
 
-- **2006** — `Optimasi Beton/Optimasi Struktur Beton.doc`, a condensed
-  paper/summary of the thesis, produced. A recompiled build (`orcisf.exe` +
-  `cw3230.dll`) with its own `aplikasi.*` example dataset was archived under
+- **2006** — `Optimasi Beton/Optimasi Struktur Beton.doc` created (file
+  timestamp 2006-09-10); binary inspection in 2026 found it has no
+  recoverable text or embedded objects — its intended content, if any, is
+  lost. A recompiled build (`orcisf.exe` + `cw3230.dll`) with its own
+  `aplikasi.*` example dataset was archived under
   `Optimasi Beton/Example/2006/`.
 
 ## 2026-08-09 — Repository documented and set up for AI-assisted work
@@ -45,3 +47,23 @@ history only; don't duplicate current-state description here.
   structural-analysis + "Flexible Polyhedron" optimization architecture, the
   `.inp`/`.isd`/.../`.opt` file-format convention, and the reserved-but-empty
   `src/` directory for any future modernization work.
+
+## 2026-08-09 — LaTeX transcription of the thesis manuscript
+
+- Added `Optimasi Beton/Teori/latex/`: a LaTeX build of the actual thesis
+  (`Teori/Isi/BAB I.doc`–`BAB V.doc`, `Intisari.doc`, `Cover/*.doc`,
+  `Daftar/*.doc`), requested as "a LaTeX version of `Optimasi Struktur
+  Beton.doc`". That specific file turned out to be empty on inspection (see
+  the 2006 entry above), so the transcription targets the real thesis
+  content instead, per the user's choice when offered that option.
+- Text was extracted with `antiword`; formulas embedded as MathType/
+  Equation Editor OLE objects (undetectable as plain text) were
+  reconstructed by cross-referencing the surrounding prose against the
+  actual C++ implementation in `Source/*.hpp` — see
+  `Teori/latex/LEGACY_TRANSCRIPTION_NOTES.md` for the full methodology and
+  a breakdown of what's verbatim vs. reconstructed vs. unrecoverable
+  (figures; Tabel 2-1's stiffness matrix, rebuilt from the cited Weaver &
+  Gere reference instead).
+- Compiled and verified with Tectonic 0.17.0 (downloaded standalone, no
+  system LaTeX install available) — `main.pdf`, 73 pages, no errors.
+  `main.pdf` is checked in alongside the `.tex` sources.
