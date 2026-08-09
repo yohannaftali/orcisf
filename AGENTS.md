@@ -125,7 +125,8 @@ by `$env{VCPKG_ROOT}`). CI: `.github/workflows/build-src.yml` matrix-builds
 all three OS targets on every push/PR touching `src/`.
 
 **Current state (#2 scaffold + #3 engine port + #4 threaded core + #5 3D
-viewport + #6 interactive editor + #7 load editor land; #8–#9 not started):**
+viewport + #6 interactive editor + #7 load editor + #8 detailing drawings
+land; #9 not started):**
 ```
 src/
 ├── vcpkg.json / CMakeLists.txt / CMakePresets.json
@@ -162,6 +163,10 @@ src/
 │   ├── LoadsPanel.{h,cpp}       # #7: load-schedule table -- one row per
 │   │                            # member/joint with a nonzero raw load,
 │   │                            # inline-editable, row click syncs Selection
+│   ├── DetailingPanel.{h,cpp}   # #8: 2D reinforcement drawing (concrete
+│   │                            # outline, bars, stirrups, dimension labels)
+│   │                            # for whichever member is selected -- view-only,
+│   │                            # docked as a "Detailing" tab alongside Viewport
 │   ├── RunPanel.{h,cpp}         # #4: dataset/options form, worker-thread-count
 │   │                            # slider, Run/Cancel, live progress bar -- runs
 │   │                            # engine::RunFullOptimization on a background
@@ -185,35 +190,102 @@ src/
 │   │                              # texture for ViewportPanel's ImGui::Image;
 │   │                              # #7 added DrawArrow()/DrawLoads() (thin-box
 │   │                              # shaft + small-cube head, fixed visual length)
-│   └── editor/                  # #6/#7: geometry+load editing, no ImGui/GL dependency
-│       ├── Selection.h          # SelectionKind{None,Joint,Member} + EditorOptions
-│       │                        # (connect-mode, snap-to-grid, #7's load_mode)
-│       │                        # shared by ViewportPanel/PropertiesPanel/Toolbar
-│       ├── EditableStructure.{h,cpp} # Add/Move/Delete joint, Add/Delete
-│       │                        # member, restraint toggle, Validate() (#6);
-│       │                        # SetMemberLoad/ClearMemberLoad/SetJointLoad/
-│       │                        # ClearJointLoad (#7, raw self-weight-free
-│       │                        # values) -- mutates an engine::StructureData&
-│       │                        # in place
-│       └── UndoStack.{h,cpp}    # GeometrySnapshot (X/Y/Z/JRL/AJ per joint,
-│                                  # JJ/JK/IA/W/AML per member -- NOT a full
-│                                  # StructureData copy) + push/undo/redo
-└── engine/                      # #3/#4/#5/#7: headless analysis/design/optimizer
+│   ├── editor/                  # #6/#7: geometry+load editing, no ImGui/GL dependency
+│   │   ├── Selection.h          # SelectionKind{None,Joint,Member} + EditorOptions
+│   │   │                        # (connect-mode, snap-to-grid, #7's load_mode)
+│   │   │                        # shared by ViewportPanel/PropertiesPanel/Toolbar
+│   │   ├── EditableStructure.{h,cpp} # Add/Move/Delete joint, Add/Delete
+│   │   │                        # member, restraint toggle, Validate() (#6);
+│   │   │                        # SetMemberLoad/ClearMemberLoad/SetJointLoad/
+│   │   │                        # ClearJointLoad (#7, raw self-weight-free
+│   │   │                        # values) -- mutates an engine::StructureData&
+│   │   │                        # in place
+│   │   └── UndoStack.{h,cpp}    # GeometrySnapshot (X/Y/Z/JRL/AJ per joint,
+│   │                              # JJ/JK/IA/W/AML per member -- NOT a full
+│   │                              # StructureData copy) + push/undo/redo
+│   └── detailing/                # #8: pure geometry, no ImGui/GL dependency --
+│       └── DetailingLayout.{h,cpp}  # engine::MemberResult -> DetailingDrawing
+│                                # (concrete outline, RebarCircle positions,
+│                                # DimensionLabel text, local mm coordinates)
+│                                # so #9's PDF export can reuse the exact same
+│                                # layout with a different renderer (libharu
+│                                # instead of ImDrawList)
+└── engine/                      # #3/#4/#5/#7/#8: headless analysis/design/optimizer
     ├── README.md                # full architecture + validation writeup — read before touching this dir
     ├── include/engine/*.h, src/*.cpp   # one pair per ported legacy file, see README's table
-    │   (MemberResults.h/.cpp is #5's addition, see below; LegacyIO's
-    │   ReadLoadsRaw()/WriteLoads() are #7's, see its own note below)
+    │   (MemberResults.h/.cpp is #5's addition, see below, extended by #8
+    │   with reinforcement fields; LegacyIO's ReadLoadsRaw()/WriteLoads()
+    │   are #7's, see its own note below)
     └── tools/orcisf_cli.cpp     # headless CLI: `info`/`equilibrium`/`optimize [worker_threads] [rng_seed] [quiet]`
-                                  # (optimize also prints a MEMBER_RESULTS section)
+                                  # (optimize's MEMBER_RESULTS section also prints
+                                  # reinforcement: bar counts/diameters/spacing)
 ```
 `Toolbar`/`ViewportPanel`/`PropertiesPanel` had inert placeholders under
 issue #2; #5 gave them their first real implementation (view-only: load,
-render, inspect), #6 added interactive geometry editing, and #7 added load
-editing (`LoadsPanel` is new). Read the relevant issue before starting
+render, inspect), #6 added interactive geometry editing, #7 added load
+editing (`LoadsPanel` is new), and #8 added the `DetailingPanel` + its
+`gui/detailing/` layout subsystem. Read the relevant issue before starting
 work here — each has detailed acceptance criteria. As each sub-issue
 lands, extend this section (new subsystems, data model, how the
 engine/GUI/export layers connect) rather than replacing it wholesale, per
 the Change Log Policy.
+
+**`engine::MemberResult`'s reinforcement fields + `gui/detailing/` (issue
+#8) — read before touching detailing drawings:**
+- **All the reinforcement data was already being computed by
+  `ComputeMemberResults()` (issue #5)** -- `IsiElemenBalokFields()`/
+  `IsiElemenKolomFields()` already set the legacy `DIA1lap`/`NL1lap`/...
+  (beam) and `DIA`/`N_DIA` (column) fields as a side effect of computing
+  dimensions/results; #8 just added capturing those into `MemberResult`
+  too (no new engine computation). If a field you need for detailing
+  isn't on `MemberResult` yet, check whether `IsiElemenBalokFields`/
+  `IsiElemenKolomFields`/`DesignColumn` already sets it on `sd` before
+  writing new engine logic.
+- **Bar counts (`lap_n_tarik` etc., `col_n_dia`) are `float`, matching the
+  legacy `NL1`/`N_DIA` fields exactly** (discrete-table lookups resolve to
+  float even for "count" tables) -- always integral in practice; format
+  with `%.0f`/`std::lround()`, don't change the type to `int` without
+  checking every call site.
+- **Tension bars flip faces between lapangan and tumpuan on purpose --
+  this is physically correct, not a placeholder.** `BuildDetailingDrawing()`
+  places lapangan (midspan) tension bars at the bottom and tumpuan
+  (support) tension bars at the top, matching the standard sagging
+  (positive moment, `MLAP`) vs. hogging (negative moment, `MTUM`) moment
+  convention -- it's exactly why the legacy format tracks two independent
+  reinforcement sets per beam in the first place. Verified both by a
+  standalone geometry test (asserts tension-bar Y sign per region) and by
+  eyeballing a real rendered drawing (`Example/Apl1-1`'s batang 8: tumpuan
+  tension top / lapangan tension bottom, both matching the CLI's
+  `MEMBER_RESULTS` numbers exactly).
+- **Column bars are placed evenly around all four sides given only
+  `N_DIA`** (bars per side, legacy convention) -- total unique bars is
+  `4*N_DIA-4` (corners shared between adjacent sides), matching
+  `WriteFinalResults()`'s `(4*N_DIA-4) D DIA` display exactly. Verified
+  with a standalone test (`N_DIA=3` -> 8 bars, all within the outline).
+- **`DetailingLayout.{h,cpp}` has zero ImGui/OpenGL dependency on
+  purpose** -- it only depends on `engine::MemberResult`/`gui::MemberVisual`
+  and produces plain-data `DetailingDrawing`/`DetailingSection`/
+  `RebarCircle`/`DimensionLabel` structs in local mm coordinates (origin
+  at the section center, +Y up). `DetailingPanel.cpp` is the *only* file
+  that touches `ImDrawList` to actually render it. **Issue #9's PDF export
+  should reuse `BuildDetailingDrawing()` directly** and write a second,
+  separate renderer (HPDF calls instead of `ImDrawList` calls) rather than
+  recomputing bar positions -- that's the whole reason the layout/render
+  split exists.
+- **Dimensioning is simple text labels anchored at a point, not a full
+  parametric CAD dimension-line-with-arrowheads system** -- judged
+  sufficient for "usable as a reference drawing" without the added
+  complexity; revisit only if a future issue specifically asks for
+  arrowed extension lines.
+- **What was verified:** `BuildDetailingDrawing()`'s geometry (bar counts,
+  in-bounds positions, correct tension/compression face per beam region,
+  column bar count formula) was unit-tested standalone before GUI wiring.
+  The full rendering pipeline was then verified interactively in this
+  environment against a real optimization run of `Example/Apl1-1`
+  (screenshotted): a column's drawing (12D25 bars, correct spacing/cover/
+  stirrup labels) and a beam's drawing (both Tumpuan and Lapangan
+  sections, correct tension-face flip, all labels) were confirmed to
+  exactly match the same run's `orcisf_cli`/`MEMBER_RESULTS` numeric output.
 
 **`engine/`'s `ReadLoadsRaw()`/`WriteLoads()` (issue #7) — the load-editor's
 critical invariant:** the legacy `.bbn` file *never* includes self-weight
@@ -638,7 +710,7 @@ for skills that apply to the current task and follow them.
 | #5 | feat(src): 3D viewport + example-folder loader (render structure & per-member results) | closed | 2026-08-10 |
 | #6 | feat(src): interactive 3D structure editor (import, drag-and-drop edit, numeric entry) | closed | 2026-08-10 |
 | #7 | feat(src): load (pembebanan) input GUI (toolbar-driven, CAD-style 3D placement) | closed | 2026-08-10 |
-| #8 | feat(src): reinforcement detailing drawings per beam/column | open | 2026-08-09 |
+| #8 | feat(src): reinforcement detailing drawings per beam/column | closed | 2026-08-10 |
 | #9 | feat(src): PDF + legacy-text export of results | open | 2026-08-09 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui

@@ -33,6 +33,17 @@ std::vector<MemberResult> ComputeMemberResults(StructureData& sd) {
         IsiElemenBalokFields(sd, oio);
         r.width = sd.B;
         r.height = sd.H;
+        r.cover_mm = sd.selimut_balok;
+        r.lap_dia_tarik = sd.DIA1lap;
+        r.lap_n_tarik = sd.NL1lap;
+        r.lap_dia_tekan = sd.DIA2lap;
+        r.lap_n_tekan = sd.NL2lap;
+        r.tum_dia_tarik = sd.DIA1tum;
+        r.tum_n_tarik = sd.NL1tum;
+        r.tum_dia_tekan = sd.DIA2tum;
+        r.tum_n_tekan = sd.NL2tum;
+        r.stirrup_dia = sd.DIAS;
+        r.stirrup_spacing = sd.Jarak_S;
 
         ElemenLapangan(sd, oio);
         DesignBeam(sd);
@@ -64,6 +75,12 @@ std::vector<MemberResult> ComputeMemberResults(StructureData& sd) {
 
         r.width = sd.sisi;
         r.height = sd.sisi;
+        r.cover_mm = sd.selimut_kolom;
+        r.col_dia = sd.DIA;
+        r.col_n_dia = sd.N_DIA;
+        r.stirrup_dia = sd.DIAS;
+        r.stirrup_spacing = sd.Jarak_S;
+        r.col_bar_spacing = sd.jarak_antar_tulangan;
         r.axial_demand = sd.PK[r.no_batang] / 0.8f; // matches .opt's "Gaya aksial" display
         r.axial_capacity = sd.FPU;
         r.moment_x_demand = sd.MKX[r.no_batang] / 0.8f;

@@ -479,3 +479,54 @@ history only; don't duplicate current-state description here.
   instead of "Save Loads" — caught immediately (window title changed to
   "Select Folder"), dismissed with Escape, no data lost, re-verified the
   correct menu item's position via a screenshot before retrying.
+
+## 2026-08-10 — #8: reinforcement detailing drawings per beam/column
+
+- Extended `engine::MemberResult` (issue #5's addition) with reinforcement
+  fields -- beam: `lap_dia_tarik`/`lap_n_tarik`/`lap_dia_tekan`/`lap_n_tekan`
+  and the `tum_*` equivalents, plus `stirrup_dia`/`stirrup_spacing`/
+  `cover_mm`; column: `col_dia`/`col_n_dia`/`col_bar_spacing`/`stirrup_*`/
+  `cover_mm`. No new engine computation was needed -- `IsiElemenBalokFields()`/
+  `IsiElemenKolomFields()` (already called by `ComputeMemberResults()`)
+  were already setting these legacy fields as a side effect of computing
+  dimensions; #8 just captures them too. `orcisf_cli optimize`'s
+  `MEMBER_RESULTS` section now also prints them, sanity-checked against
+  `Example/Apl1-1`: realistic bar counts/diameters/stirrup spacing for
+  every beam and column (e.g. a 500×500 column: `12D25`, 100mm spacing,
+  D10-300 stirrups).
+- New `src/gui/detailing/DetailingLayout.{h,cpp}`: pure geometry (zero
+  ImGui/OpenGL dependency), builds a `DetailingDrawing` (concrete outline,
+  `RebarCircle` bar positions, `DimensionLabel` text, local mm coordinates)
+  from a `MemberResult` -- deliberately separated from rendering so issue
+  #9's PDF export can reuse the exact same layout computation with a
+  different renderer (HPDF instead of ImDrawList) instead of recomputing
+  bar positions. Beam tension bars are placed on the correct physical face
+  per region: lapangan (midspan, sagging/positive moment) tension at the
+  bottom, tumpuan (support, hogging/negative moment) tension at the top --
+  the standard RC convention, and exactly why the legacy format tracks two
+  independent reinforcement sets per beam. Column bars are spread evenly
+  around all four sides given only `N_DIA` (bars per side), producing
+  `4*N_DIA-4` unique bars (corners shared between adjacent sides),
+  matching `WriteFinalResults()`'s display formula exactly. Both were
+  unit-tested standalone (bar-in-bounds, correct tension/compression face
+  per region, correct column bar count for a known `N_DIA`) before GUI wiring.
+- New `src/gui/DetailingPanel.{h,cpp}`: docked "Detailing" tab (alongside
+  Viewport) rendering whichever member is selected via `ImDrawList`
+  (concrete rect, stirrup rect, bar circles color-coded tension/
+  compression, text labels for B/H/cover/stirrup/bar callouts). Beams show
+  two side-by-side sections (Tumpuan first, then Lapangan, matching
+  `WriteFinalResults()`'s text-output order); columns show one. View-only,
+  no editing capability (not called for by #8's acceptance criteria).
+- **Validation:** the full rendering pipeline was verified interactively
+  in this environment against a real completed optimization run of
+  `Example/Apl1-1` (screenshotted): a column's drawing (12D25 bars in the
+  correct evenly-spaced arrangement, correct spacing/cover/stirrup labels)
+  and a beam's drawing (both Tumpuan and Lapangan sections, correct
+  tension-face flip between them, all labels) were confirmed to exactly
+  match that same run's `orcisf_cli`/`MEMBER_RESULTS` numeric output --
+  not just internally consistent, but numerically identical to the
+  independently-computed CLI values. One cosmetic issue was caught and
+  fixed during this pass: a Unicode filled-circle glyph used for the
+  tension/compression color legend rendered as "?" (not in ImGui's
+  default font's glyph range) -- replaced with a small `ImDrawList`-drawn
+  colored square instead, which doesn't depend on font glyph coverage.

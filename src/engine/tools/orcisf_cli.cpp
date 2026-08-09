@@ -139,7 +139,20 @@ int CmdOptimize(const std::string& dataset, float harga_beton, float harga_besi,
     std::cout << "MEMBER_RESULTS\n";
     for (const MemberResult& r : ComputeMemberResults(sd)) {
         std::cout << "batang=" << r.no_batang << " type=" << (r.is_beam ? "balok" : "kolom") << " w=" << r.width
-                   << " h=" << r.height << " harga=" << r.harga << " kendala=" << r.Kendala() << "\n";
+                   << " h=" << r.height << " harga=" << r.harga << " kendala=" << r.Kendala()
+                   << " cover=" << r.cover_mm;
+        if (r.is_beam) {
+            std::cout << " lap_tarik=" << r.lap_n_tarik << "D" << r.lap_dia_tarik
+                       << " lap_tekan=" << r.lap_n_tekan << "D" << r.lap_dia_tekan
+                       << " tum_tarik=" << r.tum_n_tarik << "D" << r.tum_dia_tarik
+                       << " tum_tekan=" << r.tum_n_tekan << "D" << r.tum_dia_tekan
+                       << " sengkang=" << r.stirrup_dia << "-" << r.stirrup_spacing;
+        } else {
+            std::cout << " tul_utama=" << (4 * r.col_n_dia - 4) << "D" << r.col_dia
+                       << " jarak_tul=" << r.col_bar_spacing
+                       << " sengkang=" << r.stirrup_dia << "-" << r.stirrup_spacing;
+        }
+        std::cout << "\n";
     }
     return 0;
 }

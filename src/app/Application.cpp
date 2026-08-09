@@ -202,6 +202,7 @@ void Application::BuildDockspace() {
         ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.25f, nullptr, &dock_main);
 
     ImGui::DockBuilderDockWindow("Viewport", dock_main);
+    ImGui::DockBuilderDockWindow("Detailing", dock_main);
     ImGui::DockBuilderDockWindow("Properties", dock_right);
     ImGui::DockBuilderDockWindow("Run Optimization", dock_right);
     ImGui::DockBuilderDockWindow("Loads", dock_bottom);
@@ -223,6 +224,7 @@ void Application::OnFrame() {
     properties_panel_.Draw(&properties_open_, scene_, selection_, editable_ptr, &undo_stack_, validation_issues_,
                             on_geometry_changed);
     loads_panel_.Draw(&loads_open_, scene_, selection_, editable_ptr, &undo_stack_, on_geometry_changed);
+    detailing_panel_.Draw(&detailing_open_, scene_, selection_);
     run_panel_.Draw(&run_open_);
     log_panel_.Draw(&log_open_);
 }

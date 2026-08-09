@@ -27,11 +27,13 @@ add_executable(orcisf_gui
     gui/RunPanel.cpp
     gui/LogPanel.cpp
     gui/LoadsPanel.cpp
+    gui/DetailingPanel.cpp
     gui/viewport/Camera.cpp
     gui/viewport/SceneModel.cpp
     gui/viewport/SceneRenderer.cpp
     gui/editor/EditableStructure.cpp
     gui/editor/UndoStack.cpp
+    gui/detailing/DetailingLayout.cpp
 )
 
 target_include_directories(orcisf_gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

@@ -35,6 +35,30 @@ struct MemberResult {
     float moment_x_demand = 0.f, moment_y_demand = 0.f, moment_capacity = 0.f;
     float kendala_kolom = 0.f;
 
+    // Reinforcement, for issue #8's detailing drawings. All diameters/
+    // spacings in mm, cover in mm. Beam: tension/compression bars differ
+    // between lapangan (midspan) and tumpuan (support) regions, matching
+    // the legacy DIA1lap/NL1lap/... vs DIA1tum/NL1tum/... split (1 =
+    // tension, 2 = compression -- see IsiElemenBalokFields). Column: a
+    // single symmetric arrangement of N_DIA bars of diameter `dia` evenly
+    // spaced around all four sides (4*N_DIA - 4 bars total, matching the
+    // legacy `WriteFinalResults()` display), with jarak_antar_tulangan
+    // the on-center spacing DesignColumn() checked against the code
+    // minimum.
+    float cover_mm = 0.f; // selimut_balok or selimut_kolom (run-wide, copied per member for a self-contained struct)
+    // Beam. Bar counts are float, matching the legacy NL1/NL2 fields
+    // exactly (discrete-table lookups resolve to float even for "count"
+    // tables) -- always integral in practice, format with %.0f.
+    float lap_dia_tarik = 0.f, lap_dia_tekan = 0.f;
+    float lap_n_tarik = 0.f, lap_n_tekan = 0.f;
+    float tum_dia_tarik = 0.f, tum_dia_tekan = 0.f;
+    float tum_n_tarik = 0.f, tum_n_tekan = 0.f;
+    float stirrup_dia = 0.f, stirrup_spacing = 0.f; // shared by both regions (DIAS/Jarak_S are per-member, not per-region)
+    // Column:
+    float col_dia = 0.f;
+    float col_n_dia = 0.f; // N_DIA -- total bars around the perimeter is 4*N_DIA-4
+    float col_bar_spacing = 0.f; // jarak_antar_tulangan
+
     // Worst-case constraint value across every check for this member --
     // 0 = fully satisfied (a reasonable "green" in a color-coded view),
     // >0 = violated (the total the optimizer's fitness formula would
