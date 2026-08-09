@@ -66,7 +66,8 @@ orcisf/
 ├── CHANGE_HISTORY.md                # dated project history
 ├── README.md                        # human-facing project overview
 ├── .claude/skills/                  # agent skills (see Agent Skills below)
-├── src/                             # RESERVED, currently EMPTY — see below
+├── .github/workflows/build-src.yml  # CI: builds src/ on Windows/macOS/Linux
+├── src/                             # modern cross-platform GUI port (in progress) — see below
 └── Optimasi Beton/                  # the original 1998-1999 thesis deliverable
     ├── BacaSaya.txt                 # original Indonesian README / user manual
     ├── orcisf.exe / orcisf.ico      # compiled Win32 console binary + icon
@@ -106,15 +107,44 @@ matrix image — reconstructed from the cited Weaver & Gere reference
 instead). `main.tex` compiles cleanly with Tectonic 0.17.0 (`main.pdf` is
 checked in); no `babel`/Indonesian language-pack dependency.
 
-### `src/` (reserved, empty)
+### `src/` — modern cross-platform GUI port (in progress, tracked by #1–#9)
 
-`src/` exists but is currently **empty**. It is not part of the historical
-deliverable — treat it as a **placeholder reserved for a possible future
-modernization/port** of the engine (e.g. a cross-platform or Python/C++ rewrite).
-**Do not assume its intended language, structure, or scope.** If asked to start
-work there, confirm the target stack/scope with the user first (or check whether
-a `planner`/GitHub issue already defines it) rather than guessing from the legacy
-code's structure.
+A ground-up rewrite of the engine as a cross-platform (Windows 11/macOS/
+Linux) desktop GUI, tracked as epic **#1** with sub-issues **#2–#9** (see
+**Tracked Issues** below). It does not touch `Optimasi Beton/Source/` (the
+legacy code stays a read-only historical reference). Full build/dependency
+docs: [`src/README.md`](src/README.md).
+
+**Stack** (ratified in #2): **Dear ImGui** (docking) + **GLFW** + OpenGL3
+for the app shell/panels, **ImGuizmo** for 3D manipulation gizmos,
+**ImPlot** for charts, **nativefiledialog-extended** for native file/folder
+dialogs, **libharu (HPDF)** for PDF export — dependency-managed via
+**vcpkg manifest mode** (`src/vcpkg.json`), built with **CMake presets**
+(`src/CMakePresets.json`: `{windows,macos,linux}-{debug,release}`, driven
+by `$env{VCPKG_ROOT}`). CI: `.github/workflows/build-src.yml` matrix-builds
+all three OS targets on every push/PR touching `src/`.
+
+**Current state (#2 scaffold only — nothing beyond this exists yet):**
+```
+src/
+├── vcpkg.json / CMakeLists.txt / CMakePresets.json
+├── app/
+│   ├── main.cpp             # GLFW/OpenGL3/ImGui bootstrap + render loop
+│   └── Application.{h,cpp}  # docking layout (Viewport | Properties / Log)
+└── gui/
+    ├── Toolbar.{h,cpp}          # menu bar — placeholder items only
+    ├── ViewportPanel.{h,cpp}    # 3D view — placeholder, real work is #5
+    ├── PropertiesPanel.{h,cpp}  # selection editor — placeholder, #6/#7
+    └── LogPanel.{h,cpp}         # run/status log — functional; detailed
+                                 # calc log to disk is #3
+```
+`ViewportPanel`/`PropertiesPanel`/`Toolbar` are intentionally inert
+placeholders — **do not build real features into them under issue #2**;
+that belongs to their respective linked issues (#3–#9). Read the relevant
+issue before starting work here — each has detailed acceptance criteria.
+As each sub-issue lands, extend this section (new subsystems, data model,
+how the engine/GUI/export layers connect) rather than replacing it
+wholesale, per the Change Log Policy.
 
 ---
 
@@ -337,15 +367,35 @@ for skills that apply to the current task and follow them.
 
 - **Remote repo:** `origin` → `https://github.com/yohannaftali/orcisf.git`
   (`yohannaftali/orcisf`).
-- **Branch strategy:** single `main` branch currently (no CI/deploy pipeline —
-  this is a documentation/archive repository, not a running service). Confirm
-  with the user before assuming a feature-branch workflow is wanted.
+- **Branch strategy:** single `main` branch currently (no deploy pipeline —
+  this is primarily a documentation/archive repository, not a running
+  service; `src/` is the one actively-developed exception, see below).
+  Confirm with the user before assuming a feature-branch workflow is wanted.
+- **CI:** `.github/workflows/build-src.yml` builds `src/` on
+  windows-latest/macos-latest/ubuntu-latest for every push/PR touching
+  `src/**`. Nothing else in the repo has CI (no build step applies to the
+  legacy archive or the docs).
 
 ## Tracked Issues
+| ID | Title | Status | Last Checked |
+|----|-------|--------|--------------|
+| #1 | epic(src): port ORCISF to a modern cross-platform GUI application | open | 2026-08-09 |
+| #2 | feat(src): choose GUI stack & scaffold cross-platform CMake build (Win/macOS/Linux) | ready-for-review | 2026-08-09 |
+| #3 | feat(src): port structural-analysis + RC-design + Flexible-Polyhedron engine as a headless library | open | 2026-08-09 |
+| #4 | feat(src): multi-threaded optimization core with configurable core count + cancellable progress | open | 2026-08-09 |
+| #5 | feat(src): 3D viewport + example-folder loader (render structure & per-member results) | open | 2026-08-09 |
+| #6 | feat(src): interactive 3D structure editor (import, drag-and-drop edit, numeric entry) | open | 2026-08-09 |
+| #7 | feat(src): load (pembebanan) input GUI (toolbar-driven, CAD-style 3D placement) | open | 2026-08-09 |
+| #8 | feat(src): reinforcement detailing drawings per beam/column | open | 2026-08-09 |
+| #9 | feat(src): PDF + legacy-text export of results | open | 2026-08-09 |
 
-None yet. Use the `planner` skill to create the first entries when there is
-concrete work to track (e.g. a modernization/port effort under `src/`, or a
-fix to a specific legacy calculation).
+Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
+(docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
+nativefiledialog-extended (native file/folder dialogs), libharu/HPDF (PDF
+export), CMake + vcpkg (Win/macOS/Linux build). **#2's scaffold has
+landed** (see `src/`, "`src/` — modern cross-platform GUI port" above) —
+build/window/docking skeleton only, no engine/viewport/editor/export
+functionality yet; #3–#9 are still open.
 
 ---
 
@@ -358,9 +408,15 @@ fix to a specific legacy calculation).
   minimum, review the change against the surrounding style and note in the
   commit/PR that it is **untested** (no compiler available) unless you have
   independently verified it against a Borland toolchain.
-- **New `src/` work:** validate with whatever toolchain that work adopts; make
-  sure its own build/run/test instructions get added to this file once it
-  exists.
+- **`src/` (GUI port) work:** build via `cmake --preset <os>-release &&
+  cmake --build --preset <os>-release` from `src/` (needs `VCPKG_ROOT` set —
+  see `src/README.md`). A clean vcpkg build compiles every dependency from
+  source (no binary cache configured) and can take a long time on first
+  configure. **CI is the authoritative cross-platform check**
+  (`.github/workflows/build-src.yml`, Windows/macOS/Linux matrix) — if you
+  can't fully build locally in your environment (e.g. no vcpkg/compiler
+  available), say so explicitly rather than claiming it was verified, and
+  let CI confirm the other platforms.
 
 ---
 

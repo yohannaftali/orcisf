@@ -1,0 +1,22 @@
+{
+  "name": "orcisf-gui",
+  "version": "0.1.0",
+  "description": "Modern cross-platform GUI port of ORCISF (Optimasi Beton Bertulang Pada Struktur Portal Ruang)",
+  "homepage": "https://github.com/yohannaftali/orcisf",
+  "builtin-baseline": "ea1a7396b05637a53bf23c078647ecc0edee4b80",
+  "dependencies": [
+    {
+      "name": "imgui",
+      "features": [
+        "docking-experimental",
+        "glfw-binding",
+        "opengl3-binding"
+      ]
+    },
+    "glfw3",
+    "imguizmo",
+    "implot",
+    "nativefiledialog-extended",
+    "libharu"
+  ]
+}
