@@ -1,0 +1,68 @@
+/**************************************************************************/
+/*                                                                        */ 
+/*      Program Optimasi Beton Bertulang Pada Struktur Portal Ruang       */
+/*                        Oleh : Yohan Naftali                            */ 
+/*             Diajukan sebagai Tugas Akhir Sarjana Strata-1              */
+/*                   Peminatan Program Studi Struktur                     */ 
+/*                      Program Studi  Teknik Sipil                       */
+/*                   Universitas Atma Jaya Yogyakarta                     */
+/*         Dosen Pembimbing I Dr. Ir. Fx. Nurwadji Wibowo M.Sc.           */
+/*              Dosen Pembimbing II Ir. Ch. Arief Sudibyo                 */
+/*                                                                        */
+/**************************************************************************/
+
+     ###     #####       ####     ###    #####     #######      
+    #   #    #    #     #    #     #    #          #     
+   #     #   #    #    #           #    #          #   
+   #     #   #####     #           #     ####      #####  
+   #     #   ##        #           #         #     #   
+   #     #   # ##      #           #          #    #
+    #   #    #  ##      #    #     #         #     #   
+     ###     #    #      ####     ###   #####     ###         VER 0.01       
+
+                 What is in a name (W. Shakesphere)
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Program ini dibuat untuk kepentingan pendidikan dan bersifat sharing, bebas
+untuk dikembangkan, hasil dari optimasi ini mungkin dalam pelaksanaannya 
+belum dapat langsung dipergunakan, tetapi dapat menjadi bahan perbandingan
+hitungan struktur.
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Untuk menjalankan program, terlebih dahulu booting ke sistem operasi Windows
+95/98/NT setelah itu klik ganda file ORCISF.EXE ( Optimizing Reinforced Con-
+crete in Space Frame structure) setelah itu pilih menu yang ada pada box DOS
+
+----------------------------------------------------------------------------
+
+Apabila ingin mengoptimasi contoh yang terdapat  pada sub direktori example,
+dan file generiknya bernama contoh dan dalam direktori tersebut paling tidak
+sudah harus memuat file :
+contoh.inp  :  berisi data umum struktur
+contoh.isd  :  berisi data diskrit sisi sisi penampang
+contoh.idl  :  berisi data diskrit diameter tulangan memanjang
+contoh.ijl  :  berisi data diskrit jumlah tulangan
+contoh.ids  :  berisi data diskrit diameter sengkang yang digunakan
+contoh.ijs  :  berisi data diskrit jarak antar sengkang
+contoh.bbn  :  berisi data pembebanan pada struktur
+file tersebut memuat data berformat ASCII, sehingga dapat diedit menggunakan
+Notepad atau MS-DOS Editor untuk mengganti data input
+Setelah file input siap, pada menu utama pilih optimasi struktur, lalu ikuti
+perintah yang ada.
+Untuk mengisi nama file generik yang berada di sub-direktori example, masuk-
+kan "example/contoh" (tanpa tanda petik), setelah itu masukkan harga beton dan besi, tebal selimut kolom dan balok, faktor penalti yang diambil > dari 
+harga struktur, serta jumlah iterasi maksimum, untuk jumlah iterasi maksimum dapat diisikan > 10000 supaya mendapatkan hasil yang baik.
+Setelah itu tekan enter dan tunggu sampai program memberi informasi bahwa program sudah selesai.
+
+----------------------------------------------------------------------------
+
+Setelah program dijalankan, hasil yang dicetak terdapat pada file contoh.opt
+berupa dimensi setiap balok dan kolom, untuk melihat informasi lainnya, seperti geometri struktur, maka dapat dilihat pada file contoh.inf, hasil analisa struktur terdapat pada file contoh.str
+
+----------------------------------------------------------------------------
+
+
+
+   

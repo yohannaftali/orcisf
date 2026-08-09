@@ -1,0 +1,575 @@
+Nama Struktur : GEDUNG_2_LANTAI
+Hasil Optimasi Beton Bertulang Pada Struktur Portal Ruang
+Metoda Optimasi : Flexible Polyhedron
+Jumlah Variabel Desain : 168
+Jumlah Struktur Desain : 171
+Oleh Yohan Naftali 1999
+
+Nama File Generik : data04/gedung
+Nama Struktur : GEDUNG_2_LANTAI
+Jumlah batang : 21
+Jumlah titik kumpul : 16
+Modulus elastisitas tarik/tekan : 19661.5 MPa
+Modulus elastisitas geser G : 11305.4 MPa
+Kuat desak Karakteristik Beton : 17.5 MPa
+Kuat tarik baja tulangan lentur : 240 MPa
+Kuat tarik baja tulangan sengkang : 240 MPa
+-----------------------------------------------------
+Balok 1 330 x 570
+Nomor Batang : 13
+Panjang Bentang : 6 m
+Beban Total : 41914.4 N/m
+Berat Sendiri : 4514.4 N/m
+Momen kiri : -108162 Nmm
+Momen tengah : 127606 Nmm
+Momen kanan : -159172 Nmm
+Geser kiri : 148677 N
+Geser kanan : -165681 N
+Lendutan Tengah Bentang : 16.0466 mm
+Lendutan ijin 33.3333 mm
+Sengkang 12 - 140
+Jarak sengkang maksimum : 151.044 mm
+
+Daerah Lapangan
+Tulangan tarik 3 D 29
+Tulangan desak 2 D 22
+Volume beton : 0.5643 m^3
+Berat Tulangan utama : 64.5372 kg
+Berat Tulangan geser : 43.4567 kg
+Harga balok daerah lapangan : 681045
+Momen yang membebani : 127606 Nmm
+Momen yang dapat ditahan : 175712 Nmm
+
+Daerah Tumpuan
+Tulangan desak 2 D 20
+Tulangan tarik 3 D 29
+Volume beton : 0.5643 m^3
+Berat Tulangan utama : 61.4315 kg
+Berat Tulangan geser : 43.4567 kg
+Harga balok pada tumpuan kiri + kanan : 665516
+Momen yang membebani : 159172 Nmm
+Momen yang dapat ditahan : 175621 Nmm
+
+-----------------------------------------------------
+Balok 2 350 x 520
+Nomor Batang : 14
+Panjang Bentang : 4 m
+Beban Total : 35678 N/m
+Berat Sendiri : 4368 N/m
+Momen kiri : -69734.4 Nmm
+Momen tengah : 19460.6 Nmm
+Momen kanan : -87330.8 Nmm
+Geser kiri : 84795.9 N
+Geser kanan : -93594.1 N
+Lendutan Tengah Bentang : 0.0488365 mm
+Lendutan ijin 22.2222 mm
+Sengkang 12 - 170
+Jarak sengkang maksimum : 229.5 mm
+
+Daerah Lapangan
+Tulangan tarik 3 D 22
+Tulangan desak 2 D 28
+Volume beton : 0.364 m^3
+Berat Tulangan utama : 37.22 kg
+Berat Tulangan geser : 21.791 kg
+Harga balok daerah lapangan : 386055
+Momen yang membebani : 19460.6 Nmm
+Momen yang dapat ditahan : 94682.1 Nmm
+
+Daerah Tumpuan
+Tulangan desak 2 D 25
+Tulangan tarik 3 D 25
+Volume beton : 0.364 m^3
+Berat Tulangan utama : 38.5141 kg
+Berat Tulangan geser : 21.791 kg
+Harga balok pada tumpuan kiri + kanan : 392526
+Momen yang membebani : 87330.8 Nmm
+Momen yang dapat ditahan : 119722 Nmm
+
+-----------------------------------------------------
+Balok 3 330 x 590
+Nomor Batang : 15
+Panjang Bentang : 6 m
+Beban Total : 41993.6 N/m
+Berat Sendiri : 4593.6 N/m
+Momen kiri : -136470 Nmm
+Momen tengah : 99743.9 Nmm
+Momen kanan : -137965 Nmm
+Geser kiri : 157227 N
+Geser kanan : -157725 N
+Lendutan Tengah Bentang : 11.813 mm
+Lendutan ijin 33.3333 mm
+Sengkang 12 - 130
+Jarak sengkang maksimum : 190.23 mm
+
+Daerah Lapangan
+Tulangan tarik 3 D 22
+Tulangan desak 2 D 25
+Volume beton : 0.5841 m^3
+Berat Tulangan utama : 49.9512 kg
+Berat Tulangan geser : 48.4822 kg
+Harga balok daerah lapangan : 638192
+Momen yang membebani : 99743.9 Nmm
+Momen yang dapat ditahan : 109601 Nmm
+
+Daerah Tumpuan
+Tulangan desak 2 D 22
+Tulangan tarik 3 D 25
+Volume beton : 0.5841 m^3
+Berat Tulangan utama : 52.5578 kg
+Berat Tulangan geser : 48.4822 kg
+Harga balok pada tumpuan kiri + kanan : 651225
+Momen yang membebani : 137965 Nmm
+Momen yang dapat ditahan : 139072 Nmm
+
+-----------------------------------------------------
+Balok 4 390 x 570
+Nomor Batang : 16
+Panjang Bentang : 6 m
+Beban Total : 42598.4 N/m
+Berat Sendiri : 5198.4 N/m
+Momen kiri : -120010 Nmm
+Momen tengah : 119606 Nmm
+Momen kanan : -154947 Nmm
+Geser kiri : 153921 N
+Geser kanan : -165567 N
+Lendutan Tengah Bentang : 13.1326 mm
+Lendutan ijin 33.3333 mm
+Sengkang 12 - 160
+Jarak sengkang maksimum : 197.889 mm
+
+Daerah Lapangan
+Tulangan tarik 3 D 28
+Tulangan desak 2 D 22
+Volume beton : 0.6669 m^3
+Berat Tulangan utama : 61.376 kg
+Berat Tulangan geser : 39.8382 kg
+Harga balok daerah lapangan : 672796
+Momen yang membebani : 119606 Nmm
+Momen yang dapat ditahan : 166191 Nmm
+
+Daerah Tumpuan
+Tulangan desak 2 D 22
+Tulangan tarik 3 D 29
+Volume beton : 0.6669 m^3
+Berat Tulangan utama : 64.5372 kg
+Berat Tulangan geser : 39.8382 kg
+Harga balok pada tumpuan kiri + kanan : 688602
+Momen yang membebani : 154947 Nmm
+Momen yang dapat ditahan : 177333 Nmm
+
+-----------------------------------------------------
+Balok 5 340 x 500
+Nomor Batang : 17
+Panjang Bentang : 4 m
+Beban Total : 35390 N/m
+Berat Sendiri : 4080 N/m
+Momen kiri : -66643.6 Nmm
+Momen tengah : 21831.4 Nmm
+Momen kanan : -80015.7 Nmm
+Geser kiri : 85132 N
+Geser kanan : -91818 N
+Lendutan Tengah Bentang : 0.154018 mm
+Lendutan ijin 22.2222 mm
+Sengkang 12 - 170
+Jarak sengkang maksimum : 218.75 mm
+
+Daerah Lapangan
+Tulangan tarik 3 D 25
+Tulangan desak 2 D 19
+Volume beton : 0.34 m^3
+Berat Tulangan utama : 32.0067 kg
+Berat Tulangan geser : 20.7915 kg
+Harga balok daerah lapangan : 348991
+Momen yang membebani : 21831.4 Nmm
+Momen yang dapat ditahan : 113873 Nmm
+
+Daerah Tumpuan
+Tulangan desak 2 D 25
+Tulangan tarik 3 D 25
+Volume beton : 0.34 m^3
+Berat Tulangan utama : 38.5141 kg
+Berat Tulangan geser : 20.7915 kg
+Harga balok pada tumpuan kiri + kanan : 381528
+Momen yang membebani : 80015.7 Nmm
+Momen yang dapat ditahan : 113849 Nmm
+
+-----------------------------------------------------
+Balok 6 360 x 570
+Nomor Batang : 18
+Panjang Bentang : 6 m
+Beban Total : 42324.8 N/m
+Berat Sendiri : 4924.8 N/m
+Momen kiri : -141777 Nmm
+Momen tengah : 96299.8 Nmm
+Momen kanan : -134635 Nmm
+Geser kiri : 159908 N
+Geser kanan : -157528 N
+Lendutan Tengah Bentang : 11.6754 mm
+Lendutan ijin 33.3333 mm
+Sengkang 12 - 170
+Jarak sengkang maksimum : 191.452 mm
+
+Daerah Lapangan
+Tulangan tarik 3 D 22
+Tulangan desak 2 D 20
+Volume beton : 0.6156 m^3
+Berat Tulangan utama : 41.6322 kg
+Berat Tulangan geser : 36.5176 kg
+Harga balok daerah lapangan : 544649
+Momen yang membebani : 96299.8 Nmm
+Momen yang dapat ditahan : 106669 Nmm
+
+Daerah Tumpuan
+Tulangan desak 2 D 22
+Tulangan tarik 3 D 29
+Volume beton : 0.6156 m^3
+Berat Tulangan utama : 64.5372 kg
+Berat Tulangan geser : 36.5176 kg
+Harga balok pada tumpuan kiri + kanan : 659174
+Momen yang membebani : 141777 Nmm
+Momen yang dapat ditahan : 176540 Nmm
+
+-----------------------------------------------------
+Balok 7 340 x 560
+Nomor Batang : 19
+Panjang Bentang : 6 m
+Beban Total : 19189.6 N/m
+Berat Sendiri : 4569.6 N/m
+Momen kiri : -53735.4 Nmm
+Momen tengah : 54206.1 Nmm
+Momen kanan : -66735 Nmm
+Geser kiri : 69794.4 N
+Geser kanan : -74127.6 N
+Lendutan Tengah Bentang : 2.84394 mm
+Lendutan ijin 33.3333 mm
+Sengkang 12 - 170
+Jarak sengkang maksimum : 239.379 mm
+
+Daerah Lapangan
+Tulangan tarik 3 D 22
+Tulangan desak 2 D 29
+Volume beton : 0.5712 m^3
+Berat Tulangan utama : 57.9375 kg
+Berat Tulangan geser : 35.3004 kg
+Harga balok daerah lapangan : 608989
+Momen yang membebani : 54206.1 Nmm
+Momen yang dapat ditahan : 103233 Nmm
+
+Daerah Tumpuan
+Tulangan desak 2 D 19
+Tulangan tarik 3 D 22
+Volume beton : 0.5712 m^3
+Berat Tulangan utama : 40.1902 kg
+Berat Tulangan geser : 35.3004 kg
+Harga balok pada tumpuan kiri + kanan : 520253
+Momen yang membebani : 66735 Nmm
+Momen yang dapat ditahan : 103247 Nmm
+
+-----------------------------------------------------
+Balok 8 340 x 500
+Nomor Batang : 20
+Panjang Bentang : 4 m
+Beban Total : 15550 N/m
+Berat Sendiri : 4080 N/m
+Momen kiri : -31274.1 Nmm
+Momen tengah : 7600.92 Nmm
+Momen kanan : -36978.1 Nmm
+Geser kiri : 37449 N
+Geser kanan : -40301 N
+Lendutan Tengah Bentang : 0.00207628 mm
+Lendutan ijin 22.2222 mm
+Sengkang 12 - 180
+Jarak sengkang maksimum : 219.5 mm
+
+Daerah Lapangan
+Tulangan tarik 3 D 22
+Tulangan desak 2 D 19
+Volume beton : 0.34 m^3
+Berat Tulangan utama : 26.7935 kg
+Berat Tulangan geser : 19.5851 kg
+Harga balok daerah lapangan : 316893
+Momen yang membebani : 7600.92 Nmm
+Momen yang dapat ditahan : 90116.3 Nmm
+
+Daerah Tumpuan
+Tulangan desak 2 D 25
+Tulangan tarik 3 D 25
+Volume beton : 0.34 m^3
+Berat Tulangan utama : 38.5141 kg
+Berat Tulangan geser : 19.5851 kg
+Harga balok pada tumpuan kiri + kanan : 375496
+Momen yang membebani : 36978.1 Nmm
+Momen yang dapat ditahan : 113849 Nmm
+
+-----------------------------------------------------
+Balok 9 340 x 520
+Nomor Batang : 21
+Panjang Bentang : 6 m
+Beban Total : 18863.2 N/m
+Berat Sendiri : 4243.2 N/m
+Momen kiri : -64181.1 Nmm
+Momen tengah : 41924.4 Nmm
+Momen kanan : -58308.3 Nmm
+Geser kiri : 71715.8 N
+Geser kanan : -69758.2 N
+Lendutan Tengah Bentang : 2.14507 mm
+Lendutan ijin 33.3333 mm
+Sengkang 12 - 160
+Jarak sengkang maksimum : 230 mm
+
+Daerah Lapangan
+Tulangan tarik 3 D 20
+Tulangan desak 2 D 25
+Volume beton : 0.5304 m^3
+Berat Tulangan utama : 45.2925 kg
+Berat Tulangan geser : 34.9799 kg
+Harga balok daerah lapangan : 533962
+Momen yang membebani : 41924.4 Nmm
+Momen yang dapat ditahan : 86557.1 Nmm
+
+Daerah Tumpuan
+Tulangan desak 2 D 25
+Tulangan tarik 3 D 22
+Volume beton : 0.5304 m^3
+Berat Tulangan utama : 49.9512 kg
+Berat Tulangan geser : 34.9799 kg
+Harga balok pada tumpuan kiri + kanan : 557255
+Momen yang membebani : 64181.1 Nmm
+Momen yang dapat ditahan : 94483.5 Nmm
+
+-----------------------------------------------------
+Kolom 1 440 x 440
+Nomor Batang : 1
+Tulangan utama 8 D 19
+Jarak antar tulangan : 141.5 mm
+Sengkang 12 - 300
+Jarak sengkang maksimum : 304 mm
+Volume beton : 0.7744 m^3
+Berat Tulangan utama : 71.1863 kg
+Berat Tulangan geser : 14.8841 kg
+Harga kolom : 623952
+Berat Kolom : 18585.6 N
+Gaya aksial : 418881 N
+Gaya aksial yang dapat ditahan = 1.81703e+06 N
+Momen arah X : 0 Nmm
+Momen arah Y : 46241.6 Nmm
+Momen yang dapat ditahan : 200252 Nmm
+Geser pada kolom : 15433.5 N
+
+-----------------------------------------------------
+Kolom 2 440 x 440
+Nomor Batang : 2
+Tulangan utama 8 D 29
+Jarak antar tulangan : 126.5 mm
+Sengkang 12 - 300
+Jarak sengkang maksimum : 440 mm
+Volume beton : 0.7744 m^3
+Berat Tulangan utama : 165.838 kg
+Berat Tulangan geser : 14.8841 kg
+Harga kolom : 1.09721e+06
+Berat Kolom : 18585.6 N
+Gaya aksial : 660332 N
+Gaya aksial yang dapat ditahan = 2.75217e+06 N
+Momen arah X : 0 Nmm
+Momen arah Y : 40430.9 Nmm
+Momen yang dapat ditahan : 168195 Nmm
+Geser pada kolom : 17087.9 N
+
+-----------------------------------------------------
+Kolom 3 450 x 450
+Nomor Batang : 3
+Tulangan utama 8 D 19
+Jarak antar tulangan : 146.5 mm
+Sengkang 12 - 300
+Jarak sengkang maksimum : 304 mm
+Volume beton : 0.81 m^3
+Berat Tulangan utama : 71.1863 kg
+Berat Tulangan geser : 15.3218 kg
+Harga kolom : 635041
+Berat Kolom : 19440 N
+Gaya aksial : 662096 N
+Gaya aksial yang dapat ditahan = 2.94346e+06 N
+Momen arah X : 0 Nmm
+Momen arah Y : 19407.3 Nmm
+Momen yang dapat ditahan : 86269.1 Nmm
+Geser pada kolom : 5180.73 N
+
+-----------------------------------------------------
+Kolom 4 470 x 470
+Nomor Batang : 4
+Tulangan utama 8 D 20
+Jarak antar tulangan : 155 mm
+Sengkang 12 - 300
+Jarak sengkang maksimum : 320 mm
+Volume beton : 0.8836 m^3
+Berat Tulangan utama : 78.8768 kg
+Berat Tulangan geser : 16.1974 kg
+Harga kolom : 696271
+Berat Kolom : 21206.4 N
+Gaya aksial : 431499 N
+Gaya aksial yang dapat ditahan = 1.6783e+06 N
+Momen arah X : 0 Nmm
+Momen arah Y : 69318 Nmm
+Momen yang dapat ditahan : 269547 Nmm
+Geser pada kolom : 28526.4 N
+
+-----------------------------------------------------
+Kolom 5 430 x 430
+Nomor Batang : 5
+Tulangan utama 8 D 28
+Jarak antar tulangan : 123 mm
+Sengkang 12 - 300
+Jarak sengkang maksimum : 430 mm
+Volume beton : 0.7396 m^3
+Berat Tulangan utama : 154.599 kg
+Berat Tulangan geser : 14.4463 kg
+Harga kolom : 1.03012e+06
+Berat Kolom : 17750.4 N
+Gaya aksial : 248016 N
+Gaya aksial yang dapat ditahan = 1.21796e+06 N
+Momen arah X : 0 Nmm
+Momen arah Y : 56243 Nmm
+Momen yang dapat ditahan : 276191 Nmm
+Geser pada kolom : 29540.9 N
+
+-----------------------------------------------------
+Kolom 6 440 x 440
+Nomor Batang : 6
+Tulangan utama 8 D 25
+Jarak antar tulangan : 132.5 mm
+Sengkang 12 - 300
+Jarak sengkang maksimum : 400 mm
+Volume beton : 0.7744 m^3
+Berat Tulangan utama : 123.245 kg
+Berat Tulangan geser : 14.8841 kg
+Harga kolom : 884245
+Berat Kolom : 17750.4 N
+Gaya aksial : 387668 N
+Gaya aksial yang dapat ditahan = 1.88983e+06 N
+Momen arah X : 0 Nmm
+Momen arah Y : 47675.8 Nmm
+Momen yang dapat ditahan : 232375 Nmm
+Geser pada kolom : 24170.6 N
+
+-----------------------------------------------------
+Kolom 7 440 x 440
+Nomor Batang : 7
+Tulangan utama 8 D 25
+Jarak antar tulangan : 132.5 mm
+Sengkang 12 - 300
+Jarak sengkang maksimum : 400 mm
+Volume beton : 0.7744 m^3
+Berat Tulangan utama : 123.245 kg
+Berat Tulangan geser : 14.8841 kg
+Harga kolom : 884245
+Berat Kolom : 18585.6 N
+Gaya aksial : 388043 N
+Gaya aksial yang dapat ditahan = 2.45969e+06 N
+Momen arah X : 0 Nmm
+Momen arah Y : 27448.6 Nmm
+Momen yang dapat ditahan : 173932 Nmm
+Geser pada kolom : 14295.2 N
+
+-----------------------------------------------------
+Kolom 8 430 x 430
+Nomor Batang : 8
+Tulangan utama 8 D 29
+Jarak antar tulangan : 121.5 mm
+Sengkang 12 - 300
+Jarak sengkang maksimum : 430 mm
+Volume beton : 0.7396 m^3
+Berat Tulangan utama : 165.838 kg
+Berat Tulangan geser : 14.4463 kg
+Harga kolom : 1.08632e+06
+Berat Kolom : 17750.4 N
+Gaya aksial : 251586 N
+Gaya aksial yang dapat ditahan = 995033 N
+Momen arah X : 0 Nmm
+Momen arah Y : 70014.9 Nmm
+Momen yang dapat ditahan : 276860 Nmm
+Geser pada kolom : 34665.5 N
+
+-----------------------------------------------------
+Kolom 9 450 x 450
+Nomor Batang : 9
+Tulangan utama 8 D 19
+Jarak antar tulangan : 146.5 mm
+Sengkang 12 - 300
+Jarak sengkang maksimum : 304 mm
+Volume beton : 0.81 m^3
+Berat Tulangan utama : 71.1863 kg
+Berat Tulangan geser : 15.3218 kg
+Harga kolom : 635041
+Berat Kolom : 19440 N
+Gaya aksial : 69794.5 N
+Gaya aksial yang dapat ditahan = 130904 N
+Momen arah X : 0 Nmm
+Momen arah Y : 53735.4 Nmm
+Momen yang dapat ditahan : 100770 Nmm
+Geser pada kolom : 29375.5 N
+
+-----------------------------------------------------
+Kolom 10 460 x 460
+Nomor Batang : 10
+Tulangan utama 8 D 19
+Jarak antar tulangan : 151.5 mm
+Sengkang 12 - 300
+Jarak sengkang maksimum : 304 mm
+Volume beton : 0.8464 m^3
+Berat Tulangan utama : 71.1863 kg
+Berat Tulangan geser : 15.7596 kg
+Harga kolom : 646330
+Berat Kolom : 20313.6 N
+Gaya aksial : 111577 N
+Gaya aksial yang dapat ditahan = 542651 N
+Momen arah X : 0 Nmm
+Momen arah Y : 35460.9 Nmm
+Momen yang dapat ditahan : 172439 Nmm
+Geser pada kolom : 19022.2 N
+
+-----------------------------------------------------
+Kolom 11 450 x 450
+Nomor Batang : 11
+Tulangan utama 8 D 22
+Jarak antar tulangan : 142 mm
+Sengkang 12 - 300
+Jarak sengkang maksimum : 352 mm
+Volume beton : 0.81 m^3
+Berat Tulangan utama : 95.4409 kg
+Berat Tulangan geser : 15.3218 kg
+Harga kolom : 756314
+Berat Kolom : 19440 N
+Gaya aksial : 112017 N
+Gaya aksial yang dapat ditahan = 978300 N
+Momen arah X : 0 Nmm
+Momen arah Y : 27203 Nmm
+Momen yang dapat ditahan : 236889 Nmm
+Geser pada kolom : 15379 N
+
+-----------------------------------------------------
+Kolom 12 450 x 450
+Nomor Batang : 12
+Tulangan utama 8 D 25
+Jarak antar tulangan : 137.5 mm
+Sengkang 12 - 300
+Jarak sengkang maksimum : 400 mm
+Volume beton : 0.81 m^3
+Berat Tulangan utama : 123.245 kg
+Berat Tulangan geser : 15.3218 kg
+Harga kolom : 895334
+Berat Kolom : 19440 N
+Gaya aksial : 69758.1 N
+Gaya aksial yang dapat ditahan = 189991 N
+Momen arah X : 0 Nmm
+Momen arah Y : 58308.3 Nmm
+Momen yang dapat ditahan : 158753 Nmm
+Geser pada kolom : 30732.2 N
+
+
+Harga Beton Rp.250000 /m^3
+Harga Besi Rp.5000 /kg
+Tebal selimut kolom 50 mm
+Tebal selimut balok 50 mm
+Faktor finalti : 1e+10
+JSTD = (JVD*1)+3

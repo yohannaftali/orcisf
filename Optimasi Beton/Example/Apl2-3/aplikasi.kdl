@@ -1,0 +1,97 @@
+Kendala Pada Struktur
+Oleh Yohan Naftali 1999
+
+Nama File Generik : apl08/aplikasi
+Nama Struktur : Aplikasi_Portal_Beton_3D
+
+Balok 1
+Nomor Batang : 5
+Kendala akibat lendutan : 0
+
+Daerah Lapangan
+Kendala rasio penulangan 0
+Kendala sengkang : 0
+Kendala momen lentur : 0
+
+Daerah Tumpuan
+Kendala rasio penulangan 0
+Kendala sengkang : 0
+Kendala momen lentur : 0
+
+Balok 2
+Nomor Batang : 6
+Kendala akibat lendutan : 0
+
+Daerah Lapangan
+Kendala rasio penulangan 0
+Kendala sengkang : 0
+Kendala momen lentur : 0
+
+Daerah Tumpuan
+Kendala rasio penulangan 0
+Kendala sengkang : 0
+Kendala momen lentur : 0
+
+Balok 3
+Nomor Batang : 7
+Kendala akibat lendutan : 0
+
+Daerah Lapangan
+Kendala rasio penulangan 0
+Kendala sengkang : 0
+Kendala momen lentur : 0
+
+Daerah Tumpuan
+Kendala rasio penulangan 0
+Kendala sengkang : 0
+Kendala momen lentur : 0
+
+Balok 4
+Nomor Batang : 8
+Kendala akibat lendutan : 0
+
+Daerah Lapangan
+Kendala rasio penulangan 0
+Kendala sengkang : 0
+Kendala momen lentur : 0
+
+Daerah Tumpuan
+Kendala rasio penulangan 0
+Kendala sengkang : 0
+Kendala momen lentur : 0
+
+Kolom 1
+Nomor Batang : 1
+
+Kendala gaya : 0
+Kendala rasio penulangan : 0
+Kendala jarak tulangan : 0
+Kendala sengkang : 0
+Kendala kelangsingan kolom : 0
+
+Kolom 2
+Nomor Batang : 2
+
+Kendala gaya : 0
+Kendala rasio penulangan : 0
+Kendala jarak tulangan : 0
+Kendala sengkang : 0
+Kendala kelangsingan kolom : 0
+
+Kolom 3
+Nomor Batang : 3
+
+Kendala gaya : 0
+Kendala rasio penulangan : 0
+Kendala jarak tulangan : 0
+Kendala sengkang : 0
+Kendala kelangsingan kolom : 0
+
+Kolom 4
+Nomor Batang : 4
+
+Kendala gaya : 0
+Kendala rasio penulangan : 0
+Kendala jarak tulangan : 0
+Kendala sengkang : 0
+Kendala kelangsingan kolom : 0

@@ -1,0 +1,75 @@
+  Struktur Portal Ruang Aplikasi_Portal_Beton_3D
+
+  Parameter Struktur
+  Jumlah batang : 8
+  DOF : 24
+  Jumlah joint : 8
+  Jumlah pengekang tumpuan : 24
+  Jumlah titik kumpul yang dikekang : 4
+  Modulus Elastisitas aksial : 2.5743e+10 N/m^2
+  Modulus Geser : 1.48022e+10 N/m^2
+
+  Properti Elemen Material
+  Kuat desak beton karakteristik : 30 MPa
+  Kuat tarik baja tulangan : 400 MPa
+  Kuat tarik tulangan sengkang : 240 MPa
+
+  Koordinat Titik Kumpul (m)
+  Titik     X             Y             Z 
+  1         0             0             0             
+  2         6             0             0             
+  3         0             0             6             
+  4         6             0             6             
+  5         0             5             0             
+  6         6             5             0             
+  7         0             5             6             
+  8         6             5             6             
+
+  Informasi Batang 
+  Batang  JJ      JK      IA
+  1       1       5       0  
+  2       2       6       0  
+  3       3       7       0  
+  4       4       8       0  
+  5       5       6       0  
+  6       7       8       0  
+  7       5       7       0  
+  8       6       8       0  
+
+  Pengekang Titik Kumpul 
+  Titik     JR1   JR2   JR3   JR4   JR5   JR6
+  1         1     1     1     1     1     1     
+  2         1     1     1     1     1     1     
+  3         1     1     1     1     1     1     
+  4         1     1     1     1     1     1     
+
+  Gaya di Ujung Batang Terkekang Akibat Beban (Nm)
+  Batang  AML1        AML2        AML3        AML4        AML5        AML6
+          AML7        AML8        AML9        AML10       AML11       AML12
+  1       0           0           0           0           0           0           
+          0           0           0           0           0           0           
+  2       0           0           0           0           0           0           
+          0           0           0           0           0           0           
+  3       0           0           0           0           0           0           
+          0           0           0           0           0           0           
+  4       0           0           0           0           0           0           
+          0           0           0           0           0           0           
+  5       0           120120      0           0           0           120120      
+          0           120120      0           0           0           -120120     
+  6       0           116880      0           0           0           116880      
+          0           116880      0           0           0           -116880     
+  7       0           117960      0           0           0           117960      
+          0           117960      0           0           0           -117960     
+  8       0           119040      0           0           0           119040      
+          0           119040      0           0           0           -119040     
+
+  Beban Titik (N)
+  Titik   Arah 1      Arah 2      Arah 3      Arah 4      Arah 5      Arah 6
+  1       0           -24300      0           0           0           0           
+  2       0           -30000      0           0           0           0           
+  3       0           -36300      0           0           0           0           
+  4       0           -36300      0           0           0           0           
+  5       0           0           0           0           0           0           
+  6       0           0           0           0           0           0           
+  7       0           0           0           0           0           0           
+  8       0           0           0           0           0           0           
