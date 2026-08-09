@@ -124,27 +124,60 @@ dialogs, **libharu (HPDF)** for PDF export — dependency-managed via
 by `$env{VCPKG_ROOT}`). CI: `.github/workflows/build-src.yml` matrix-builds
 all three OS targets on every push/PR touching `src/`.
 
-**Current state (#2 scaffold only — nothing beyond this exists yet):**
+**Current state (#2 scaffold + #3 engine port land; #4–#9 not started):**
 ```
 src/
 ├── vcpkg.json / CMakeLists.txt / CMakePresets.json
 ├── app/
 │   ├── main.cpp             # GLFW/OpenGL3/ImGui bootstrap + render loop
 │   └── Application.{h,cpp}  # docking layout (Viewport | Properties / Log)
-└── gui/
-    ├── Toolbar.{h,cpp}          # menu bar — placeholder items only
-    ├── ViewportPanel.{h,cpp}    # 3D view — placeholder, real work is #5
-    ├── PropertiesPanel.{h,cpp}  # selection editor — placeholder, #6/#7
-    └── LogPanel.{h,cpp}         # run/status log — functional; detailed
-                                 # calc log to disk is #3
+├── gui/
+│   ├── Toolbar.{h,cpp}          # menu bar — placeholder items only
+│   ├── ViewportPanel.{h,cpp}    # 3D view — placeholder, real work is #5
+│   ├── PropertiesPanel.{h,cpp}  # selection editor — placeholder, #6/#7
+│   └── LogPanel.{h,cpp}         # run/status log — functional; detailed
+│                                # calc log to disk is done, see engine/
+└── engine/                      # #3: headless analysis/design/optimizer
+    ├── README.md                # full architecture + validation writeup — read before touching this dir
+    ├── include/engine/*.h, src/*.cpp   # one pair per ported legacy file, see README's table
+    └── tools/orcisf_cli.cpp     # headless CLI: `info`/`equilibrium`/`optimize`
 ```
 `ViewportPanel`/`PropertiesPanel`/`Toolbar` are intentionally inert
 placeholders — **do not build real features into them under issue #2**;
-that belongs to their respective linked issues (#3–#9). Read the relevant
-issue before starting work here — each has detailed acceptance criteria.
-As each sub-issue lands, extend this section (new subsystems, data model,
-how the engine/GUI/export layers connect) rather than replacing it
-wholesale, per the Change Log Policy.
+that belongs to their respective linked issues (#4–#9, `orcisf_gui` now
+links `orcisf_engine` but nothing calls into it from the GUI yet). Read the
+relevant issue before starting work here — each has detailed acceptance
+criteria. As each sub-issue lands, extend this section (new subsystems,
+data model, how the engine/GUI/export layers connect) rather than
+replacing it wholesale, per the Change Log Policy.
+
+**`engine/` (issue #3) — read
+[`src/engine/README.md`](src/engine/README.md) before touching it.** It's a
+line-by-line port of `Optimasi Beton/Source/*.hpp` (direct-stiffness
+analysis, RC beam/column design, the Flexible Polyhedron optimizer) into a
+headless library with no GUI/console dependency, keeping the legacy
+Indonesian identifiers and 1-based array indexing on purpose (see
+`StructureData.h`) for line-by-line checkability against the original. Two
+things every future agent touching it must know:
+- **A handful of legacy behaviors are deliberately preserved even though
+  they look like bugs or asymmetries** (e.g. `KendalaHarga()` adjusts a
+  column's stirrup spacing/side length but not a beam's, unlike the
+  optimizer's own per-generation evaluation path; `WriteFinalResults()`'s
+  `.str` section reflects a different population slot's geometry than its
+  `.opt`/`.kdl` sections). **Do not "fix" these without checking
+  `engine/README.md`'s "Deliberate deviations" section first** — they're
+  characteristics of the 1999 algorithm, not oversights in the port, and
+  "fixing" them would silently change numerical output.
+- **Multi-threading is issue #4's scope, not #3's** —
+  `OptimizationOptions::worker_threads` exists but `RunOptimization()` is
+  currently single-threaded; parallelizing the population-evaluation loop
+  needs each worker to own its own `StructureData` scratch state.
+- **Never point the CLI/GUI's output at `Optimasi Beton/Example/` directly**
+  — output filenames are case-insensitive-colliding with the checked-in
+  reference files on Windows (`GEDUNG.opt` == `gedung.opt`). Always use a
+  scratch copy. (This is exactly how the checked-in Example outputs almost
+  got overwritten during #3's own validation — restored via `git restore`,
+  no harm done, but a real hazard for the next agent too.)
 
 ---
 
@@ -380,8 +413,8 @@ for skills that apply to the current task and follow them.
 | ID | Title | Status | Last Checked |
 |----|-------|--------|--------------|
 | #1 | epic(src): port ORCISF to a modern cross-platform GUI application | open | 2026-08-09 |
-| #2 | feat(src): choose GUI stack & scaffold cross-platform CMake build (Win/macOS/Linux) | ready-for-review | 2026-08-09 |
-| #3 | feat(src): port structural-analysis + RC-design + Flexible-Polyhedron engine as a headless library | open | 2026-08-09 |
+| #2 | feat(src): choose GUI stack & scaffold cross-platform CMake build (Win/macOS/Linux) | closed | 2026-08-09 |
+| #3 | feat(src): port structural-analysis + RC-design + Flexible-Polyhedron engine as a headless library | ready-for-review | 2026-08-09 |
 | #4 | feat(src): multi-threaded optimization core with configurable core count + cancellable progress | open | 2026-08-09 |
 | #5 | feat(src): 3D viewport + example-folder loader (render structure & per-member results) | open | 2026-08-09 |
 | #6 | feat(src): interactive 3D structure editor (import, drag-and-drop edit, numeric entry) | open | 2026-08-09 |

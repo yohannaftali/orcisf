@@ -1,0 +1,154 @@
+// Small headless validation/batch CLI for orcisf_engine -- also doubles as
+// the "future CLI/batch tool" mentioned in issue #3's Objective. Not part
+// of the GUI; used here to validate the engine port against real
+// Optimasi Beton/Example/* datasets without needing the GUI built.
+#include <cmath>
+#include <cstdio>
+#include <iostream>
+#include <string>
+
+#include "engine/Engine.h"
+#include "engine/StructuralAnalysis.h"
+
+using namespace orcisf::engine;
+
+namespace {
+
+int CmdInfo(const std::string& dataset) {
+    StructureData sd;
+    LoadDatasetForViewing(sd, dataset);
+    std::cout << "ISN=" << sd.ISN << "\n";
+    std::cout << "M=" << sd.M << " NJ=" << sd.NJ << " NR=" << sd.NR << " NRJ=" << sd.NRJ << "\n";
+    std::cout << "E=" << sd.E << " G=" << sd.G << "\n";
+    std::cout << "FC=" << sd.FC << " FY=" << sd.FY << " FYS=" << sd.FYS << "\n";
+    std::cout << "ND=" << sd.ND << " N=" << sd.N << "\n";
+    std::cout << "nsisi_B=" << sd.nsisi_B << " nsisi_H=" << sd.nsisi_H << " nsisi_K=" << sd.nsisi_K
+              << " nDIA=" << sd.nDIA << " nNL=" << sd.nNL << " nDIAS=" << sd.nDIAS << " nJS=" << sd.nJS << "\n";
+    for (int i = 1; i <= sd.NJ; ++i) {
+        std::cout << "  joint " << i << ": (" << sd.X[i] << ", " << sd.Y[i] << ", " << sd.Z[i] << ")\n";
+    }
+    for (int i = 1; i <= sd.M; ++i) {
+        std::cout << "  member " << i << ": " << sd.JJ[i] << " -> " << sd.JK[i] << "\n";
+    }
+    return 0;
+}
+
+// Assigns every discrete design-variable slot its *smallest* index (0), runs
+// a full analysis, and checks global equilibrium (sum of support reactions
+// should balance sum of applied joint loads + member self-weight) as an
+// independent correctness check on the ported stiffness solver -- this does
+// not depend on reproducing the legacy binary's (unreproducible, RNG-based)
+// output, only on Newton's third law / statics.
+int CmdEquilibrium(const std::string& dataset) {
+    StructureData sd;
+    LoadDatasetForViewing(sd, dataset);
+
+    OptimizationOptions opt;
+    opt.fak_kali = 1;
+    opt.fak_plus = 0;
+    PrepareOptimization(sd, opt);
+
+    sd.no_struktur = 0;
+    for (int b = 0; b < sd.jum_balok; ++b) {
+        for (int j = 0; j < 12; ++j) sd.var_b[0][j + 12 * b] = sd.nvb[j + 12 * b] / 2; // mid-range size
+    }
+    for (int k = 0; k < sd.jum_kolom; ++k) {
+        for (int j = 0; j < 5; ++j) sd.var_k[0][j + 5 * k] = sd.nvk[j + 5 * k] / 2;
+    }
+
+    Inersia(sd);
+    Struktur(sd);
+
+    // Vertical (global axis 2, i.e. Y-up per the .inp convention) global
+    // equilibrium check: sum of applied joint loads (AJ, which berat_sendiri()
+    // already folded column self-weight into) plus the resultant of every
+    // beam's distributed self-weight/applied load (W) must balance the sum
+    // of support reactions.
+    double sum_AJ = 0.0, sum_beam_resultant = 0.0, sum_reactions = 0.0;
+    for (int j = 1; j <= sd.NJ; ++j) {
+        sum_AJ += sd.AJ[6 * j - 4]; // arah 2 = Y
+    }
+    for (int i = 1; i <= sd.M; ++i) {
+        PeriksaBatang(sd, i);
+        if (sd.CXZ > 0.001f) { // beams only; column self-weight is in AJ
+            sum_beam_resultant += -static_cast<double>(sd.W[i]) * sd.EL[i]; // W acts downward (-Y)
+        }
+    }
+    for (int j = 1; j <= sd.NJ; ++j) {
+        sum_reactions += sd.AR[6 * j - 4];
+    }
+
+    double applied_total = sum_AJ + sum_beam_resultant;
+    std::cout << "Sum applied load, arah Y (joint AJ + beam self-weight resultant): " << applied_total << "\n";
+    std::cout << "Sum support reactions, arah Y:                                    " << sum_reactions << "\n";
+    double diff = applied_total + sum_reactions; // reactions oppose applied load, should cancel to ~0
+    std::cout << "Residual (should be ~0): " << diff << "\n";
+    return (std::fabs(diff) < 1.0) ? 0 : 1; // 1 N tolerance
+}
+
+int CmdOptimize(const std::string& dataset, float harga_beton, float harga_besi, float selimut_kolom,
+                 float selimut_balok, float finalti, int iter_mak, int fak_plus, int fak_kali) {
+    StructureData sd;
+    OptimizationOptions opt;
+    opt.harga_beton = harga_beton;
+    opt.harga_besi = harga_besi;
+    opt.selimut_kolom = selimut_kolom;
+    opt.selimut_balok = selimut_balok;
+    opt.finalti = finalti;
+    opt.j_iterasi_mak = iter_mak;
+    opt.fak_plus = fak_plus;
+    opt.fak_kali = fak_kali;
+
+    ProgressCallback cb = [](const ProgressInfo& info) -> bool {
+        std::printf("gen %d/%d  fitness=%.6g  harga=%.6g  kendala=%.6g  t=%.2fs%s\n", info.generation,
+                     info.max_generation, info.best_fitness, info.best_harga, info.best_kendala,
+                     info.elapsed_seconds, info.converged ? "  [CONVERGED]" : "");
+        return true;
+    };
+
+    RunFullOptimization(sd, dataset, opt, cb);
+
+    std::cout << "Done. JVD=" << sd.JVD << " JSTD=" << sd.JSTD << "\n";
+    std::cout << "Best fitness=" << sd.fitstr[sd.JSTD - 1] << " harga=" << sd.hargastr[sd.JSTD - 1]
+              << " kendala=" << sd.kendalastr[sd.JSTD - 1] << "\n";
+    return 0;
+}
+
+} // namespace
+
+int main(int argc, char** argv) {
+    if (argc < 3) {
+        std::cerr << "Usage:\n"
+                  << "  orcisf_cli info <dataset-generic-path>\n"
+                  << "  orcisf_cli equilibrium <dataset-generic-path>\n"
+                  << "  orcisf_cli optimize <dataset-generic-path> <harga_beton> <harga_besi> <selimut_kolom> "
+                     "<selimut_balok> <finalti> <iter_mak> <fak_plus> <fak_kali>\n";
+        return 2;
+    }
+
+    std::string cmd = argv[1];
+    std::string dataset = argv[2];
+
+    try {
+        if (cmd == "info") {
+            return CmdInfo(dataset);
+        }
+        if (cmd == "equilibrium") {
+            return CmdEquilibrium(dataset);
+        }
+        if (cmd == "optimize") {
+            if (argc < 11) {
+                std::cerr << "optimize needs 9 args after dataset\n";
+                return 2;
+            }
+            return CmdOptimize(dataset, std::stof(argv[3]), std::stof(argv[4]), std::stof(argv[5]),
+                                std::stof(argv[6]), std::stof(argv[7]), std::stoi(argv[8]), std::stoi(argv[9]),
+                                std::stoi(argv[10]));
+        }
+        std::cerr << "Unknown command: " << cmd << "\n";
+        return 2;
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << "\n";
+        return 1;
+    }
+}

@@ -136,3 +136,83 @@ history only; don't duplicate current-state description here.
 - `AGENTS.md` updated: `src/` section now documents the actual scaffold
   structure (not just the plan), repository-layout tree, GitHub Workflow
   CI note, and Validation section build instructions.
+
+## 2026-08-09 — #3: headless engine port (structural analysis, RC design, optimizer)
+
+- Ported every legacy analysis/design/optimization file
+  (`Struktur.hpp`, `Solver.hpp`, `Pembebanan.hpp`, `ELEMEN.HPP`,
+  `Balok.hpp`, `Kolom.hpp`, `Kendala.hpp`, `Polyhedron.hpp`,
+  `Pengacakan.hpp`, `Penormalan.hpp`, `Telusur.hpp`, `Baru.hpp`,
+  `Pengurutan.hpp`, `Diskritisasi.hpp`, and the read/write halves of
+  `InOut.hpp`/`CETAK.HPP`) into `src/engine/` as a headless C++20 static
+  library (`orcisf_engine`) with no console/GUI dependency, plus a
+  headless validation CLI (`orcisf_cli`, `info`/`equilibrium`/`optimize`
+  subcommands). `orcisf_gui` now links `orcisf_engine` (nothing calls into
+  it from the GUI yet — that's #4–#9).
+- Every legacy global from `Variabel.hpp` became one field on an owned
+  `StructureData` context struct passed by reference, keeping the original
+  Indonesian identifiers and 1-based array indexing on purpose (for
+  line-by-line checkability against the legacy source, per the file's own
+  header comment) — satisfies #3's "RAII, no bare globals" criterion
+  without changing any numeric formula.
+- Two categories of not-obviously-correct legacy behavior were identified
+  by close reading and preserved deliberately (documented in
+  `CostConstraint.h` and `LegacyIO.h`'s header comments, and summarized in
+  `src/engine/README.md`'s "Deliberate deviations" section): (1)
+  `Kendala_Harga()` adjusts a candidate column's stirrup spacing/side
+  length in place but *not* a beam's, unlike the optimizer's own
+  first-generation/end-of-generation evaluation path, which adjusts both;
+  (2) `cetak_akhir()`'s `.str` output reflects whichever population slot's
+  geometry is "frozen" at call time (not necessarily the best), while its
+  `.opt`/`.kdl` sections explicitly use the best (`JSTD-1`) structure. Both
+  are reproduced exactly, not "fixed."
+- One genuine, justified simplification: `KendalaHarga()` (called
+  potentially thousands of times per generation during the search) no
+  longer re-reads input files or re-runs the structural analysis on every
+  call the way the legacy `Kendala_Harga()` did — those calls were
+  idempotent after the first one (same frozen geometry every time within a
+  search), so skipping them changes nothing numerically while being far
+  faster and safe to eventually parallelize (issue #4).
+- Random-number generation (`std::mt19937`, statistically equivalent) is
+  **not** bit-reproducible against Borland's `randomize()`/`random()` —
+  documented as a fundamental, unavoidable limit (the original wasn't
+  reproducible run-to-run either, since it seeds from wall-clock time).
+- New detailed per-generation calculation log (`<dataset>.log.txt`,
+  superset of `.his`): every generation's full population (index, fitness,
+  kendala, harga, and every beam/column design-variable vector), not just
+  a one-line summary per shrink/convergence event.
+- Progress/cancellation interface: `ProgressCallback` (generation, best
+  fitness/harga/kendala, elapsed time, converged flag) polled once per
+  generation, plus an `std::atomic<bool>` cancel token checked between
+  generations — the GUI can now show live progress without polling files
+  (once #4/#5 wire it up).
+- **Validation** (no Borland toolchain exists to diff against the original
+  binary, and its output isn't reproducible anyway — see above):
+  1. `orcisf_cli info` against `Example/Data01/GEDUNG` reproduces every
+     field of the checked-in `GEDUNG.INP` exactly.
+  2. `orcisf_cli equilibrium` (uniform mid-range section on every member,
+     full analysis, check that support reactions balance applied loads +
+     self-weight — a physics-based check independent of RNG/history)
+     passed on all 8 bundled dataset folders (`Data01`, `Data02+3`,
+     `Data02x2`, `Data03x2`, `Data04+3`, `Apl1-1`, `Apl2-1`, `Apl3-1`):
+     residual ≤0.22 N against totals of ~0.9–1.6 million N.
+  3. `orcisf_cli optimize` end-to-end runs cross-checked against the
+     thesis text: `Data01` (the Harsoyo validation case) reports
+     `JVD=168 JSTD=171`, matching `Teori/Isi/BAB IV.doc` exactly; `Apl1-1`
+     reports total beam load `36200 N/m`, exactly BAB IV's stated
+     `35 kN/m` applied load plus computed self-weight. All 5 datasets
+     tested converge to a fully constraint-satisfying design (`kendala=0`)
+     with monotonically decreasing cost.
+  4. **Incident during validation, self-corrected:** the first `optimize`
+     run pointed output at the real `Example/Data01/` folder; since
+     Windows filenames are case-insensitive, `GEDUNG.opt` collided with
+     and overwrote the checked-in `gedung.opt`/`.str`/`.kdl`/`.inf`/`.his`
+     reference files. Caught immediately via `git status`, restored with
+     `git restore` (no data loss — git had the originals), and all further
+     validation was run against scratch copies outside the repo. Flagged
+     prominently in `engine/README.md` and `AGENTS.md` so the next agent
+     doesn't repeat it.
+- Not in scope for #3 (see `src/engine/README.md`): real multi-threaded
+  population evaluation (#4 — `OptimizationOptions::worker_threads` exists
+  as a documented no-op for now), and wiring any of this into the actual
+  GUI (#4–#9).

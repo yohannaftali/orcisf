@@ -13,6 +13,10 @@ find_package(implot CONFIG REQUIRED)
 find_package(nfd CONFIG REQUIRED)
 find_package(unofficial-libharu CONFIG REQUIRED)
 
+# Headless analysis/design/optimization engine (issue #3) -- no GUI
+# dependencies of its own; see engine/README.md.
+add_subdirectory(engine)
+
 add_executable(orcisf_gui
     app/main.cpp
     app/Application.cpp
@@ -25,6 +29,7 @@ add_executable(orcisf_gui
 target_include_directories(orcisf_gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(orcisf_gui PRIVATE
+    orcisf_engine
     imgui::imgui
     glfw
     OpenGL::GL
