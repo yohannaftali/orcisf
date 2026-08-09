@@ -399,3 +399,83 @@ history only; don't duplicate current-state description here.
   output feeds the identical `MoveJoint()` call the verified numeric-entry
   path already exercises, so remaining risk is isolated to ImGuizmo's own
   hit-testing.
+
+## 2026-08-10 — #7: load (pembebanan) input GUI
+
+- Studied the legacy `.bbn` format precisely (`Pembebanan.hpp`'s
+  `load_data()`/`baca_beban()`) before designing anything: it only ever
+  supports two load categories -- a uniform distributed load on a member
+  (`W`, transverse/gravity-sense, with its 12 fixed-end-force components
+  `AML` derived from `W` and the member's length via a fixed formula) and
+  a 6-DOF generalized action at a joint (`AJ`, "arah 1..6" =
+  Fx,Fy,Fz,Mx,My,Mz -- also how a "point load" or "wind/lateral load" is
+  represented, there's no separate type for those in the format). The GUI
+  deliberately mirrors exactly these two categories, not more, so
+  `WriteLoads()` can always round-trip whatever the GUI creates.
+- New engine functions `engine::ReadLoadsRaw()`/`engine::WriteLoads()`
+  (`LegacyIO.h/.cpp`): `ReadLoadsRaw()` parses `.bbn` without `ReadLoads()`'s
+  `BeratSendiri()` self-weight side effect (tolerates a missing file, for
+  a brand-new dataset with no loads yet); `WriteLoads()` writes the exact
+  legacy format. Critical invariant documented in both the code and
+  `AGENTS.md`: the file never includes self-weight, so `WriteLoads()` must
+  only ever be given raw (self-weight-free) `W`/`AJ` -- verified with a
+  standalone round-trip test (`ReadDataset`+`ReadLoadsRaw` →
+  `WriteLoads` → `ReadLoadsRaw` again) against a real scratch copy of
+  `Example/Apl1-1`: every `W`/`AML`/`AJ` value bit-identical, including
+  the real 35000 N/m beam loads; also confirmed `ReadLoadsRaw()` tolerates
+  a missing `.bbn`.
+- `EditableStructure` (#6) extended with `SetMemberLoad()`/`ClearMemberLoad()`
+  (recomputes the 12 `AML` fixed-end-forces from the member's *current*
+  length, so a load set before a geometry edit stays correct) and
+  `SetJointLoad()`/`ClearJointLoad()`; `AddJoint()`/`AddMember()`/
+  `DeleteJoint()`/`DeleteMember()` now also initialize/compact `W`/`AML`
+  (per member) and `AJ` (per joint) alongside the geometry fields they
+  already handled, and `UndoStack`'s `GeometrySnapshot` now captures them
+  too -- unit-tested standalone (UDL fixed-end-force formula correctness,
+  undo/redo covering loads, load state correctly surviving/compacting
+  through a member delete) before GUI wiring.
+- `SceneModel` gained `MemberLoadVisual`/`JointLoadVisual` (populated from
+  `sd`'s raw `W`/`AJ` -- callers must have loaded via `ReadLoadsRaw()`, not
+  `ReadLoads()`, or self-weight would show up as a phantom "user load").
+  `SceneRenderer` gained `DrawArrow()`/`DrawLoads()`: fixed-visual-length
+  arrow glyphs (magnitudes span orders of magnitude across real datasets,
+  so glyph length isn't scaled by them -- the exact number is always in
+  the schedule table/Properties), moments shown as a plain marker rather
+  than a directional glyph.
+- `ViewportPanel` gained load-placement-mode clicking (`EditorOptions::load_mode`):
+  clicking a member/joint while in that mode sets a default load (5000 N/m,
+  or (0,-10000,0,0,0,0) N downward) which the user then fine-tunes.
+  `PropertiesPanel` gained load fields (member `W`; joint `Fx..Mz`) +
+  Clear Load. New `src/gui/LoadsPanel.{h,cpp}` (docked panel, issue #7's
+  "load-schedule panel (table)" criterion): one row per member/joint with
+  a nonzero raw load, inline-editable, row click syncs `Selection`.
+  `Toolbar` gained a Loads menu (Select/Add Member Load/Add Joint Load)
+  and `File > Save Loads (.bbn)`.
+- `Application::OnOpenFolderRequested()` switched from
+  `engine::LoadDatasetForViewing()` (which calls `ReadLoads()`) to
+  `ReadDataset()`+`ReadLoadsRaw()` directly, so the editable in-memory
+  structure always holds raw loads. `OnRunResult()` (a real optimization
+  run, which *does* go through self-weight-inflating `ReadLoads()`)
+  explicitly zeroes `W`/`AML`/`AJ` before treating that run's
+  `StructureData` as editable -- there's no cheap way to separate a run's
+  self-weight-inflated joint actions back into "raw user load" per joint
+  (a joint's self-weight contribution can come from multiple columns
+  sharing it), so post-run load editing starts from a clean slate rather
+  than risk showing the user numbers they never entered.
+- **Validation:** the full workflow was exercised end-to-end in this
+  environment against a real scratch copy of `Example/Apl1-1`
+  (screenshotted at each step, via the same synthesized-Win32-input
+  approach as #6): existing `.bbn` loads (35000 N/m × 4 beams) loaded,
+  rendered (visible arrow glyphs), and matched `LoadsPanel`'s table
+  exactly; placing a new joint load via Loads > Add Joint Load + a
+  viewport click updated Properties and `LoadsPanel` in sync; **File >
+  Save Loads (.bbn) was actually clicked, and the resulting file was read
+  back from disk and diffed against expectations** -- it contained both
+  the original 4 member loads and the newly-placed joint load, exactly
+  matching what the GUI showed (a real end-to-end read → edit → write →
+  verify-on-disk round trip, not just the standalone engine-level test
+  above). One scripting mishap during this process is worth recording:
+  a mis-clicked menu coordinate opened the native "Open Folder" dialog
+  instead of "Save Loads" — caught immediately (window title changed to
+  "Select Folder"), dismissed with Escape, no data lost, re-verified the
+  correct menu item's position via a screenshot before retrying.

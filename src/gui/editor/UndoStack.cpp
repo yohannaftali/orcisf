@@ -11,22 +11,30 @@ GeometrySnapshot CaptureSnapshot(const engine::StructureData& sd) {
     snap.Y.assign(static_cast<size_t>(sd.NJ) + 1, 0.f);
     snap.Z.assign(static_cast<size_t>(sd.NJ) + 1, 0.f);
     snap.JRL.assign(static_cast<size_t>(6 * sd.NJ) + 1, 0);
+    snap.AJ.assign(static_cast<size_t>(6 * sd.NJ) + 1, 0.f);
     for (int j = 1; j <= sd.NJ; ++j) {
         snap.X[j] = sd.X[j];
         snap.Y[j] = sd.Y[j];
         snap.Z[j] = sd.Z[j];
         for (int dof = 0; dof < 6; ++dof) {
             snap.JRL[6 * j - 5 + dof] = sd.JRL[6 * j - 5 + dof];
+            snap.AJ[6 * j - 5 + dof] = sd.AJ[6 * j - 5 + dof];
         }
     }
 
     snap.JJ.assign(static_cast<size_t>(sd.M) + 1, 0);
     snap.JK.assign(static_cast<size_t>(sd.M) + 1, 0);
     snap.IA.assign(static_cast<size_t>(sd.M) + 1, 0);
+    snap.W.assign(static_cast<size_t>(sd.M) + 1, 0.f);
+    snap.AML.assign(13, std::vector<float>(static_cast<size_t>(sd.M) + 1, 0.f));
     for (int i = 1; i <= sd.M; ++i) {
         snap.JJ[i] = sd.JJ[i];
         snap.JK[i] = sd.JK[i];
         snap.IA[i] = sd.IA[i];
+        snap.W[i] = sd.W[i];
+        for (int j = 1; j <= 12; ++j) {
+            snap.AML[j][i] = sd.AML[j][i];
+        }
     }
 
     return snap;
@@ -42,12 +50,17 @@ void RestoreSnapshot(engine::StructureData& sd, const GeometrySnapshot& snapshot
         sd.Z[j] = snapshot.Z[j];
         for (int dof = 0; dof < 6; ++dof) {
             sd.JRL[6 * j - 5 + dof] = snapshot.JRL[6 * j - 5 + dof];
+            sd.AJ[6 * j - 5 + dof] = snapshot.AJ[6 * j - 5 + dof];
         }
     }
     for (int i = 1; i <= snapshot.M; ++i) {
         sd.JJ[i] = snapshot.JJ[i];
         sd.JK[i] = snapshot.JK[i];
         sd.IA[i] = snapshot.IA[i];
+        sd.W[i] = snapshot.W[i];
+        for (int j = 1; j <= 12; ++j) {
+            sd.AML[j][i] = snapshot.AML[j][i];
+        }
     }
 }
 

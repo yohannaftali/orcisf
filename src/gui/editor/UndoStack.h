@@ -4,20 +4,24 @@
 
 #include "engine/StructureData.h"
 
-// Undo/redo for issue #6's geometry edits. Snapshots are sized to the
-// *current* NJ/M (not the full kMak=825 legacy array), the same lesson
-// learned the hard way in issue #4: a full StructureData copy is ~14MB
-// and would make every edit (and every undo/redo step) pay that cost for
-// no reason -- only geometry (X/Y/Z/JRL per joint, JJ/JK/IA per member)
-// needs to round-trip here, everything else (analysis/design scratch
-// state) is recomputed from scratch on the next run regardless.
+// Undo/redo for issue #6's geometry edits and issue #7's load edits.
+// Snapshots are sized to the *current* NJ/M (not the full kMak=825 legacy
+// array), the same lesson learned the hard way in issue #4: a full
+// StructureData copy is ~14MB and would make every edit (and every
+// undo/redo step) pay that cost for no reason -- only geometry (X/Y/Z/JRL
+// per joint, JJ/JK/IA per member) and raw loads (AJ per joint, W/AML per
+// member) need to round-trip here, everything else (analysis/design
+// scratch state) is recomputed from scratch on the next run regardless.
 namespace orcisf::gui {
 
 struct GeometrySnapshot {
     int NJ = 0, M = 0;
     std::vector<float> X, Y, Z; // index 0 unused, size NJ+1
     std::vector<int> JRL;       // index 0 unused, size 6*NJ+1
+    std::vector<float> AJ;      // index 0 unused, size 6*NJ+1 -- raw joint loads (#7)
     std::vector<int> JJ, JK, IA; // index 0 unused, size M+1
+    std::vector<float> W;        // index 0 unused, size M+1 -- raw member UDL (#7)
+    std::vector<std::vector<float>> AML; // AML[1..12][0..M], index 0 unused on both axes
 };
 
 GeometrySnapshot CaptureSnapshot(const engine::StructureData& sd);

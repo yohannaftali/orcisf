@@ -210,6 +210,58 @@ void SceneRenderer::DrawBox(const Vec3& a, const Vec3& b, float width_m, float h
     glDrawArrays(GL_TRIANGLES, 0, 36);
 }
 
+void SceneRenderer::DrawArrow(const Vec3& tail, const Vec3& tip, const float color[4], const float* view_proj) {
+    Vec3 delta = tip - tail;
+    float length = delta.Length();
+    if (length < 1e-5f) return;
+    DrawBox(tail, tip, 0.04f, 0.04f, color, view_proj);
+    DrawCube(tip, 0.07f, color, view_proj);
+}
+
+// Issue #7's load glyphs. Arrow lengths are a fixed visual size, not
+// scaled by magnitude -- N/m and N values span orders of magnitude in
+// practice, and a schematic "loaded here, see the schedule panel for the
+// number" arrow (the same convention structural drawings typically use
+// for a run of UDL arrows) is clearer than arrows that might be
+// microscopic or enormous depending on the dataset. Moments (Mx/My/Mz)
+// are shown as a single small marker offset above the joint rather than a
+// directional glyph -- representing rotation direction with this
+// renderer's straight-line-only primitives wasn't worth the complexity
+// for what's a secondary indicator (the exact values are always visible
+// in the load schedule panel).
+void SceneRenderer::DrawLoads(const SceneModel& scene, const float* view_proj) {
+    static constexpr float kMemberLoadColor[4] = {0.35f, 0.75f, 0.95f, 1.f};
+    static constexpr float kForceXColor[4] = {0.9f, 0.3f, 0.3f, 1.f};
+    static constexpr float kForceYColor[4] = {0.35f, 0.85f, 0.4f, 1.f};
+    static constexpr float kForceZColor[4] = {0.35f, 0.55f, 0.95f, 1.f};
+    static constexpr float kMomentColor[4] = {0.85f, 0.4f, 0.85f, 1.f};
+    constexpr float kArrowLength = 0.9f;
+
+    for (const MemberLoadVisual& ml : scene.member_loads) {
+        Vec3 dir = (ml.w_n_per_m >= 0.f) ? Vec3{0, -1, 0} : Vec3{0, 1, 0};
+        Vec3 tail = ml.midpoint - dir * kArrowLength;
+        DrawArrow(tail, ml.midpoint, kMemberLoadColor, view_proj);
+    }
+
+    for (const JointLoadVisual& jl : scene.joint_loads) {
+        if (jl.actions[0] != 0.f) {
+            Vec3 dir{jl.actions[0] > 0.f ? 1.f : -1.f, 0, 0};
+            DrawArrow(jl.pos - dir * kArrowLength, jl.pos, kForceXColor, view_proj);
+        }
+        if (jl.actions[1] != 0.f) {
+            Vec3 dir{0, jl.actions[1] > 0.f ? 1.f : -1.f, 0};
+            DrawArrow(jl.pos - dir * kArrowLength, jl.pos, kForceYColor, view_proj);
+        }
+        if (jl.actions[2] != 0.f) {
+            Vec3 dir{0, 0, jl.actions[2] > 0.f ? 1.f : -1.f};
+            DrawArrow(jl.pos - dir * kArrowLength, jl.pos, kForceZColor, view_proj);
+        }
+        if (jl.actions[3] != 0.f || jl.actions[4] != 0.f || jl.actions[5] != 0.f) {
+            DrawCube(jl.pos + Vec3{0, 0.35f, 0}, 0.09f, kMomentColor, view_proj);
+        }
+    }
+}
+
 unsigned int SceneRenderer::Render(const SceneModel& scene, const Camera& camera, int width, int height,
                                     int selected_member) {
     EnsureGLObjects();
@@ -258,6 +310,8 @@ unsigned int SceneRenderer::Render(const SceneModel& scene, const Camera& camera
         float size = jv.restrained ? 0.12f : 0.08f;
         DrawCube(jv.pos, size, jv.restrained ? kRestraintColor : kJointColor, view_proj.m);
     }
+
+    DrawLoads(scene, view_proj.m);
 
     glBindVertexArray(0);
     glUseProgram(0);

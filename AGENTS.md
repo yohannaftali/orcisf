@@ -125,33 +125,43 @@ by `$env{VCPKG_ROOT}`). CI: `.github/workflows/build-src.yml` matrix-builds
 all three OS targets on every push/PR touching `src/`.
 
 **Current state (#2 scaffold + #3 engine port + #4 threaded core + #5 3D
-viewport + #6 interactive editor land; #7–#9 not started):**
+viewport + #6 interactive editor + #7 load editor land; #8–#9 not started):**
 ```
 src/
 ├── vcpkg.json / CMakeLists.txt / CMakePresets.json
 ├── app/
 │   ├── main.cpp             # GLFW/OpenGL3/ImGui bootstrap + render loop;
 │   │                        # also: gl3w init, NFD_Init/Quit
-│   └── Application.{h,cpp}  # docking layout (Viewport | Properties/RunPanel / Log);
-│                            # owns loaded_sd_ (the one editable StructureData),
-│                            # the derived SceneModel, Selection, UndoStack,
-│                            # EditorOptions; File > Open Folder... (NFD),
-│                            # Add Joint / Undo / Redo, and Run-completion wiring
+│   └── Application.{h,cpp}  # docking layout (Viewport | Properties/RunPanel/Loads/Log);
+│                            # owns loaded_sd_ (the one editable StructureData,
+│                            # loaded via ReadDataset+ReadLoadsRaw -- not
+│                            # LoadDatasetForViewing, see gui/editor/ note
+│                            # below), the derived SceneModel, Selection,
+│                            # UndoStack, EditorOptions; File > Open Folder...
+│                            # / Save Loads (.bbn) (NFD), Add Joint / Undo /
+│                            # Redo, and Run-completion wiring
 ├── gui/
-│   ├── Toolbar.{h,cpp}          # menu bar; File > Open Folder... (#5) and the
+│   ├── Toolbar.{h,cpp}          # menu bar; File > Open Folder... (#5), the
 │   │                            # Edit menu (#6: Undo/Redo, Add Joint, Connect
-│   │                            # Joints, Snap to Grid) are wired
+│   │                            # Joints, Snap to Grid), and the Loads menu +
+│   │                            # File > Save Loads (.bbn) (#7) are wired
 │   ├── ViewportPanel.{h,cpp}    # #5: offscreen OpenGL render of a SceneModel,
 │   │                            # orbit/pan/zoom camera, click-to-pick a joint
 │   │                            # or member; #6: ImGuizmo translate handle for
 │   │                            # the selected joint, connect-mode clicking to
-│   │                            # add a member
+│   │                            # add a member; #7: load-placement-mode clicking
+│   │                            # to place a default member/joint load
 │   ├── PropertiesPanel.{h,cpp}  # #5: shows the selected member's dimensions +
 │   │                            # (if available) demand/capacity/kendala;
 │   │                            # #6: numeric X/Y/Z + restrained-toggle for a
 │   │                            # selected joint, Delete Joint/Member buttons,
 │   │                            # always-visible EditableStructure::Validate()
-│   │                            # issue list (blocks a future Run when non-empty)
+│   │                            # issue list (blocks a future Run when non-empty);
+│   │                            # #7: numeric load fields (member W, joint
+│   │                            # Fx..Mz) + Clear Load button
+│   ├── LoadsPanel.{h,cpp}       # #7: load-schedule table -- one row per
+│   │                            # member/joint with a nonzero raw load,
+│   │                            # inline-editable, row click syncs Selection
 │   ├── RunPanel.{h,cpp}         # #4: dataset/options form, worker-thread-count
 │   │                            # slider, Run/Cancel, live progress bar -- runs
 │   │                            # engine::RunFullOptimization on a background
@@ -166,38 +176,64 @@ src/
 │   │   ├── Camera.{h,cpp}       # orbit camera (target/distance/yaw/pitch)
 │   │   ├── SceneModel.{h,cpp}   # engine::StructureData (+ optional
 │   │   │                        # MemberResult list) -> render-ready
-│   │   │                        # joints/members snapshot; PickMember()/
-│   │   │                        # PickJoint() (ray-vs-segment/sphere, no GL involved)
+│   │   │                        # joints/members/loads snapshot; PickMember()/
+│   │   │                        # PickJoint() (ray-vs-segment/sphere, no GL
+│   │   │                        # involved); #7 added MemberLoadVisual/
+│   │   │                        # JointLoadVisual, read from sd's raw W/AJ
 │   │   └── SceneRenderer.{h,cpp} # owns the FBO/shader/cube-mesh GL objects,
 │   │                              # draws a SceneModel from a Camera into a
-│   │                              # texture for ViewportPanel's ImGui::Image
-│   └── editor/                  # #6: geometry editing, no ImGui/GL dependency
+│   │                              # texture for ViewportPanel's ImGui::Image;
+│   │                              # #7 added DrawArrow()/DrawLoads() (thin-box
+│   │                              # shaft + small-cube head, fixed visual length)
+│   └── editor/                  # #6/#7: geometry+load editing, no ImGui/GL dependency
 │       ├── Selection.h          # SelectionKind{None,Joint,Member} + EditorOptions
-│       │                        # (connect-mode, snap-to-grid) shared by
-│       │                        # ViewportPanel/PropertiesPanel/Toolbar
+│       │                        # (connect-mode, snap-to-grid, #7's load_mode)
+│       │                        # shared by ViewportPanel/PropertiesPanel/Toolbar
 │       ├── EditableStructure.{h,cpp} # Add/Move/Delete joint, Add/Delete
-│       │                        # member, restraint toggle, Validate() --
-│       │                        # mutates an engine::StructureData& in place
-│       └── UndoStack.{h,cpp}    # GeometrySnapshot (X/Y/Z/JRL/JJ/JK/IA only,
-│                                  # NOT a full StructureData copy) + push/undo/redo
-└── engine/                      # #3/#4/#5: headless analysis/design/optimizer
+│       │                        # member, restraint toggle, Validate() (#6);
+│       │                        # SetMemberLoad/ClearMemberLoad/SetJointLoad/
+│       │                        # ClearJointLoad (#7, raw self-weight-free
+│       │                        # values) -- mutates an engine::StructureData&
+│       │                        # in place
+│       └── UndoStack.{h,cpp}    # GeometrySnapshot (X/Y/Z/JRL/AJ per joint,
+│                                  # JJ/JK/IA/W/AML per member -- NOT a full
+│                                  # StructureData copy) + push/undo/redo
+└── engine/                      # #3/#4/#5/#7: headless analysis/design/optimizer
     ├── README.md                # full architecture + validation writeup — read before touching this dir
     ├── include/engine/*.h, src/*.cpp   # one pair per ported legacy file, see README's table
-    │   (MemberResults.h/.cpp is #5's addition: per-member final-design
-    │   results captured into memory, mirroring WriteFinalResults' loop --
-    │   see its header comment before changing WriteFinalResults itself)
+    │   (MemberResults.h/.cpp is #5's addition, see below; LegacyIO's
+    │   ReadLoadsRaw()/WriteLoads() are #7's, see its own note below)
     └── tools/orcisf_cli.cpp     # headless CLI: `info`/`equilibrium`/`optimize [worker_threads] [rng_seed] [quiet]`
                                   # (optimize also prints a MEMBER_RESULTS section)
 ```
 `Toolbar`/`ViewportPanel`/`PropertiesPanel` had inert placeholders under
 issue #2; #5 gave them their first real implementation (view-only: load,
-render, inspect) and #6 added interactive editing on top. Read the
-relevant issue before starting work here — each has detailed acceptance
-criteria. As each sub-issue lands, extend this section (new subsystems,
-data model, how the engine/GUI/export layers connect) rather than
-replacing it wholesale, per the Change Log Policy.
+render, inspect), #6 added interactive geometry editing, and #7 added load
+editing (`LoadsPanel` is new). Read the relevant issue before starting
+work here — each has detailed acceptance criteria. As each sub-issue
+lands, extend this section (new subsystems, data model, how the
+engine/GUI/export layers connect) rather than replacing it wholesale, per
+the Change Log Policy.
 
-**`gui/editor/` (issue #6) — read before touching geometry editing:**
+**`engine/`'s `ReadLoadsRaw()`/`WriteLoads()` (issue #7) — the load-editor's
+critical invariant:** the legacy `.bbn` file *never* includes self-weight
+(`Pembebanan.hpp`'s `load_data()` writes it before self-weight is ever
+computed); `ReadLoads()` (used by real analysis/optimization runs, #3/#4)
+re-derives self-weight fresh into `sd.W`/`sd.AJ` on every call via
+`BeratSendiri()`. The GUI editor uses `ReadLoadsRaw()` (parses the file
+without that side effect) and `WriteLoads()` (writes exactly what's in
+`sd.W`/`AML`/`AJ`, unconditionally) instead — **never point `WriteLoads()`
+at a StructureData that went through `ReadLoads()`/`BeratSendiri()`**, or
+self-weight gets baked into the file and double-counted on the next real
+`ReadLoads()`. This is also why `Application::OnRunResult()` explicitly
+zeroes `sd.W`/`AML`/`AJ` before treating a just-completed run's
+`StructureData` as an editable one — there's no cheap way to separate a
+run's self-weight-inflated joint actions back into "raw user load" per
+joint (a joint's self-weight contribution can come from multiple columns
+sharing it), so post-run load editing starts from a clean slate rather
+than risk showing numbers the user never entered.
+
+**`gui/editor/` (issues #6/#7) — read before touching geometry/load editing:**
 - **Only geometry fields are edited/compacted, deliberately not every
   legacy per-member array.** `EditableStructure` (add/move/delete
   joint/member) and `UndoStack`'s `GeometrySnapshot` both touch only
@@ -229,7 +265,7 @@ replacing it wholesale, per the Change Log Policy.
   to "run an optimization on it" (no save/export-to-.inp exists either).
   That's natural territory for #7 or a dedicated follow-up, not something
   #6 was required to solve.
-- **What was interactively verified vs. reasoned through:** joint/member
+- **What was interactively verified vs. reasoned through (#6):** joint/member
   picking, numeric position entry live-updating the 3D view, the
   Restrained checkbox, Delete Joint, Add Joint, Undo, and the Validation
   panel were all exercised end-to-end in this environment (mouse/keyboard
@@ -241,6 +277,44 @@ replacing it wholesale, per the Change Log Policy.
   feeds the exact same `EditableStructure::MoveJoint()` call the verified
   numeric-entry path uses, so the remaining risk is specifically in
   ImGuizmo's own hit-testing, not in this project's code.
+- **Issue #7's load types match the legacy format exactly, nothing more.**
+  `Pembebanan.hpp`'s `.bbn` format only ever supported two load
+  categories: a uniform distributed load on a member (`W`, transverse,
+  gravity-sense-positive), and a 6-DOF generalized action at a joint
+  (`AJ`, "arah 1..6" = Fx,Fy,Fz,Mx,My,Mz). There is no separate "point
+  load" or "wind load" type in the format -- both are just a joint action
+  with the appropriate components set. The Loads toolbar menu's "Add
+  Member Load"/"Add Joint Load" placement modes and `LoadsPanel`'s two
+  tables deliberately mirror this 2-category structure; don't invent a
+  third category (e.g. a point load *on a member*, or a partial-length
+  UDL) without confirming the legacy format can actually represent it --
+  otherwise `WriteLoads()` couldn't round-trip it and #7's "round-trips
+  correctly to/from the legacy .bbn format" criterion would silently break.
+- **Click-to-place uses a default value, not zero, so the placed load is
+  immediately visible.** `ViewportPanel::HandlePicking()` sets 5000 N/m
+  (member) or (0, -10000, 0, 0, 0, 0) N (joint, downward) on the clicked
+  entity, which the user then fine-tunes in Properties/`LoadsPanel`. Same
+  reasoning as Add Joint defaulting to the scene's bounding-sphere center
+  in #6 -- placement should produce something visible/editable, not a
+  silent no-op.
+- **Load arrow glyphs are a fixed visual length, not scaled by
+  magnitude**, and moments (Mx/My/Mz) render as a plain marker, not a
+  directional glyph -- see the comment above `SceneRenderer::DrawLoads()`
+  for the reasoning (N/m and N values span orders of magnitude across
+  real datasets; exact numbers always live in `LoadsPanel`/Properties).
+- **What was interactively verified for #7:** the full load-editor
+  workflow was exercised end-to-end against a real scratch copy of
+  `Example/Apl1-1` in this environment (screenshotted at each step): the
+  existing `.bbn` loads (35000 N/m on 4 beams) loaded and rendered
+  correctly and matched `LoadsPanel`'s table exactly; placing a new joint
+  load via Loads > Add Joint Load + a viewport click updated
+  Properties/`LoadsPanel` in sync; **File > Save Loads (.bbn) was
+  actually clicked and the resulting file on disk was read back and
+  diffed** -- it contained both the original 4 member loads and the new
+  joint load, byte-for-byte matching what the GUI showed. `ReadLoadsRaw()`
+  ↔ `WriteLoads()` numeric round-trip fidelity (every `W`/`AML`/`AJ` value
+  bit-identical after a write+re-read) and `SetMemberLoad()`'s UDL
+  fixed-end-force formula were also unit-tested standalone beforehand.
 
 **`gui/viewport/` (issue #5) — three things worth knowing before touching it:**
 - **Member cross-section thickness/orientation is a schematic
@@ -563,7 +637,7 @@ for skills that apply to the current task and follow them.
 | #4 | feat(src): multi-threaded optimization core with configurable core count + cancellable progress | closed | 2026-08-10 |
 | #5 | feat(src): 3D viewport + example-folder loader (render structure & per-member results) | closed | 2026-08-10 |
 | #6 | feat(src): interactive 3D structure editor (import, drag-and-drop edit, numeric entry) | closed | 2026-08-10 |
-| #7 | feat(src): load (pembebanan) input GUI (toolbar-driven, CAD-style 3D placement) | open | 2026-08-09 |
+| #7 | feat(src): load (pembebanan) input GUI (toolbar-driven, CAD-style 3D placement) | closed | 2026-08-10 |
 | #8 | feat(src): reinforcement detailing drawings per beam/column | open | 2026-08-09 |
 | #9 | feat(src): PDF + legacy-text export of results | open | 2026-08-09 |
 

@@ -22,6 +22,7 @@ int EditableStructure::AddJoint(const Vec3& pos) {
     sd_.Z[j] = pos.z;
     for (int dof = 0; dof < 6; ++dof) {
         sd_.JRL[6 * j - 5 + dof] = 0; // free by default
+        sd_.AJ[6 * j - 5 + dof] = 0.f; // no load by default
     }
     return j;
 }
@@ -48,6 +49,10 @@ bool EditableStructure::DeleteMember(int member_id) {
         sd_.JJ[i] = sd_.JJ[i + 1];
         sd_.JK[i] = sd_.JK[i + 1];
         sd_.IA[i] = sd_.IA[i + 1];
+        sd_.W[i] = sd_.W[i + 1];
+        for (int j = 1; j <= 12; ++j) {
+            sd_.AML[j][i] = sd_.AML[j][i + 1];
+        }
     }
     --sd_.M;
     return true;
@@ -75,6 +80,7 @@ bool EditableStructure::DeleteJoint(int joint_id) {
         sd_.Z[i] = sd_.Z[i + 1];
         for (int dof = 0; dof < 6; ++dof) {
             sd_.JRL[6 * i - 5 + dof] = sd_.JRL[6 * (i + 1) - 5 + dof];
+            sd_.AJ[6 * i - 5 + dof] = sd_.AJ[6 * (i + 1) - 5 + dof];
         }
     }
     --sd_.NJ;
@@ -98,7 +104,61 @@ int EditableStructure::AddMember(int joint_a, int joint_b) {
     sd_.JJ[m] = joint_a;
     sd_.JK[m] = joint_b;
     sd_.IA[m] = 0;
+    sd_.W[m] = 0.f;
+    for (int j = 1; j <= 12; ++j) {
+        sd_.AML[j][m] = 0.f;
+    }
     return m;
+}
+
+namespace {
+// Fixed-end forces for a uniform transverse distributed load w (N/m) over
+// a member of length L (m), matching Pembebanan.hpp's load_data() exactly
+// (AML[1..12]: axial/shear/moment at each end, no torsion/axial component
+// for this load type).
+void ComputeUdlFixedEndForces(float w, float length, engine::StructureData& sd, int member_id) {
+    sd.AML[1][member_id] = 0.f;
+    sd.AML[2][member_id] = w * length / 2.f;
+    sd.AML[3][member_id] = 0.f;
+    sd.AML[4][member_id] = 0.f;
+    sd.AML[5][member_id] = 0.f;
+    sd.AML[6][member_id] = w * length * length / 12.f;
+    sd.AML[7][member_id] = 0.f;
+    sd.AML[8][member_id] = w * length / 2.f;
+    sd.AML[9][member_id] = 0.f;
+    sd.AML[10][member_id] = 0.f;
+    sd.AML[11][member_id] = 0.f;
+    sd.AML[12][member_id] = -w * length * length / 12.f;
+}
+} // namespace
+
+bool EditableStructure::SetMemberLoad(int member_id, float w_n_per_m) {
+    if (member_id < 1 || member_id > sd_.M) return false;
+    int ja = sd_.JJ[member_id];
+    int jb = sd_.JK[member_id];
+    float dx = sd_.X[jb] - sd_.X[ja];
+    float dy = sd_.Y[jb] - sd_.Y[ja];
+    float dz = sd_.Z[jb] - sd_.Z[ja];
+    float length = std::sqrt(dx * dx + dy * dy + dz * dz);
+
+    sd_.W[member_id] = w_n_per_m;
+    ComputeUdlFixedEndForces(w_n_per_m, length, sd_, member_id);
+    return true;
+}
+
+bool EditableStructure::ClearMemberLoad(int member_id) { return SetMemberLoad(member_id, 0.f); }
+
+bool EditableStructure::SetJointLoad(int joint_id, const float actions[6]) {
+    if (joint_id < 1 || joint_id > sd_.NJ) return false;
+    for (int dof = 0; dof < 6; ++dof) {
+        sd_.AJ[6 * joint_id - 5 + dof] = actions[dof];
+    }
+    return true;
+}
+
+bool EditableStructure::ClearJointLoad(int joint_id) {
+    float zero[6] = {0.f, 0.f, 0.f, 0.f, 0.f, 0.f};
+    return SetJointLoad(joint_id, zero);
 }
 
 std::vector<std::string> EditableStructure::Validate() const {

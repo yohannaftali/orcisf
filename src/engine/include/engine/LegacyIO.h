@@ -40,6 +40,17 @@ void ReadDiscreteTables(StructureData& sd, const DatasetPaths& paths);
 // StructuralAnalysis.h's BeratSendiri(), called here to match).
 void ReadLoads(StructureData& sd, const std::string& bbn_path);
 
+// New in this port (issue #7's GUI load editor): reads .bbn without
+// applying self-weight. Tolerates a missing file (leaves sd.W/AML/AJ at
+// their defaults). See LegacyIO.cpp's comment on why the editor needs
+// this instead of ReadLoads().
+void ReadLoadsRaw(StructureData& sd, const std::string& bbn_path);
+
+// New in this port (issue #7): writes .bbn matching load_data()'s exact
+// format. `sd`'s W/AML/AJ must be the raw, self-weight-free values (e.g.
+// from ReadLoadsRaw() + edits) -- see LegacyIO.cpp's comment.
+void WriteLoads(const StructureData& sd, const std::string& bbn_path);
+
 // Convenience: ReadStructureFile + ReadDiscreteTables for `paths`.
 void ReadDataset(StructureData& sd, const DatasetPaths& paths);
 

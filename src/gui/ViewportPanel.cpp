@@ -19,6 +19,27 @@ void ViewportPanel::HandlePicking(const SceneModel& scene, Selection& selection,
     Vec3 origin, dir;
     camera_.ScreenRay(ndc_x, ndc_y, aspect, origin, dir);
 
+    if (options.load_mode == LoadPlacementMode::MemberLoad && editable) {
+        int hit_member = PickMember(scene, origin, dir);
+        if (hit_member < 0) return;
+        if (undo) undo->PushUndo(editable->SdForUndo());
+        constexpr float kDefaultMemberLoad = 5000.f; // N/m, a reasonable starting point to then fine-tune
+        editable->SetMemberLoad(hit_member, kDefaultMemberLoad);
+        selection = {SelectionKind::Member, hit_member};
+        if (on_geometry_changed) on_geometry_changed();
+        return;
+    }
+    if (options.load_mode == LoadPlacementMode::JointLoad && editable) {
+        int hit_joint = PickJoint(scene, origin, dir);
+        if (hit_joint < 0) return;
+        if (undo) undo->PushUndo(editable->SdForUndo());
+        constexpr float kDefaultJointLoad[6] = {0.f, -10000.f, 0.f, 0.f, 0.f, 0.f}; // N, downward
+        editable->SetJointLoad(hit_joint, kDefaultJointLoad);
+        selection = {SelectionKind::Joint, hit_joint};
+        if (on_geometry_changed) on_geometry_changed();
+        return;
+    }
+
     if (options.connect_mode && editable) {
         int hit_joint = PickJoint(scene, origin, dir);
         if (hit_joint < 0) return;

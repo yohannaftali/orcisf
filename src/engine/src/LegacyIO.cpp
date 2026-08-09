@@ -140,9 +140,11 @@ void ReadDataset(StructureData& sd, const DatasetPaths& paths) {
     ReadDiscreteTables(sd, paths);
 }
 
-void ReadLoads(StructureData& sd, const std::string& bbn_path) {
-    std::ifstream baca = OpenRead(bbn_path);
+namespace {
 
+// Shared by ReadLoads and ReadLoadsRaw: parses the .bbn file's two
+// sections into sd.W/AML/AJ verbatim (no self-weight applied).
+void ParseLoadsFile(StructureData& sd, std::ifstream& baca) {
     baca >> sd.sub_name; // "[BebanBatang]"
     baca >> sd.M;
     for (int kinp = 1; kinp <= sd.M; ++kinp) {
@@ -166,8 +168,61 @@ void ReadLoads(StructureData& sd, const std::string& bbn_path) {
         baca >> sd.AJ[6 * kinp - 1];
         baca >> sd.AJ[6 * kinp];
     }
+}
 
+} // namespace
+
+void ReadLoads(StructureData& sd, const std::string& bbn_path) {
+    std::ifstream baca = OpenRead(bbn_path);
+    ParseLoadsFile(sd, baca);
     BeratSendiri(sd);
+}
+
+// New in this port (issue #7): reads .bbn the same way ReadLoads() does,
+// but *without* BeratSendiri()'s self-weight side effect -- the file on
+// disk (and load_data()'s original console-input flow that wrote it)
+// never includes self-weight; ReadLoads() re-derives it fresh on every
+// read for real analysis runs. The GUI load editor needs the raw,
+// self-weight-free values (so re-saving doesn't bake self-weight into the
+// file, which would then get double-counted on the next ReadLoads()).
+// Tolerates a missing file (leaves sd.W/AML/AJ at their defaults) so a
+// brand-new dataset with no .bbn yet can still be edited.
+void ReadLoadsRaw(StructureData& sd, const std::string& bbn_path) {
+    std::ifstream baca(bbn_path);
+    if (!baca) return;
+    ParseLoadsFile(sd, baca);
+}
+
+// New in this port (issue #7): writes .bbn matching load_data()'s exact
+// format (CETAK.HPP has no equivalent -- the legacy program only ever
+// wrote loads from its own interactive console prompts, never from a
+// re-editable in-memory model). Callers must pass raw (self-weight-free)
+// values -- see ReadLoadsRaw()'s comment; writing sd.W/AJ after a real
+// ReadLoads()+BeratSendiri() call would bake self-weight into the file.
+void WriteLoads(const StructureData& sd, const std::string& bbn_path) {
+    std::ofstream tulis = OpenWrite(bbn_path);
+
+    tulis << "[BebanBatang]\n";
+    tulis << sd.M << "\n";
+    for (int kbn = 1; kbn <= sd.M; ++kbn) {
+        tulis << kbn << "\n";
+        tulis << sd.W[kbn] << "\n";
+        for (int j = 1; j <= 12; ++j) {
+            tulis << sd.AML[j][kbn] << "\n";
+        }
+    }
+
+    tulis << "[BebanTitik]\n";
+    tulis << sd.NJ << "\n";
+    for (int kbn = 1; kbn <= sd.NJ; ++kbn) {
+        tulis << kbn << "\n";
+        tulis << sd.AJ[6 * kbn - 5] << "\n";
+        tulis << sd.AJ[6 * kbn - 4] << "\n";
+        tulis << sd.AJ[6 * kbn - 3] << "\n";
+        tulis << sd.AJ[6 * kbn - 2] << "\n";
+        tulis << sd.AJ[6 * kbn - 1] << "\n";
+        tulis << sd.AJ[6 * kbn] << "\n";
+    }
 }
 
 namespace {

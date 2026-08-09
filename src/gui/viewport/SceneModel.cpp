@@ -71,6 +71,28 @@ SceneModel BuildSceneModel(const StructureData& sd, const std::vector<MemberResu
             mv.kendala = it->second->Kendala();
         }
         scene.members.push_back(mv);
+
+        if (sd.W[i] != 0.f) {
+            MemberLoadVisual ml;
+            ml.no_batang = i;
+            ml.w_n_per_m = sd.W[i];
+            ml.midpoint = (mv.a + mv.b) * 0.5f;
+            ml.axis = (len > 1e-6f) ? (mv.b - mv.a) * (1.f / len) : Vec3{1.f, 0.f, 0.f};
+            scene.member_loads.push_back(ml);
+        }
+    }
+
+    scene.joint_loads.reserve(static_cast<size_t>(sd.NJ));
+    for (int j = 1; j <= sd.NJ; ++j) {
+        bool any_nonzero = false;
+        JointLoadVisual jl;
+        jl.no_joint = j;
+        jl.pos = Vec3{sd.X[j], sd.Y[j], sd.Z[j]};
+        for (int dof = 0; dof < 6; ++dof) {
+            jl.actions[dof] = sd.AJ[6 * j - 5 + dof];
+            if (jl.actions[dof] != 0.f) any_nonzero = true;
+        }
+        if (any_nonzero) scene.joint_loads.push_back(jl);
     }
 
     if (sd.NJ > 0) {

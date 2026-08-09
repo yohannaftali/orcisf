@@ -30,6 +30,10 @@ private:
     void DrawBox(const math3d::Vec3& a, const math3d::Vec3& b, float width_m, float height_m,
                  const float color[4], const float* view_proj);
     void DrawCube(const math3d::Vec3& center, float half_size, const float color[4], const float* view_proj);
+    // Thin shaft (DrawBox) + a small cube arrowhead at `tip`, from `tail`
+    // to `tip` -- issue #7's load glyphs.
+    void DrawArrow(const math3d::Vec3& tail, const math3d::Vec3& tip, const float color[4], const float* view_proj);
+    void DrawLoads(const SceneModel& scene, const float* view_proj);
 
     bool gl_objects_ready_ = false;
     unsigned int shader_program_ = 0;

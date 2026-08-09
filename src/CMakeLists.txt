@@ -26,6 +26,7 @@ add_executable(orcisf_gui
     gui/PropertiesPanel.cpp
     gui/RunPanel.cpp
     gui/LogPanel.cpp
+    gui/LoadsPanel.cpp
     gui/viewport/Camera.cpp
     gui/viewport/SceneModel.cpp
     gui/viewport/SceneRenderer.cpp

@@ -58,7 +58,32 @@ void DrawJointProperties(const SceneModel& scene, Selection& selection, Editable
         editable->DeleteJoint(jv.no_joint);
         selection.Clear();
         if (on_geometry_changed) on_geometry_changed();
+        ImGui::EndDisabled();
+        return;
     }
+
+    ImGui::SeparatorText("Load (issue #7)");
+    auto load_it = std::find_if(scene.joint_loads.begin(), scene.joint_loads.end(),
+                                 [&](const JointLoadVisual& jl) { return jl.no_joint == jv.no_joint; });
+    float actions[6] = {0, 0, 0, 0, 0, 0};
+    if (load_it != scene.joint_loads.end()) {
+        for (int i = 0; i < 6; ++i) actions[i] = load_it->actions[i];
+    }
+    bool force_edited = ImGui::InputFloat3("Force Fx,Fy,Fz (N)", actions);
+    bool force_committed = force_edited && ImGui::IsItemDeactivatedAfterEdit();
+    bool moment_edited = ImGui::InputFloat3("Moment Mx,My,Mz (Nm)", actions + 3);
+    bool moment_committed = moment_edited && ImGui::IsItemDeactivatedAfterEdit();
+    if ((force_committed || moment_committed) && can_edit) {
+        if (undo) undo->PushUndo(editable->SdForUndo());
+        editable->SetJointLoad(jv.no_joint, actions);
+        if (on_geometry_changed) on_geometry_changed();
+    }
+    if (load_it != scene.joint_loads.end() && ImGui::Button("Clear Load") && can_edit) {
+        if (undo) undo->PushUndo(editable->SdForUndo());
+        editable->ClearJointLoad(jv.no_joint);
+        if (on_geometry_changed) on_geometry_changed();
+    }
+
     ImGui::EndDisabled();
     if (!can_edit) {
         ImGui::TextDisabled("Editing requires a loaded dataset (not just a run-result preview).");
@@ -88,6 +113,22 @@ void DrawMemberProperties(const SceneModel& scene, Selection& selection, Editabl
             selection.Clear();
             if (on_geometry_changed) on_geometry_changed();
             return;
+        }
+
+        ImGui::SeparatorText("Load (issue #7)");
+        auto load_it = std::find_if(scene.member_loads.begin(), scene.member_loads.end(),
+                                     [&](const MemberLoadVisual& ml) { return ml.no_batang == mv.no_batang; });
+        float w = (load_it != scene.member_loads.end()) ? load_it->w_n_per_m : 0.f;
+        bool edited = ImGui::InputFloat("Distributed load (N/m)", &w);
+        if (edited && ImGui::IsItemDeactivatedAfterEdit()) {
+            if (undo) undo->PushUndo(editable->SdForUndo());
+            editable->SetMemberLoad(mv.no_batang, w);
+            if (on_geometry_changed) on_geometry_changed();
+        }
+        if (load_it != scene.member_loads.end() && ImGui::Button("Clear Load")) {
+            if (undo) undo->PushUndo(editable->SdForUndo());
+            editable->ClearMemberLoad(mv.no_batang);
+            if (on_geometry_changed) on_geometry_changed();
         }
     }
 

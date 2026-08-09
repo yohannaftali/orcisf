@@ -4,6 +4,16 @@ namespace orcisf::gui {
 
 enum class SelectionKind { None, Joint, Member };
 
+// Issue #7's toolbar-driven load placement modes -- "None" leaves
+// clicking as plain select (issue #5/#6 behavior), the other two make a
+// click place a default load onto whatever's clicked (then edited
+// numerically in Properties/the load schedule panel), matching the
+// legacy .bbn format's only two load categories (Pembebanan.hpp): a
+// uniform distributed load on a member, or a 6-DOF generalized action
+// (force/moment) at a joint -- which also covers "point load" and
+// "wind/lateral load", both just a joint force in a particular direction.
+enum class LoadPlacementMode { None, MemberLoad, JointLoad };
+
 // Shared selection state: what's picked in the 3D viewport, read/written
 // by ViewportPanel (picking, gizmo drag) and read by PropertiesPanel
 // (numeric editing, delete button) -- both act on the same joint/member.
@@ -31,6 +41,8 @@ struct EditorOptions {
 
     bool snap_to_grid = false;
     float grid_size_m = 0.5f;
+
+    LoadPlacementMode load_mode = LoadPlacementMode::None;
 };
 
 } // namespace orcisf::gui

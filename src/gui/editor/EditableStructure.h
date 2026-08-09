@@ -10,11 +10,15 @@
 // joints and members directly on a loaded engine::StructureData, kept
 // consistent with the legacy 1-based/fixed-size array layout (NJ/M counts,
 // X/Y/Z/JJ/JK/JRL/IA arrays) so the *same* StructureData a dataset was
-// loaded into (via engine::LoadDatasetForViewing) can be edited in place
-// and re-rendered (BuildSceneModel) after every change.
+// loaded into can be edited in place and re-rendered (BuildSceneModel)
+// after every change. Issue #7 extends this to the load fields (W/AML per
+// member, AJ per joint) -- kept compacted alongside geometry for the same
+// reason, and always the *raw*, self-weight-free values (see
+// engine::ReadLoadsRaw()'s comment) since that's what round-trips to
+// .bbn via engine::WriteLoads().
 //
-// Deliberately does *not* touch any analysis/design scratch field (SFF,
-// SM, AM, W, MTUM_*, var_b/var_k, ...) -- those are recomputed from
+// Deliberately does *not* touch any other analysis/design scratch field
+// (SFF, SM, AM, MTUM_*, var_b/var_k, ...) -- those are recomputed from
 // scratch by Inersia()/Struktur()/the optimizer on the next run and don't
 // need to stay consistent between edits (see AGENTS.md's gui/editor
 // section for why this is a safe simplification, not a shortcut that
@@ -54,6 +58,23 @@ public:
 
     // Returns false if member_id is out of [1, M].
     bool DeleteMember(int member_id);
+
+    // Sets a uniform distributed load (N/m, legacy convention: transverse
+    // to the member, gravity-direction sense -- see Pembebanan.hpp's
+    // load_data()) and recomputes its 12 fixed-end-force components (AML)
+    // from the member's *current* length -- so this stays correct even if
+    // the member's endpoints moved since the load was first set. Returns
+    // false if member_id is out of [1, M].
+    bool SetMemberLoad(int member_id, float w_n_per_m);
+    bool ClearMemberLoad(int member_id); // sets w=0 and all 12 AML to 0
+
+    // Sets the joint's 6 generalized actions (order: Fx, Fy, Fz, Mx, My,
+    // Mz in the legacy "arah 1..6" global-DOF convention -- the same
+    // mechanism the legacy format uses for point loads, moments, and
+    // lateral/wind loads alike, see Pembebanan.hpp). Returns false if
+    // joint_id is out of [1, NJ].
+    bool SetJointLoad(int joint_id, const float actions[6]);
+    bool ClearJointLoad(int joint_id); // sets all 6 actions to 0
 
     // Human-readable problems that should block running an analysis/
     // optimization (issue #6's "surfaced to the user before an analysis

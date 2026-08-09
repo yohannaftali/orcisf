@@ -30,10 +30,31 @@ struct JointVisual {
     bool restrained = false;
 };
 
+// Issue #7: a member's uniform distributed load, present only for members
+// with a nonzero raw W (see engine::ReadLoadsRaw()/EditableStructure --
+// self-weight is never shown here, only user-applied loads).
+struct MemberLoadVisual {
+    int no_batang = 0;
+    float w_n_per_m = 0.f; // legacy convention: positive = downward (gravity sense)
+    math3d::Vec3 midpoint;
+    math3d::Vec3 axis; // normalized member direction, for placing the arrow along its length
+};
+
+// Issue #7: a joint's 6 generalized actions (Fx,Fy,Fz,Mx,My,Mz -- the
+// legacy "arah 1..6" convention), present only for joints with at least
+// one nonzero component.
+struct JointLoadVisual {
+    int no_joint = 0;
+    float actions[6] = {0.f, 0.f, 0.f, 0.f, 0.f, 0.f};
+    math3d::Vec3 pos;
+};
+
 struct SceneModel {
     std::string dataset_path; // generic path (no extension) this scene was loaded from
     std::vector<MemberVisual> members;
     std::vector<JointVisual> joints;
+    std::vector<MemberLoadVisual> member_loads;
+    std::vector<JointLoadVisual> joint_loads;
     math3d::Vec3 bounds_center{0.f, 0.f, 0.f};
     float bounds_radius = 1.f;
 
@@ -45,6 +66,10 @@ struct SceneModel {
 // `results`, if non-null, must have one entry per member in `sd`'s
 // no_balok/no_kolom order -- e.g. from engine::ComputeMemberResults --
 // and is used for dimension-scaled thickness + constraint-status color).
+// Also reads `sd`'s raw W/AJ directly for member_loads/joint_loads (issue
+// #7) -- callers must have populated those via engine::ReadLoadsRaw() (or
+// left them at zero), never via engine::ReadLoads(), or self-weight would
+// show up as a phantom "user load".
 SceneModel BuildSceneModel(const engine::StructureData& sd, const std::vector<engine::MemberResult>* results,
                             std::string dataset_path);
 

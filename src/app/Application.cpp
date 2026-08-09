@@ -12,6 +12,7 @@
 #include <utility>
 
 #include "engine/Engine.h"
+#include "engine/LegacyIO.h"
 #include "engine/MemberResults.h"
 
 namespace orcisf::app {
@@ -44,8 +45,8 @@ std::optional<std::string> FindDatasetGenericPath(const std::string& folder) {
 
 Application::Application() {
     log_panel_.AddLine("ORCISF GUI scaffold started (issue #2).");
-    log_panel_.AddLine("3D viewport (#5), Run panel (#4), and the interactive editor (#6) are wired to the "
-                        "engine; load-input GUI lands in issue #7.");
+    log_panel_.AddLine("3D viewport (#5), Run panel (#4), the interactive editor (#6), and the load editor (#7) "
+                        "are wired to the engine.");
 
     run_panel_.SetLogSink([this](std::string line) { log_panel_.AddLine(std::move(line)); });
     run_panel_.SetOnResult([this](engine::StructureData sd, std::string dataset_path) {
@@ -55,6 +56,7 @@ Application::Application() {
     toolbar_.SetOnUndo([this]() { OnUndo(); });
     toolbar_.SetOnRedo([this]() { OnRedo(); });
     toolbar_.SetOnAddJoint([this]() { OnAddJointRequested(); });
+    toolbar_.SetOnSaveLoads([this]() { OnSaveLoadsRequested(); });
 }
 
 void Application::LoadStructure(engine::StructureData sd, const std::vector<engine::MemberResult>* results,
@@ -93,7 +95,13 @@ void Application::OnOpenFolderRequested() {
         }
         try {
             engine::StructureData sd;
-            engine::LoadDatasetForViewing(sd, *generic);
+            engine::DatasetPaths paths = engine::MakeDatasetPaths(*generic);
+            engine::ReadDataset(sd, paths);
+            // Raw (self-weight-free) loads, not engine::LoadDatasetForViewing's
+            // ReadLoads() -- the editor must round-trip exactly what the user
+            // set, not ReadLoads()'s self-weight-inflated in-memory state
+            // (see engine::ReadLoadsRaw()'s comment).
+            engine::ReadLoadsRaw(sd, paths.bbn);
             LoadStructure(std::move(sd), nullptr, *generic);
             log_panel_.AddLine("Loaded dataset: " + *generic);
         } catch (const std::exception& e) {
@@ -106,6 +114,24 @@ void Application::OnOpenFolderRequested() {
 
 void Application::OnRunResult(engine::StructureData sd, std::string dataset_path) {
     std::vector<engine::MemberResult> results = engine::ComputeMemberResults(sd);
+
+    // RunFullOptimization's sd came through engine::ReadLoads(), which
+    // bakes self-weight into W/AJ (see engine::ReadLoadsRaw()'s comment on
+    // LegacyIO.h) -- there's no cheap way to separate that back into "raw
+    // user load" vs. "self-weight" per member/joint (self-weight's joint
+    // contribution can be shared across multiple columns at that joint).
+    // Rather than show self-weight-inflated values as if they were
+    // editable user loads (issue #7's load editor/schedule would then be
+    // showing numbers the user never entered), clear them: post-run
+    // editing starts from a clean load slate. The .bbn file on disk (the
+    // actual source of truth) is untouched by this -- only this in-memory
+    // copy, which the editor treats independently of what RunPanel used.
+    for (int i = 1; i <= sd.M; ++i) {
+        sd.W[i] = 0.f;
+        for (int j = 1; j <= 12; ++j) sd.AML[j][i] = 0.f;
+    }
+    for (int i = 1; i <= 6 * sd.NJ; ++i) sd.AJ[i] = 0.f;
+
     LoadStructure(std::move(sd), &results, dataset_path);
     log_panel_.AddLine("Viewport updated with results from: " + dataset_path);
 }
@@ -144,6 +170,17 @@ void Application::OnRedo() {
     RebuildSceneAfterEdit();
 }
 
+void Application::OnSaveLoadsRequested() {
+    if (!editable_ || loaded_dataset_path_.empty()) return;
+    try {
+        engine::DatasetPaths paths = engine::MakeDatasetPaths(loaded_dataset_path_);
+        engine::WriteLoads(loaded_sd_, paths.bbn);
+        log_panel_.AddLine("Saved loads to: " + paths.bbn);
+    } catch (const std::exception& e) {
+        log_panel_.AddLine(std::string("Failed to save loads: ") + e.what());
+    }
+}
+
 void Application::BuildDockspace() {
     ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
     ImGui::DockSpaceOverViewport(dockspace_id, ImGui::GetMainViewport(),
@@ -167,13 +204,15 @@ void Application::BuildDockspace() {
     ImGui::DockBuilderDockWindow("Viewport", dock_main);
     ImGui::DockBuilderDockWindow("Properties", dock_right);
     ImGui::DockBuilderDockWindow("Run Optimization", dock_right);
+    ImGui::DockBuilderDockWindow("Loads", dock_bottom);
     ImGui::DockBuilderDockWindow("Log", dock_bottom);
 
     ImGui::DockBuilderFinish(dockspace_id);
 }
 
 void Application::OnFrame() {
-    toolbar_.Draw(undo_stack_.CanUndo(), undo_stack_.CanRedo(), editor_options_);
+    bool can_save = editable_.has_value() && !loaded_dataset_path_.empty();
+    toolbar_.Draw(undo_stack_.CanUndo(), undo_stack_.CanRedo(), can_save, editor_options_);
     BuildDockspace();
 
     gui::EditableStructure* editable_ptr = editable_ ? &*editable_ : nullptr;
@@ -183,6 +222,7 @@ void Application::OnFrame() {
                           on_geometry_changed);
     properties_panel_.Draw(&properties_open_, scene_, selection_, editable_ptr, &undo_stack_, validation_issues_,
                             on_geometry_changed);
+    loads_panel_.Draw(&loads_open_, scene_, selection_, editable_ptr, &undo_stack_, on_geometry_changed);
     run_panel_.Draw(&run_open_);
     log_panel_.Draw(&log_open_);
 }
