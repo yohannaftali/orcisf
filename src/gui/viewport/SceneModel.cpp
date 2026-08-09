@@ -133,4 +133,26 @@ int PickMember(const SceneModel& scene, const Vec3& ray_origin, const Vec3& ray_
     return best_no_batang;
 }
 
+namespace {
+constexpr float kJointPickRadius = 0.28f; // meters; a bit larger than the rendered marker for easy clicking
+}
+
+int PickJoint(const SceneModel& scene, const Vec3& ray_origin, const Vec3& ray_dir) {
+    int best_no_joint = -1;
+    float best_distance = std::numeric_limits<float>::max();
+
+    for (const JointVisual& jv : scene.joints) {
+        Vec3 to_point = jv.pos - ray_origin;
+        float t = Dot(to_point, ray_dir);
+        if (t < 0.f) continue; // behind the camera
+        Vec3 closest_on_ray = ray_origin + ray_dir * t;
+        float dist = (closest_on_ray - jv.pos).Length();
+        if (dist <= kJointPickRadius && dist < best_distance) {
+            best_distance = dist;
+            best_no_joint = jv.no_joint;
+        }
+    }
+    return best_no_joint;
+}
+
 } // namespace orcisf::gui

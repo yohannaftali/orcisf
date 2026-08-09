@@ -7,23 +7,70 @@
 
 namespace orcisf::gui {
 
-void PropertiesPanel::Draw(bool* open, const SceneModel& scene, int selected_member) {
-    if (!ImGui::Begin("Properties", open)) {
-        ImGui::End();
+namespace {
+
+void DrawValidationSection(const std::vector<std::string>& issues, bool has_dataset) {
+    if (!has_dataset) return;
+    ImGui::SeparatorText("Validation");
+    if (issues.empty()) {
+        ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.4f, 1.f), "No issues -- OK to run.");
         return;
     }
+    ImGui::TextColored(ImVec4(0.95f, 0.45f, 0.35f, 1.f), "%zu issue(s) -- fix before running:", issues.size());
+    for (const std::string& issue : issues) {
+        ImGui::BulletText("%s", issue.c_str());
+    }
+}
 
-    if (selected_member < 0) {
-        ImGui::TextDisabled("Click a member in the Viewport to see its data here.");
-        ImGui::End();
+void DrawJointProperties(const SceneModel& scene, Selection& selection, EditableStructure* editable, UndoStack* undo,
+                          const std::function<void()>& on_geometry_changed) {
+    auto it = std::find_if(scene.joints.begin(), scene.joints.end(),
+                            [&](const JointVisual& jv) { return jv.no_joint == selection.id; });
+    if (it == scene.joints.end()) {
+        ImGui::TextDisabled("Selected joint is no longer in the loaded dataset.");
         return;
     }
+    const JointVisual& jv = *it;
 
+    ImGui::Text("Joint %d", jv.no_joint);
+    ImGui::Separator();
+
+    float pos[3] = {jv.pos.x, jv.pos.y, jv.pos.z};
+    bool can_edit = editable != nullptr;
+    ImGui::BeginDisabled(!can_edit);
+    bool edited = ImGui::InputFloat3("Position (m)", pos);
+    if (edited && ImGui::IsItemDeactivatedAfterEdit() && can_edit) {
+        if (undo) undo->PushUndo(editable->SdForUndo());
+        editable->MoveJoint(jv.no_joint, math3d::Vec3{pos[0], pos[1], pos[2]});
+        if (on_geometry_changed) on_geometry_changed();
+    }
+
+    bool restrained = jv.restrained;
+    if (ImGui::Checkbox("Restrained (fixed support)", &restrained) && can_edit) {
+        if (undo) undo->PushUndo(editable->SdForUndo());
+        editable->SetJointRestrained(jv.no_joint, restrained);
+        if (on_geometry_changed) on_geometry_changed();
+    }
+
+    ImGui::Spacing();
+    if (ImGui::Button("Delete Joint") && can_edit) {
+        if (undo) undo->PushUndo(editable->SdForUndo());
+        editable->DeleteJoint(jv.no_joint);
+        selection.Clear();
+        if (on_geometry_changed) on_geometry_changed();
+    }
+    ImGui::EndDisabled();
+    if (!can_edit) {
+        ImGui::TextDisabled("Editing requires a loaded dataset (not just a run-result preview).");
+    }
+}
+
+void DrawMemberProperties(const SceneModel& scene, Selection& selection, EditableStructure* editable,
+                           UndoStack* undo, const std::function<void()>& on_geometry_changed) {
     auto it = std::find_if(scene.members.begin(), scene.members.end(),
-                            [selected_member](const MemberVisual& mv) { return mv.no_batang == selected_member; });
+                            [&](const MemberVisual& mv) { return mv.no_batang == selection.id; });
     if (it == scene.members.end()) {
         ImGui::TextDisabled("Selected member is no longer in the loaded dataset.");
-        ImGui::End();
         return;
     }
     const MemberVisual& mv = *it;
@@ -33,10 +80,20 @@ void PropertiesPanel::Draw(bool* open, const SceneModel& scene, int selected_mem
     ImGui::Text("Panjang: %.3f m", (mv.b - mv.a).Length());
     ImGui::Text("Dimensi: %.0f x %.0f mm", mv.width_m * 1000.f, mv.height_m * 1000.f);
 
+    if (editable) {
+        ImGui::Spacing();
+        if (ImGui::Button("Delete Member")) {
+            if (undo) undo->PushUndo(editable->SdForUndo());
+            editable->DeleteMember(mv.no_batang);
+            selection.Clear();
+            if (on_geometry_changed) on_geometry_changed();
+            return;
+        }
+    }
+
     if (!mv.has_results) {
         ImGui::Spacing();
         ImGui::TextDisabled("No design results yet -- run an optimization to see forces/capacity/constraints.");
-        ImGui::End();
         return;
     }
 
@@ -69,6 +126,31 @@ void PropertiesPanel::Draw(bool* open, const SceneModel& scene, int selected_mem
         ImGui::SeparatorText("Kendala");
         ImGui::Text("%.4g", mv.result.kendala_kolom);
     }
+}
+
+} // namespace
+
+void PropertiesPanel::Draw(bool* open, const SceneModel& scene, Selection& selection, EditableStructure* editable,
+                            UndoStack* undo, const std::vector<std::string>& validation_issues,
+                            const std::function<void()>& on_geometry_changed) {
+    if (!ImGui::Begin("Properties", open)) {
+        ImGui::End();
+        return;
+    }
+
+    switch (selection.kind) {
+        case SelectionKind::Joint:
+            DrawJointProperties(scene, selection, editable, undo, on_geometry_changed);
+            break;
+        case SelectionKind::Member:
+            DrawMemberProperties(scene, selection, editable, undo, on_geometry_changed);
+            break;
+        case SelectionKind::None:
+            ImGui::TextDisabled("Click a joint or member in the Viewport to see its data here.");
+            break;
+    }
+
+    DrawValidationSection(validation_issues, !scene.Empty());
 
     ImGui::End();
 }

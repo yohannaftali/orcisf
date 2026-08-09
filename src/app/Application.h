@@ -1,20 +1,28 @@
 #pragma once
 
+#include <optional>
+#include <vector>
+
+#include "engine/MemberResults.h"
 #include "gui/LogPanel.h"
 #include "gui/PropertiesPanel.h"
 #include "gui/RunPanel.h"
 #include "gui/Toolbar.h"
 #include "gui/ViewportPanel.h"
+#include "gui/editor/EditableStructure.h"
+#include "gui/editor/Selection.h"
+#include "gui/editor/UndoStack.h"
 #include "gui/viewport/SceneModel.h"
 
 namespace orcisf::app {
 
 // Owns the docking layout and top-level panels. One instance per process;
 // driven once per frame by main.cpp's render loop. Also owns the shared
-// scene/selection state (issue #5): the currently loaded SceneModel and
-// which member (if any) is selected, both read by ViewportPanel and
-// PropertiesPanel and written by ViewportPanel (picking) and the
-// load-folder/run-completion flows below.
+// scene/selection/editing state (issues #5/#6): the currently loaded
+// StructureData (`loaded_sd_`, the single source of truth an
+// EditableStructure mutates in place), the derived SceneModel read by
+// ViewportPanel/PropertiesPanel, which member/joint is selected, the
+// undo/redo stack, and the current validation-issue list.
 class Application {
 public:
     Application();
@@ -26,6 +34,22 @@ private:
     void BuildDockspace();
     void OnOpenFolderRequested();
     void OnRunResult(engine::StructureData sd, std::string dataset_path);
+    void OnAddJointRequested();
+    void OnUndo();
+    void OnRedo();
+
+    // Common load path for both OnOpenFolderRequested (view-only, no
+    // results yet) and OnRunResult (results available): replaces
+    // loaded_sd_, resets selection/undo/editor state, and rebuilds
+    // scene_/validation_issues_.
+    void LoadStructure(engine::StructureData sd, const std::vector<engine::MemberResult>* results,
+                        std::string dataset_path);
+
+    // Rebuilds scene_ + validation_issues_ from the current loaded_sd_ --
+    // called after every edit. Any edit invalidates previously-computed
+    // MemberResult data (member ids can shift on delete), so this always
+    // rebuilds geometry-only (no results) once editing has started.
+    void RebuildSceneAfterEdit();
 
     gui::Toolbar toolbar_;
     gui::ViewportPanel viewport_panel_;
@@ -33,8 +57,15 @@ private:
     gui::LogPanel log_panel_;
     gui::RunPanel run_panel_;
 
+    engine::StructureData loaded_sd_;
+    std::optional<gui::EditableStructure> editable_; // wraps loaded_sd_ once something is loaded
+    gui::UndoStack undo_stack_;
+    gui::Selection selection_;
+    gui::EditorOptions editor_options_;
+    std::string loaded_dataset_path_;
+
     gui::SceneModel scene_;
-    int selected_member_ = -1;
+    std::vector<std::string> validation_issues_;
 
     bool viewport_open_ = true;
     bool properties_open_ = true;

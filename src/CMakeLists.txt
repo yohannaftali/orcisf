@@ -29,6 +29,8 @@ add_executable(orcisf_gui
     gui/viewport/Camera.cpp
     gui/viewport/SceneModel.cpp
     gui/viewport/SceneRenderer.cpp
+    gui/editor/EditableStructure.cpp
+    gui/editor/UndoStack.cpp
 )
 
 target_include_directories(orcisf_gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

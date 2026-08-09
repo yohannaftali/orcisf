@@ -342,3 +342,60 @@ history only; don't duplicate current-state description here.
   section) — makes the app directory's copies win regardless of PATH,
   which is also just correct practice for distributing a MinGW-built exe.
   No-op on the MSVC/x64-windows triplet CI uses.
+
+## 2026-08-10 — #6: interactive 3D structure editor
+
+- New `src/gui/editor/` subsystem: `Selection.h` (`SelectionKind`
+  {None,Joint,Member} + `EditorOptions` for connect-mode/snap-to-grid,
+  shared by ViewportPanel/PropertiesPanel/Toolbar), `EditableStructure.{h,cpp}`
+  (add/move/delete joint, add/delete member, a single fixed/free restraint
+  toggle per joint, `Validate()`), `UndoStack.{h,cpp}` (geometry-only
+  snapshots — `X`/`Y`/`Z`/`JRL`/`JJ`/`JK`/`IA` sized to the current `NJ`/`M`,
+  not a full ~14MB `StructureData` copy, the same lesson issue #4 already
+  learned about that).
+- `DeleteJoint()` cascades (deletes every member touching the joint first)
+  and compacts every array so 1-based indices stay contiguous with no
+  gaps — the same invariant every other legacy array in this port relies
+  on. Verified with a standalone test program (not checked in): a 4-joint
+  square, deleting one joint, checking the cascading member deletion +
+  index remapping + an undo/redo round-trip all landed correctly.
+- `SceneModel` gained `PickJoint()` (ray-vs-sphere, sibling to #5's
+  `PickMember()`) so a click in the viewport can select a joint in
+  preference to a member.
+- `ViewportPanel` gained an ImGuizmo translate gizmo for the selected
+  joint (undo-snapshotted exactly once per drag, on the `IsUsing()`
+  false→true edge, not every frame) and connect-mode clicking (first
+  joint click picks a start point, second click on a different joint adds
+  a member and stays in connect mode for chaining). `PropertiesPanel`
+  gained numeric X/Y/Z entry + a restrained checkbox for a selected joint,
+  Delete Joint/Member buttons, and an always-visible validation-issue
+  list. `Toolbar` gained an Edit menu (Undo/Redo, Add Joint, Connect
+  Joints, Snap to Grid + grid-size slider). `Application` now owns the
+  one canonical editable `StructureData` (`loaded_sd_`) that both the
+  Open-Folder load path and the editor operate on; any edit invalidates
+  previously-computed `MemberResult` data (member ids can shift on
+  delete), so the scene rebuilds geometry-only (no results/colors) after
+  the first edit, until a fresh optimization run repopulates them.
+- Explicitly out of scope per #6's acceptance criteria (not attempted):
+  wiring edited in-memory geometry into `RunPanel`'s "Run" (it still
+  always re-reads a dataset from disk by path) — no save/export-to-`.inp`
+  exists yet either. Natural follow-up for #7 or a dedicated issue.
+- **Validation:** joint/member picking, numeric position entry (confirmed
+  live-updating the 3D view and the connected members' geometry), the
+  Restrained checkbox, Delete Joint, Add Joint (confirmed it defaults to
+  the scene's bounding-sphere center), Undo (confirmed it exactly restored
+  prior geometry and cleared selection), and the Validation panel (showed
+  "No issues -- OK to run" throughout, matching the unit-tested
+  zero-issue case) were all exercised end-to-end via synthesized Win32
+  mouse/keyboard input (with `AttachThreadInput` to work around Windows'
+  foreground-focus protections blocking a background process from
+  stealing focus) and screenshotted to confirm. `EditableStructure`'s
+  core logic (add/move/delete cascading + compaction, `Validate()`
+  catching coincident joints and zero-length members, undo/redo) was also
+  unit-tested standalone before GUI wiring. **Not exercised:** an actual
+  click-drag on the ImGuizmo gizmo's translate arrows (sub-pixel
+  axis-handle targeting was judged too unreliable to script reliably) —
+  the gizmo was confirmed to render at the correct position, and its
+  output feeds the identical `MoveJoint()` call the verified numeric-entry
+  path already exercises, so remaining risk is isolated to ImGuizmo's own
+  hit-testing.

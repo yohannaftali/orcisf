@@ -125,7 +125,7 @@ by `$env{VCPKG_ROOT}`). CI: `.github/workflows/build-src.yml` matrix-builds
 all three OS targets on every push/PR touching `src/`.
 
 **Current state (#2 scaffold + #3 engine port + #4 threaded core + #5 3D
-viewport land; #6–#9 not started):**
+viewport + #6 interactive editor land; #7–#9 not started):**
 ```
 src/
 ├── vcpkg.json / CMakeLists.txt / CMakePresets.json
@@ -133,16 +133,25 @@ src/
 │   ├── main.cpp             # GLFW/OpenGL3/ImGui bootstrap + render loop;
 │   │                        # also: gl3w init, NFD_Init/Quit
 │   └── Application.{h,cpp}  # docking layout (Viewport | Properties/RunPanel / Log);
-│                            # owns the shared SceneModel + selected-member state,
-│                            # File > Open Folder... (NFD) and Run-completion wiring
+│                            # owns loaded_sd_ (the one editable StructureData),
+│                            # the derived SceneModel, Selection, UndoStack,
+│                            # EditorOptions; File > Open Folder... (NFD),
+│                            # Add Joint / Undo / Redo, and Run-completion wiring
 ├── gui/
-│   ├── Toolbar.{h,cpp}          # menu bar; "File > Open Folder..." wired (#5),
-│   │                            # rest still placeholders
+│   ├── Toolbar.{h,cpp}          # menu bar; File > Open Folder... (#5) and the
+│   │                            # Edit menu (#6: Undo/Redo, Add Joint, Connect
+│   │                            # Joints, Snap to Grid) are wired
 │   ├── ViewportPanel.{h,cpp}    # #5: offscreen OpenGL render of a SceneModel,
-│   │                            # orbit/pan/zoom camera, click-to-pick a member
+│   │                            # orbit/pan/zoom camera, click-to-pick a joint
+│   │                            # or member; #6: ImGuizmo translate handle for
+│   │                            # the selected joint, connect-mode clicking to
+│   │                            # add a member
 │   ├── PropertiesPanel.{h,cpp}  # #5: shows the selected member's dimensions +
 │   │                            # (if available) demand/capacity/kendala;
-│   │                            # numeric *editing* is still #6/#7
+│   │                            # #6: numeric X/Y/Z + restrained-toggle for a
+│   │                            # selected joint, Delete Joint/Member buttons,
+│   │                            # always-visible EditableStructure::Validate()
+│   │                            # issue list (blocks a future Run when non-empty)
 │   ├── RunPanel.{h,cpp}         # #4: dataset/options form, worker-thread-count
 │   │                            # slider, Run/Cancel, live progress bar -- runs
 │   │                            # engine::RunFullOptimization on a background
@@ -151,17 +160,26 @@ src/
 │   │                            # Application to refresh the viewport
 │   ├── LogPanel.{h,cpp}         # run/status log -- functional; detailed
 │   │                            # calc log to disk is done, see engine/
-│   └── viewport/                # #5: rendering/camera/scene-data, no ImGui
-│       │                        # dependency except ViewportPanel.cpp itself
-│       ├── Math3D.h             # minimal Vec3/Mat4 (no GLM dependency)
-│       ├── Camera.{h,cpp}       # orbit camera (target/distance/yaw/pitch)
-│       ├── SceneModel.{h,cpp}   # engine::StructureData (+ optional
-│       │                        # MemberResult list) -> render-ready
-│       │                        # joints/members snapshot; PickMember()
-│       │                        # (ray-vs-segment, no GL involved)
-│       └── SceneRenderer.{h,cpp} # owns the FBO/shader/cube-mesh GL objects,
-│                                  # draws a SceneModel from a Camera into a
-│                                  # texture for ViewportPanel's ImGui::Image
+│   ├── viewport/                # #5: rendering/camera/scene-data, no ImGui
+│   │   │                        # dependency except ViewportPanel.cpp itself
+│   │   ├── Math3D.h             # minimal Vec3/Mat4 (no GLM dependency)
+│   │   ├── Camera.{h,cpp}       # orbit camera (target/distance/yaw/pitch)
+│   │   ├── SceneModel.{h,cpp}   # engine::StructureData (+ optional
+│   │   │                        # MemberResult list) -> render-ready
+│   │   │                        # joints/members snapshot; PickMember()/
+│   │   │                        # PickJoint() (ray-vs-segment/sphere, no GL involved)
+│   │   └── SceneRenderer.{h,cpp} # owns the FBO/shader/cube-mesh GL objects,
+│   │                              # draws a SceneModel from a Camera into a
+│   │                              # texture for ViewportPanel's ImGui::Image
+│   └── editor/                  # #6: geometry editing, no ImGui/GL dependency
+│       ├── Selection.h          # SelectionKind{None,Joint,Member} + EditorOptions
+│       │                        # (connect-mode, snap-to-grid) shared by
+│       │                        # ViewportPanel/PropertiesPanel/Toolbar
+│       ├── EditableStructure.{h,cpp} # Add/Move/Delete joint, Add/Delete
+│       │                        # member, restraint toggle, Validate() --
+│       │                        # mutates an engine::StructureData& in place
+│       └── UndoStack.{h,cpp}    # GeometrySnapshot (X/Y/Z/JRL/JJ/JK/IA only,
+│                                  # NOT a full StructureData copy) + push/undo/redo
 └── engine/                      # #3/#4/#5: headless analysis/design/optimizer
     ├── README.md                # full architecture + validation writeup — read before touching this dir
     ├── include/engine/*.h, src/*.cpp   # one pair per ported legacy file, see README's table
@@ -172,15 +190,57 @@ src/
                                   # (optimize also prints a MEMBER_RESULTS section)
 ```
 `Toolbar`/`ViewportPanel`/`PropertiesPanel` had inert placeholders under
-issue #2; #5 gave `ViewportPanel`/`PropertiesPanel` (and Toolbar's "Open
-Folder...") their first real implementation. **Interactive editing (drag,
-numeric entry, add/remove members) is still #6/#7** — don't build that
-into `ViewportPanel`/`PropertiesPanel` under issue #5's banner; #5 is
-view-only (load + render + inspect). Read the relevant issue before
-starting work here — each has detailed acceptance criteria. As each
-sub-issue lands, extend this section (new subsystems, data model, how the
-engine/GUI/export layers connect) rather than replacing it wholesale, per
-the Change Log Policy.
+issue #2; #5 gave them their first real implementation (view-only: load,
+render, inspect) and #6 added interactive editing on top. Read the
+relevant issue before starting work here — each has detailed acceptance
+criteria. As each sub-issue lands, extend this section (new subsystems,
+data model, how the engine/GUI/export layers connect) rather than
+replacing it wholesale, per the Change Log Policy.
+
+**`gui/editor/` (issue #6) — read before touching geometry editing:**
+- **Only geometry fields are edited/compacted, deliberately not every
+  legacy per-member array.** `EditableStructure` (add/move/delete
+  joint/member) and `UndoStack`'s `GeometrySnapshot` both touch only
+  `NJ`/`M`/`X`/`Y`/`Z`/`JRL` (per joint) and `JJ`/`JK`/`IA` (per member) --
+  every other per-member field (`SFF`, `SM`, `AM`, `W`, `MTUM_*`,
+  `var_b`/`var_k`, `R11..R33`, ...) is analysis/design *scratch state* that
+  `Inersia()`/`Struktur()`/the optimizer recompute from scratch on the next
+  run regardless of what edits happened in between, so there's nothing to
+  keep consistent there. Don't "complete" this list to cover those fields
+  without a concrete reason (it would only add dead-weight copying, per
+  the same lesson issue #4 learned about full `StructureData` copies).
+  `T_K`/`ND`/`N` are legacy input-parsing scratch, also untouched.
+- **Deleting a joint/member compacts indices, not tombstones them** --
+  `DeleteJoint()`/`DeleteMember()` shift every higher-indexed
+  joint/member down by one and remap `JJ`/`JK` accordingly, keeping the
+  1-based arrays contiguous (the invariant every other legacy array in
+  this port relies on: `NJ`/`M` as "how many are in use", no gaps). Verified
+  with a standalone test (not checked in): adding a 4-joint/4-member square,
+  deleting one joint, and checking the cascading member deletion +
+  reindexing + undo/redo round-trip all landed correctly.
+- **Restraint editing is a single fixed/free toggle, not per-DOF.**
+  `SetJointRestrained()` sets/clears all 6 `JRL` DOF flags for a joint at
+  once. Fine-grained per-DOF restraint editing wasn't in #6's acceptance
+  criteria; add it as a refinement if a future issue needs it, don't
+  silently change this toggle's meaning.
+- **Wiring edits into a `RunPanel` run was explicitly out of scope for
+  #6** — `RunPanel`/`RunFullOptimization` still always re-read a dataset
+  from disk by path; there's no path yet from "edited in-memory geometry"
+  to "run an optimization on it" (no save/export-to-.inp exists either).
+  That's natural territory for #7 or a dedicated follow-up, not something
+  #6 was required to solve.
+- **What was interactively verified vs. reasoned through:** joint/member
+  picking, numeric position entry live-updating the 3D view, the
+  Restrained checkbox, Delete Joint, Add Joint, Undo, and the Validation
+  panel were all exercised end-to-end in this environment (mouse/keyboard
+  input synthesized via Win32 API + `AttachThreadInput` to work around
+  Windows' foreground-focus protections, screenshotted to confirm). An
+  actual click-drag *on* the ImGuizmo gizmo's arrows was not (sub-pixel
+  axis targeting was judged too unreliable to script); the gizmo was
+  confirmed to render at the correct position and `Manipulate()`'s output
+  feeds the exact same `EditableStructure::MoveJoint()` call the verified
+  numeric-entry path uses, so the remaining risk is specifically in
+  ImGuizmo's own hit-testing, not in this project's code.
 
 **`gui/viewport/` (issue #5) — three things worth knowing before touching it:**
 - **Member cross-section thickness/orientation is a schematic
@@ -502,7 +562,7 @@ for skills that apply to the current task and follow them.
 | #3 | feat(src): port structural-analysis + RC-design + Flexible-Polyhedron engine as a headless library | closed | 2026-08-09 |
 | #4 | feat(src): multi-threaded optimization core with configurable core count + cancellable progress | closed | 2026-08-10 |
 | #5 | feat(src): 3D viewport + example-folder loader (render structure & per-member results) | closed | 2026-08-10 |
-| #6 | feat(src): interactive 3D structure editor (import, drag-and-drop edit, numeric entry) | open | 2026-08-09 |
+| #6 | feat(src): interactive 3D structure editor (import, drag-and-drop edit, numeric entry) | closed | 2026-08-10 |
 | #7 | feat(src): load (pembebanan) input GUI (toolbar-driven, CAD-style 3D placement) | open | 2026-08-09 |
 | #8 | feat(src): reinforcement detailing drawings per beam/column | open | 2026-08-09 |
 | #9 | feat(src): PDF + legacy-text export of results | open | 2026-08-09 |

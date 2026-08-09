@@ -44,14 +44,38 @@ std::optional<std::string> FindDatasetGenericPath(const std::string& folder) {
 
 Application::Application() {
     log_panel_.AddLine("ORCISF GUI scaffold started (issue #2).");
-    log_panel_.AddLine("3D viewport (issue #5) and Run panel (issue #4) are wired to the engine; "
-                        "interactive editing lands in issue #6/#7.");
+    log_panel_.AddLine("3D viewport (#5), Run panel (#4), and the interactive editor (#6) are wired to the "
+                        "engine; load-input GUI lands in issue #7.");
 
     run_panel_.SetLogSink([this](std::string line) { log_panel_.AddLine(std::move(line)); });
     run_panel_.SetOnResult([this](engine::StructureData sd, std::string dataset_path) {
         OnRunResult(std::move(sd), std::move(dataset_path));
     });
     toolbar_.SetOnOpenFolder([this]() { OnOpenFolderRequested(); });
+    toolbar_.SetOnUndo([this]() { OnUndo(); });
+    toolbar_.SetOnRedo([this]() { OnRedo(); });
+    toolbar_.SetOnAddJoint([this]() { OnAddJointRequested(); });
+}
+
+void Application::LoadStructure(engine::StructureData sd, const std::vector<engine::MemberResult>* results,
+                                 std::string dataset_path) {
+    loaded_sd_ = std::move(sd);
+    loaded_dataset_path_ = std::move(dataset_path);
+    editable_.emplace(loaded_sd_);
+    undo_stack_.Clear();
+    selection_.Clear();
+    editor_options_.connect_mode = false;
+    editor_options_.connect_first_joint = -1;
+
+    scene_ = gui::BuildSceneModel(loaded_sd_, results, loaded_dataset_path_);
+    validation_issues_ = editable_->Validate();
+    viewport_panel_.FrameScene(scene_);
+}
+
+void Application::RebuildSceneAfterEdit() {
+    if (!editable_) return;
+    scene_ = gui::BuildSceneModel(loaded_sd_, nullptr, loaded_dataset_path_);
+    validation_issues_ = editable_->Validate();
 }
 
 void Application::OnOpenFolderRequested() {
@@ -70,9 +94,7 @@ void Application::OnOpenFolderRequested() {
         try {
             engine::StructureData sd;
             engine::LoadDatasetForViewing(sd, *generic);
-            scene_ = gui::BuildSceneModel(sd, nullptr, *generic);
-            selected_member_ = -1;
-            viewport_panel_.FrameScene(scene_);
+            LoadStructure(std::move(sd), nullptr, *generic);
             log_panel_.AddLine("Loaded dataset: " + *generic);
         } catch (const std::exception& e) {
             log_panel_.AddLine(std::string("Failed to load dataset: ") + e.what());
@@ -84,10 +106,42 @@ void Application::OnOpenFolderRequested() {
 
 void Application::OnRunResult(engine::StructureData sd, std::string dataset_path) {
     std::vector<engine::MemberResult> results = engine::ComputeMemberResults(sd);
-    scene_ = gui::BuildSceneModel(sd, &results, dataset_path);
-    selected_member_ = -1;
-    viewport_panel_.FrameScene(scene_);
+    LoadStructure(std::move(sd), &results, dataset_path);
     log_panel_.AddLine("Viewport updated with results from: " + dataset_path);
+}
+
+void Application::OnAddJointRequested() {
+    if (!editable_) {
+        // No dataset loaded yet -- start a blank in-memory structure the
+        // user can build up from scratch (issue #6's editor isn't only for
+        // editing an imported file).
+        LoadStructure(engine::StructureData{}, nullptr, "");
+        log_panel_.AddLine("Started a new blank structure.");
+    }
+
+    gui::math3d::Vec3 pos = scene_.Empty() ? gui::math3d::Vec3{0.f, 0.f, 0.f} : scene_.bounds_center;
+    undo_stack_.PushUndo(editable_->SdForUndo());
+    int joint_id = editable_->AddJoint(pos);
+    if (joint_id < 0) {
+        log_panel_.AddLine("Could not add joint: dataset is at its maximum size.");
+        return;
+    }
+    selection_ = {gui::SelectionKind::Joint, joint_id};
+    RebuildSceneAfterEdit();
+}
+
+void Application::OnUndo() {
+    if (!editable_ || !undo_stack_.CanUndo()) return;
+    undo_stack_.Undo(loaded_sd_);
+    selection_.Clear();
+    RebuildSceneAfterEdit();
+}
+
+void Application::OnRedo() {
+    if (!editable_ || !undo_stack_.CanRedo()) return;
+    undo_stack_.Redo(loaded_sd_);
+    selection_.Clear();
+    RebuildSceneAfterEdit();
 }
 
 void Application::BuildDockspace() {
@@ -119,11 +173,16 @@ void Application::BuildDockspace() {
 }
 
 void Application::OnFrame() {
-    toolbar_.Draw();
+    toolbar_.Draw(undo_stack_.CanUndo(), undo_stack_.CanRedo(), editor_options_);
     BuildDockspace();
 
-    viewport_panel_.Draw(&viewport_open_, scene_, selected_member_);
-    properties_panel_.Draw(&properties_open_, scene_, selected_member_);
+    gui::EditableStructure* editable_ptr = editable_ ? &*editable_ : nullptr;
+    auto on_geometry_changed = [this]() { RebuildSceneAfterEdit(); };
+
+    viewport_panel_.Draw(&viewport_open_, scene_, selection_, editable_ptr, &undo_stack_, editor_options_,
+                          on_geometry_changed);
+    properties_panel_.Draw(&properties_open_, scene_, selection_, editable_ptr, &undo_stack_, validation_issues_,
+                            on_geometry_changed);
     run_panel_.Draw(&run_open_);
     log_panel_.Draw(&log_open_);
 }

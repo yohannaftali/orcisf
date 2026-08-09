@@ -55,4 +55,10 @@ SceneModel BuildSceneModel(const engine::StructureData& sd, const std::vector<en
 // criterion -- pure geometry, no OpenGL/rendering involved.
 int PickMember(const SceneModel& scene, const math3d::Vec3& ray_origin, const math3d::Vec3& ray_dir);
 
+// Same idea as PickMember but for joint markers (ray-vs-sphere against
+// each joint's position) -- used by issue #6's editor so a click can
+// select a joint (to drag/delete/retype its coordinates) in preference to
+// the member underneath it. Returns -1 if none is within pick range.
+int PickJoint(const SceneModel& scene, const math3d::Vec3& ray_origin, const math3d::Vec3& ray_dir);
+
 } // namespace orcisf::gui
