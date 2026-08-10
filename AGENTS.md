@@ -794,7 +794,7 @@ for skills that apply to the current task and follow them.
 | #7 | feat(src): load (pembebanan) input GUI (toolbar-driven, CAD-style 3D placement) | closed | 2026-08-10 |
 | #8 | feat(src): reinforcement detailing drawings per beam/column | closed | 2026-08-10 |
 | #9 | feat(src): PDF + legacy-text export of results | closed | 2026-08-10 |
-| #10 | fix(src): CI build-src.yml failing on Linux and Windows targets | open | 2026-08-10 |
+| #10 | fix(src): CI build-src.yml failing on Linux and Windows targets | closed | 2026-08-10 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

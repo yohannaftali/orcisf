@@ -612,3 +612,35 @@ history only; don't duplicate current-state description here.
   step. Detailed logs weren't accessible (403, needs admin/write access)
   so root cause isn't identified yet -- filed with job/step-level status
   only.
+- **Root causes found and fixed, issue closed.** Pulled full job logs via
+  the GitHub API (needed a repo token; the earlier 403 was because the
+  first attempt used no auth) and identified two independent problems:
+  - **Linux (Configure):** vcpkg's `pthread-stubs` port (a transitive
+    dependency, pulled in via GLFW's X11 deps) needs `autoconf`/
+    `autoconf-archive`/`automake`/`libtool` from the system package
+    manager to build via autotools; `build-src.yml`'s "Install Linux
+    GL/X11 dev packages" step didn't install them. Fixed in one commit,
+    which then surfaced a second autotools port needing the same
+    treatment one level further down the dependency graph: `libxcrypt`
+    additionally needs `libltdl-dev`. Both are now installed in that step.
+  - **Windows (Build/link):** every `.cpp` compiled, but linking
+    `orcisf_gui.exe` failed with dozens of `undefined reference to
+    ImGui::...` errors. Root cause: the Windows job never set up an MSVC
+    environment, so CMake's Ninja generator auto-detected
+    `C:\mingw64\bin\c++.exe` (present on the `windows-latest` runner) as
+    the compiler instead of `cl.exe` -- linking MinGW/Itanium-ABI object
+    files against the `x64-windows` vcpkg triplet's MSVC-ABI import
+    libraries. `CMakeLists.txt` already assumed MSVC/x64-windows in CI
+    (see its `MINGW`-guarded post-build DLL-copy comment) but nothing in
+    the workflow actually enforced it. Fixed by adding
+    `ilammy/msvc-dev-cmd` and forcing `CC=CXX=cl` before configuring.
+  - Windows was independently verified with a full local build on this
+    machine (VS Build Tools 2022's bundled `cl`/`cmake`/`ninja`, vcpkg
+    checked out at the same pinned commit CI uses) -- both `orcisf_gui.exe`
+    and `orcisf_cli.exe` linked and ran. Local Linux verification via WSL
+    was attempted but abandoned (`sudo` required an interactive password
+    with no TTY available); the Linux fix was verified via CI directly
+    instead, across two iterations (pthread-stubs, then libxcrypt).
+  - Final CI run (https://github.com/yohannaftali/orcisf/actions/runs/31375100535,
+    commit 6aff4b4): all three matrix targets (`windows-latest`,
+    `ubuntu-latest`, `macos-latest`) passed. Issue #10 closed.
