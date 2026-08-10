@@ -644,3 +644,25 @@ history only; don't duplicate current-state description here.
   - Final CI run (https://github.com/yohannaftali/orcisf/actions/runs/31375100535,
     commit 6aff4b4): all three matrix targets (`windows-latest`,
     `ubuntu-latest`, `macos-latest`) passed. Issue #10 closed.
+
+## 2026-08-10 — File > New Data action + Open Folder... rename
+
+- Issue #11 created on GitHub: "feat(src): add File > New Data action,
+  rename Open Folder... to Open Data...".
+- Scope: `src/gui/Toolbar.{h,cpp}`, `src/app/Application.{h,cpp}`
+- Labels: enhancement
+- Currently `File` only has "Open Folder..." (loads an existing dataset);
+  there's no in-app way to start a blank dataset from scratch. #11 adds a
+  `New Data` action and relabels the existing item to `Open Data...` so
+  the two read as a create/load pair.
+- **#11 expanded (same day):** clarified that point/member/restraint
+  entry mostly already exists (issue #6's `gui/editor/`) and just needs
+  to work starting from a blank `New Data` dataset -- not new machinery.
+  Added a genuinely new requirement: a `.inf`-equivalent preview/export
+  (`Koordinat Titik Kumpul (m)` / `Informasi Batang` / `Pengekang Titik
+  Kumpul`, English aliases acceptable) generated directly from the
+  in-GUI-edited dataset at any time, since today `.inf` is only ever
+  produced by `engine::WriteFinalResults()` as a byproduct of a
+  completed run (#9). Units stay meters-only per the legacy format;
+  cm/mm support explicitly deferred to a future issue, not attempted
+  here.
