@@ -1,1 +1,9 @@
 .env
+
+# vcpkg checkout (per src/README.md's local build instructions, cloned
+# at repo root and pointed at via VCPKG_ROOT) and any build dirs created
+# outside src/ (src/.gitignore covers build/ output under src/ itself)
+vcpkg/
+build/
+out/
+.cache/
