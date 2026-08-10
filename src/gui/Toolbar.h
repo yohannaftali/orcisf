@@ -7,12 +7,14 @@
 namespace orcisf::gui {
 
 // Top toolbar. "File > Open Folder..." (#5), the "Edit" menu (#6:
-// Undo/Redo, Add Joint, Connect Mode, Snap to Grid), and the "Loads" menu
-// + "File > Save Loads (.bbn)" (#7) are wired; Run/View menu items are
-// still placeholders (Run is covered by the separate RunPanel).
+// Undo/Redo, Add Joint, Connect Mode, Snap to Grid), the "Loads" menu +
+// "File > Save Loads (.bbn)" (#7), and "File > Export PDF.../Export
+// Text..." (#9) are wired; Run/View menu items are still placeholders
+// (Run is covered by the separate RunPanel).
 class Toolbar {
 public:
-    void Draw(bool can_undo, bool can_redo, bool can_save, EditorOptions& options);
+    void Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_text, bool can_export_pdf,
+              EditorOptions& options);
 
     void SetOnOpenFolder(std::function<void()> callback);
     void SetOnUndo(std::function<void()> callback);
@@ -24,6 +26,9 @@ public:
     void SetOnAddJoint(std::function<void()> callback);
     // Writes the current raw loads back to the loaded dataset's .bbn file.
     void SetOnSaveLoads(std::function<void()> callback);
+    // Issue #9: full legacy text file set / PDF report, via an NFD save dialog.
+    void SetOnExportText(std::function<void()> callback);
+    void SetOnExportPdf(std::function<void()> callback);
 
 private:
     std::function<void()> on_open_folder_;
@@ -31,6 +36,8 @@ private:
     std::function<void()> on_redo_;
     std::function<void()> on_add_joint_;
     std::function<void()> on_save_loads_;
+    std::function<void()> on_export_text_;
+    std::function<void()> on_export_pdf_;
 };
 
 } // namespace orcisf::gui

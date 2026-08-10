@@ -124,9 +124,8 @@ dialogs, **libharu (HPDF)** for PDF export — dependency-managed via
 by `$env{VCPKG_ROOT}`). CI: `.github/workflows/build-src.yml` matrix-builds
 all three OS targets on every push/PR touching `src/`.
 
-**Current state (#2 scaffold + #3 engine port + #4 threaded core + #5 3D
-viewport + #6 interactive editor + #7 load editor + #8 detailing drawings
-land; #9 not started):**
+**Current state (all of epic #1's sub-issues, #2 through #9, have landed --
+see "Epic #1 complete" below for what that does and doesn't mean):**
 ```
 src/
 ├── vcpkg.json / CMakeLists.txt / CMakePresets.json
@@ -144,8 +143,9 @@ src/
 ├── gui/
 │   ├── Toolbar.{h,cpp}          # menu bar; File > Open Folder... (#5), the
 │   │                            # Edit menu (#6: Undo/Redo, Add Joint, Connect
-│   │                            # Joints, Snap to Grid), and the Loads menu +
-│   │                            # File > Save Loads (.bbn) (#7) are wired
+│   │                            # Joints, Snap to Grid), the Loads menu +
+│   │                            # File > Save Loads (.bbn) (#7), and File >
+│   │                            # Export PDF.../Export Text... (#9) are wired
 │   ├── ViewportPanel.{h,cpp}    # #5: offscreen OpenGL render of a SceneModel,
 │   │                            # orbit/pan/zoom camera, click-to-pick a joint
 │   │                            # or member; #6: ImGuizmo translate handle for
@@ -207,15 +207,29 @@ src/
 │       └── DetailingLayout.{h,cpp}  # engine::MemberResult -> DetailingDrawing
 │                                # (concrete outline, RebarCircle positions,
 │                                # DimensionLabel text, local mm coordinates)
-│                                # so #9's PDF export can reuse the exact same
-│                                # layout with a different renderer (libharu
-│                                # instead of ImDrawList)
-└── engine/                      # #3/#4/#5/#7/#8: headless analysis/design/optimizer
+│                                # -- #9's PDF export reuses this exact layout
+│                                # with a different renderer (libharu instead
+│                                # of ImDrawList), which is the whole reason
+│                                # the layout/render split exists
+├── report/                      # #9: PDF + legacy-text export (named `report/`,
+│   │                            # not the issue's suggested `/src/export` --
+│   │                            # `export` is a reserved C++ word, can't be a
+│   │                            # namespace identifier)
+│   ├── TextExport.{h,cpp}       # writes the full legacy file set (.inp/.isd/
+│   │                            # .idl/.ijl/.ids/.ijs/.bbn always; .opt/.str/
+│   │                            # .kdl/.inf + copies of .his/.log.txt too if
+│   │                            # a completed, not-since-edited run exists)
+│   └── PdfExport.{h,cpp}        # HPDF-based report: cover/input summary, a
+│                                # per-member summary table, and one detailing
+│                                # page per member (reusing
+│                                # gui::BuildDetailingDrawing() -- see above)
+└── engine/                      # #3/#4/#5/#7/#8/#9: headless analysis/design/optimizer
     ├── README.md                # full architecture + validation writeup — read before touching this dir
     ├── include/engine/*.h, src/*.cpp   # one pair per ported legacy file, see README's table
     │   (MemberResults.h/.cpp is #5's addition, see below, extended by #8
     │   with reinforcement fields; LegacyIO's ReadLoadsRaw()/WriteLoads()
-    │   are #7's, see its own note below)
+    │   are #7's; WriteStructureFile()/WriteDiscreteTables() are #9's --
+    │   see their own notes below)
     └── tools/orcisf_cli.cpp     # headless CLI: `info`/`equilibrium`/`optimize [worker_threads] [rng_seed] [quiet]`
                                   # (optimize's MEMBER_RESULTS section also prints
                                   # reinforcement: bar counts/diameters/spacing)
@@ -223,12 +237,14 @@ src/
 `Toolbar`/`ViewportPanel`/`PropertiesPanel` had inert placeholders under
 issue #2; #5 gave them their first real implementation (view-only: load,
 render, inspect), #6 added interactive geometry editing, #7 added load
-editing (`LoadsPanel` is new), and #8 added the `DetailingPanel` + its
-`gui/detailing/` layout subsystem. Read the relevant issue before starting
-work here — each has detailed acceptance criteria. As each sub-issue
-lands, extend this section (new subsystems, data model, how the
-engine/GUI/export layers connect) rather than replacing it wholesale, per
-the Change Log Policy.
+editing (`LoadsPanel` is new), #8 added the `DetailingPanel` + its
+`gui/detailing/` layout subsystem, and #9 added `src/report/` (PDF + full
+legacy-text export) plus the corresponding `Toolbar`/`Application` wiring.
+Read the relevant issue before starting work here — each has detailed
+acceptance criteria. If a *new* sub-issue is ever added to this epic (or a
+new epic reuses this codebase), extend this section (new subsystems, data
+model, how the engine/GUI/export layers connect) rather than replacing it
+wholesale, per the Change Log Policy.
 
 **`engine::MemberResult`'s reinforcement fields + `gui/detailing/` (issue
 #8) — read before touching detailing drawings:**
@@ -266,12 +282,13 @@ the Change Log Policy.
   purpose** -- it only depends on `engine::MemberResult`/`gui::MemberVisual`
   and produces plain-data `DetailingDrawing`/`DetailingSection`/
   `RebarCircle`/`DimensionLabel` structs in local mm coordinates (origin
-  at the section center, +Y up). `DetailingPanel.cpp` is the *only* file
-  that touches `ImDrawList` to actually render it. **Issue #9's PDF export
-  should reuse `BuildDetailingDrawing()` directly** and write a second,
-  separate renderer (HPDF calls instead of `ImDrawList` calls) rather than
-  recomputing bar positions -- that's the whole reason the layout/render
-  split exists.
+  at the section center, +Y up). `DetailingPanel.cpp` is the *only* GUI
+  file that touches `ImDrawList` to render it -- `report/PdfExport.cpp`
+  (issue #9) is the second renderer this split was built for: it calls
+  `BuildDetailingDrawing()` directly and draws the identical layout with
+  HPDF calls instead, no bar-position recomputation. If you ever need a
+  *third* rendering target, follow the same pattern rather than
+  special-casing detailing logic into that renderer.
 - **Dimensioning is simple text labels anchored at a point, not a full
   parametric CAD dimension-line-with-arrowheads system** -- judged
   sufficient for "usable as a reference drawing" without the added
@@ -286,6 +303,71 @@ the Change Log Policy.
   stirrup labels) and a beam's drawing (both Tumpuan and Lapangan
   sections, correct tension-face flip, all labels) were confirmed to
   exactly match the same run's `orcisf_cli`/`MEMBER_RESULTS` numeric output.
+
+**`src/report/` + `engine::WriteStructureFile()`/`WriteDiscreteTables()`
+(issue #9) — read before touching export:**
+- **`WriteStructureFile()` recomputes `NRJ`/`NR`/`ND`/`N` from the current
+  `sd.JRL` rather than trusting `sd`'s own fields** (a joint counts as
+  restrained if any of its 6 DOF flags is 1; `ND = 6*NJ`, `N = ND - NR`) --
+  same reasoning as `WriteLoads()` needing raw values: an edited-then-
+  exported dataset has no reliable `NRJ`/`NR` sitting around (the editor
+  doesn't maintain them), so re-deriving from the ground truth (`JRL`) at
+  write time is the only way exported `.inp` files stay internally
+  consistent. A partially-restrained joint's *actual* `JRL` pattern is
+  preserved as-is (e.g. a pin support with translations fixed but
+  rotations free), not forced to all-6.
+- **`WriteDiscreteTables()` is a pure echo** -- the five discrete design
+  tables (`.isd`/`.idl`/`.ijl`/`.ids`/`.ijs`) aren't touched by the editor
+  (#6/#7 don't create/resize them), so this just writes back whatever
+  `ReadDiscreteTables()` populated. Round-trip verified with a standalone
+  test: read a real dataset, write it to a scratch path, read it back,
+  compare every field (`NJ`/`M`/`NRJ`/`NR`/`ND`/`N`, every joint/member/
+  discrete-table value) -- bit-identical, including the recomputed
+  `NRJ`/`NR`/`ND`/`N` matching the originals exactly.
+- **"Download as text" (`report::WriteTextExport()`) always writes
+  `.inp`/`.isd`/`.idl`/`.ijl`/`.ids`/`.ijs`/`.bbn` (mirroring whatever's
+  currently in `sd`), and *additionally* writes `.opt`/`.str`/`.kdl`/`.inf`
+  + copies `.his`/`.log.txt` from the run's original location only if
+  `has_run_results` is true** (a completed run with no edit since --
+  `Application` tracks this the same way it already tracked "does the
+  scene have `MemberResult` data", see its header comment). `.his`/
+  `.log.txt` are copied rather than regenerated because they're
+  per-generation history that only ever existed as a byproduct of the
+  original run -- there's no way to reconstruct them from the final
+  `StructureData` alone. `Application::OnRunResult()` already zeroes
+  post-run `W`/`AJ` for the *load editor*'s sake (see the note below); the
+  *same* `has_run_results_` flag independently gates PDF export and the
+  `.opt`/`.str`/`.kdl`/`.inf`/`.his`/`.log.txt` part of text export, and is
+  cleared on any subsequent edit (`RebuildSceneAfterEdit()`) since edited
+  geometry invalidates `var_b`/`var_k`/`fitstr` (member ids/counts can
+  shift on delete).
+- **Namespace is `orcisf::report`, not `orcisf::export`** -- `export` has
+  been a reserved C++ word since C++98 (unused "export templates" feature,
+  repurposed for C++20 modules), so it can't be a namespace identifier
+  even outside a module build. The directory is `src/report/`, not the
+  issue's literally-suggested `/src/export`.
+- **HPDF error handling uses `setjmp`/`longjmp`** (`PdfExport.cpp`'s
+  `ErrorHandler`), the standard pattern in every libharu example, wrapping
+  the whole `WritePdfReport()` body. This is technically UB if a
+  non-trivial-destructor C++ object is live on the stack when a `longjmp`
+  fires (destructors don't run) -- accepted here as a known, standard
+  tradeoff of using a C library's callback-based error model from C++,
+  not something to "fix" by rewriting HPDF's API surface.
+- **What was verified:** `WriteStructureFile()`/`WriteDiscreteTables()`'s
+  round-trip (above) and `WritePdfReport()`/`WriteTextExport()` were both
+  exercised standalone (a real completed run of `Example/Apl1-1`: PDF
+  generated, opened, and screenshotted page-by-page -- cover/input
+  summary, the per-member summary table matching `MEMBER_RESULTS` exactly,
+  and a detailing page with correct Tumpuan/Lapangan sections; text export
+  produced all 12 files, `.his`/`.log.txt` included, at the right sizes).
+  The full GUI path was then verified separately, through the *actual*
+  native NFD dialogs (not simulated): "Export PDF..." opened a real "Save
+  As" dialog (pre-filled `report.pdf`, `*.pdf` filter) and produced a
+  byte-identical file to the standalone test; "Export Text..." opened a
+  real "Select Folder" dialog and produced the same 12-file set. The
+  round-trip criterion was checked by re-reading the exported dataset with
+  `orcisf_cli info`/`equilibrium` -- identical geometry/topology, and a
+  perfect (0.0) equilibrium residual.
 
 **`engine/`'s `ReadLoadsRaw()`/`WriteLoads()` (issue #7) — the load-editor's
 critical invariant:** the legacy `.bbn` file *never* includes self-weight
@@ -711,15 +793,29 @@ for skills that apply to the current task and follow them.
 | #6 | feat(src): interactive 3D structure editor (import, drag-and-drop edit, numeric entry) | closed | 2026-08-10 |
 | #7 | feat(src): load (pembebanan) input GUI (toolbar-driven, CAD-style 3D placement) | closed | 2026-08-10 |
 | #8 | feat(src): reinforcement detailing drawings per beam/column | closed | 2026-08-10 |
-| #9 | feat(src): PDF + legacy-text export of results | open | 2026-08-09 |
+| #9 | feat(src): PDF + legacy-text export of results | closed | 2026-08-10 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
 nativefiledialog-extended (native file/folder dialogs), libharu/HPDF (PDF
-export), CMake + vcpkg (Win/macOS/Linux build). **#2's scaffold has
-landed** (see `src/`, "`src/` — modern cross-platform GUI port" above) —
-build/window/docking skeleton only, no engine/viewport/editor/export
-functionality yet; #3–#9 are still open.
+export), CMake + vcpkg (Win/macOS/Linux build).
+
+**Epic #1 complete: #2 through #9 have all landed.** The GUI port now
+covers the full pipeline the legacy console program did (load/create a
+dataset, view it in 3D, edit geometry and loads interactively, run the
+threaded optimizer with live progress, inspect results including
+reinforcement detailing drawings, export a PDF report or the full legacy
+text file set) — see each numbered section above (`gui/viewport/`,
+`gui/editor/`, `engine/`, `gui/detailing/` + `src/report/`) for what
+landed under which issue and what's deliberately still simplified or
+out of scope. "Complete" means the acceptance criteria as written are
+met and interactively verified where this environment allows it, **not**
+that the port is a pixel-perfect or feature-complete replacement for the
+legacy program — known gaps (e.g. per-DOF restraint editing, arrowed
+CAD-style dimension lines, wiring edited in-memory geometry directly into
+a `Run` without a save/reload step) are called out in their respective
+sections above. Treat any *new* work here as a fresh issue against this
+now-shipped baseline, not as "finishing" epic #1.
 
 ---
 

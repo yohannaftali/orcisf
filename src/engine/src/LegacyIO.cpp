@@ -135,6 +135,97 @@ void ReadDiscreteTables(StructureData& sd, const DatasetPaths& paths) {
     }
 }
 
+void WriteStructureFile(const StructureData& sd, const std::string& inp_path) {
+    std::ofstream tulis = OpenWrite(inp_path);
+
+    // Recompute the derived counts from the current JRL rather than trust
+    // sd.NRJ/NR/ND/N -- see header comment.
+    int nrj = 0, nr = 0;
+    for (int j = 1; j <= sd.NJ; ++j) {
+        bool any = false;
+        for (int dof = 0; dof < 6; ++dof) {
+            if (sd.JRL[6 * j - 5 + dof] == 1) {
+                any = true;
+                ++nr;
+            }
+        }
+        if (any) ++nrj;
+    }
+    int nd = 6 * sd.NJ;
+    int n = nd - nr;
+
+    tulis << sd.ISN << "\n";
+    tulis << sd.M << "\n";
+    tulis << sd.NJ << "\n";
+    tulis << nrj << "\n";
+    tulis << nr << "\n";
+    tulis << sd.E << "\n";
+    tulis << sd.G << "\n";
+    tulis << sd.FC << "\n";
+    tulis << sd.FY << "\n";
+    tulis << sd.FYS << "\n";
+    tulis << nd << "\n";
+    tulis << n << "\n";
+
+    tulis << "[Koordinat]\n";
+    for (int j = 1; j <= sd.NJ; ++j) {
+        tulis << j << "\n" << sd.X[j] << "\n" << sd.Y[j] << "\n" << sd.Z[j] << "\n";
+    }
+
+    tulis << "[Pengekang]\n";
+    for (int j = 1; j <= sd.NJ; ++j) {
+        bool any = false;
+        for (int dof = 0; dof < 6; ++dof) {
+            if (sd.JRL[6 * j - 5 + dof] == 1) any = true;
+        }
+        if (!any) continue;
+        tulis << j << "\n";
+        for (int dof = 0; dof < 6; ++dof) {
+            tulis << sd.JRL[6 * j - 5 + dof] << "\n";
+        }
+    }
+
+    tulis << "[InformasiBatang]\n";
+    for (int i = 1; i <= sd.M; ++i) {
+        tulis << i << "\n" << sd.JJ[i] << "\n" << sd.JK[i] << "\n" << sd.IA[i] << "\n";
+        if (sd.IA[i] != 0) {
+            tulis << sd.XP[i] << "\n" << sd.YP[i] << "\n" << sd.ZP[i] << "\n";
+        }
+    }
+}
+
+void WriteDiscreteTables(const StructureData& sd, const DatasetPaths& paths) {
+    {
+        std::ofstream t = OpenWrite(paths.isd);
+        t << "[LebarBalok]\n" << sd.nsisi_B << "\n";
+        for (int i = 0; i < sd.nsisi_B; ++i) t << sd.sisi_d_B[i] << "\n";
+        t << "[TinggiBalok]\n" << sd.nsisi_H << "\n";
+        for (int i = 0; i < sd.nsisi_H; ++i) t << sd.sisi_d_H[i] << "\n";
+        t << "[SisiKolom]\n" << sd.nsisi_K << "\n";
+        for (int i = 0; i < sd.nsisi_K; ++i) t << sd.sisi_d_K[i] << "\n";
+    }
+    {
+        std::ofstream t = OpenWrite(paths.idl);
+        t << "[DiameterTulanganUtama]\n" << sd.nDIA << "\n";
+        for (int i = 0; i < sd.nDIA; ++i) t << sd.DIA_d[i] << "\n";
+    }
+    {
+        std::ofstream t = OpenWrite(paths.ijl);
+        t << "[JumlahTulanganUtama]\n" << sd.nNL << "\n";
+        for (int i = 0; i < sd.nNL; ++i) t << sd.NL_d[i] << "\n";
+    }
+    {
+        std::ofstream t = OpenWrite(paths.ids);
+        t << "[DiameterTulanganSengkang]\n" << sd.nDIAS << "\n";
+        for (int i = 0; i < sd.nDIAS; ++i) t << sd.DIAS_d[i] << "\n";
+    }
+    {
+        std::ofstream t = OpenWrite(paths.ijs);
+        t << "[JarakAntarSengkang]\n" << sd.nJS << "\n";
+        for (int i = 0; i < sd.nJS; ++i) t << sd.JS_d[i] << "\n";
+    }
+}
+
 void ReadDataset(StructureData& sd, const DatasetPaths& paths) {
     ReadStructureFile(sd, paths.inp);
     ReadDiscreteTables(sd, paths);

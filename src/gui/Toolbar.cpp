@@ -9,8 +9,11 @@ void Toolbar::SetOnUndo(std::function<void()> callback) { on_undo_ = std::move(c
 void Toolbar::SetOnRedo(std::function<void()> callback) { on_redo_ = std::move(callback); }
 void Toolbar::SetOnAddJoint(std::function<void()> callback) { on_add_joint_ = std::move(callback); }
 void Toolbar::SetOnSaveLoads(std::function<void()> callback) { on_save_loads_ = std::move(callback); }
+void Toolbar::SetOnExportText(std::function<void()> callback) { on_export_text_ = std::move(callback); }
+void Toolbar::SetOnExportPdf(std::function<void()> callback) { on_export_pdf_ = std::move(callback); }
 
-void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, EditorOptions& options) {
+void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_text, bool can_export_pdf,
+                    EditorOptions& options) {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
             if (ImGui::MenuItem("Open Folder...")) {
@@ -19,8 +22,13 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, EditorOptions& o
             if (ImGui::MenuItem("Save Loads (.bbn)", nullptr, false, can_save)) {
                 if (on_save_loads_) on_save_loads_();
             }
-            ImGui::MenuItem("Export PDF...", nullptr, false, false);
-            ImGui::MenuItem("Export Text...", nullptr, false, false);
+            ImGui::Separator();
+            if (ImGui::MenuItem("Export PDF...", nullptr, false, can_export_pdf)) {
+                if (on_export_pdf_) on_export_pdf_();
+            }
+            if (ImGui::MenuItem("Export Text...", nullptr, false, can_export_text)) {
+                if (on_export_text_) on_export_text_();
+            }
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Edit")) {

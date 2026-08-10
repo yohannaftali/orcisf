@@ -40,6 +40,8 @@ private:
     void OnUndo();
     void OnRedo();
     void OnSaveLoadsRequested();
+    void OnExportTextRequested();
+    void OnExportPdfRequested();
 
     // Common load path for both OnOpenFolderRequested (view-only, no
     // results yet) and OnRunResult (results available): replaces
@@ -71,6 +73,16 @@ private:
 
     gui::SceneModel scene_;
     std::vector<std::string> validation_issues_;
+
+    // Issue #9: true iff loaded_sd_ is exactly what a completed
+    // optimization run produced (var_b/var_k/fitstr etc. all valid,
+    // matching engine::WriteFinalResults()'s precondition) with no edit
+    // since -- gates "Export PDF..." and .opt/.str/.kdl/.inf in "Export
+    // Text...". current_results_ is the same MemberResult list the scene
+    // was built from, kept around so PDF export doesn't need to recompute
+    // it (which would also mutate loaded_sd_'s scratch fields again).
+    bool has_run_results_ = false;
+    std::vector<engine::MemberResult> current_results_;
 
     bool viewport_open_ = true;
     bool properties_open_ = true;

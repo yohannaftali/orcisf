@@ -34,6 +34,8 @@ add_executable(orcisf_gui
     gui/editor/EditableStructure.cpp
     gui/editor/UndoStack.cpp
     gui/detailing/DetailingLayout.cpp
+    report/TextExport.cpp
+    report/PdfExport.cpp
 )
 
 target_include_directories(orcisf_gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

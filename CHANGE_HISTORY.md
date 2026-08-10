@@ -530,3 +530,69 @@ history only; don't duplicate current-state description here.
   tension/compression color legend rendered as "?" (not in ImGui's
   default font's glyph range) -- replaced with a small `ImDrawList`-drawn
   colored square instead, which doesn't depend on font glyph coverage.
+
+## 2026-08-10 — #9: PDF + legacy-text export of results (epic #1 complete)
+
+- New `engine::WriteStructureFile()`/`WriteDiscreteTables()` (`LegacyIO.h/.cpp`):
+  mirror `ReadStructureFile()`/`ReadDiscreteTables()` exactly in reverse,
+  completing the round-trip started by issue #7's `WriteLoads()`.
+  `WriteStructureFile()` recomputes `NRJ`/`NR`/`ND`/`N` from the current
+  `sd.JRL` (a joint counts as restrained if any of its 6 DOF flags is 1)
+  rather than trusting `sd`'s own fields, since the #6/#7 editor doesn't
+  maintain those derived counts -- a dataset built or edited entirely in
+  the GUI still exports a self-consistent `.inp`. Verified with a
+  standalone round-trip test against a real dataset: every field
+  (including the recomputed `NRJ`/`NR`/`ND`/`N`) came back bit-identical
+  after a write + re-read.
+- New `src/report/` module (namespace `orcisf::report` -- not `export`,
+  a reserved C++ word since C++98): `TextExport.{h,cpp}` writes the full
+  legacy file set (`.inp`/`.isd`/`.idl`/`.ijl`/`.ids`/`.ijs`/`.bbn` always;
+  `.opt`/`.str`/`.kdl`/`.inf` + copies of `.his`/`.log.txt` from the run's
+  original location if a completed, not-since-edited run exists --
+  per-generation history can't be regenerated from the final
+  `StructureData` alone). `PdfExport.{h,cpp}` builds a multi-page HPDF
+  report (cover/input summary, a per-member dimensions/cost/constraint
+  table, and one landscape detailing page per member) by calling
+  `gui::BuildDetailingDrawing()` (issue #8) directly and drawing the
+  identical layout with HPDF calls instead of `ImDrawList` calls --
+  exactly the reuse issue #8's layout/render split was built for. HPDF's
+  C callback-based error handling uses the standard `setjmp`/`longjmp`
+  pattern (documented as a known, accepted tradeoff, not something to
+  "fix").
+- `Application` now tracks `has_run_results_`/`current_results_`: true
+  only when `loaded_sd_` is exactly what a completed run produced (no
+  edit since -- `var_b`/`var_k`/`fitstr` etc. still valid, matching
+  `WriteFinalResults()`'s own precondition), gating "Export PDF..." and
+  the `.opt`/`.str`/`.kdl`/`.inf`/`.his`/`.log.txt` part of "Export
+  Text...". `Toolbar` gained "Export PDF..."/"Export Text..." (File
+  menu), wired to real native NFD dialogs (Save dialog with a `.pdf`
+  filter; folder picker, reusing the loaded dataset's own base filename
+  in the chosen destination).
+- **Validation:** `WriteStructureFile()`/`WriteDiscreteTables()`'s
+  round-trip and `WritePdfReport()`/`WriteTextExport()` were first
+  exercised standalone against a real completed run of `Example/Apl1-1` --
+  the generated PDF was opened and screenshotted page-by-page (cover,
+  a per-member summary table exactly matching `MEMBER_RESULTS`, and a
+  detailing page with correct Tumpuan/Lapangan sections matching issue
+  #8's ImGui rendering exactly); text export produced all 12 files
+  (11 legacy extensions + `.log.txt`) at plausible sizes. **The full GUI
+  path was then separately verified through the actual native dialogs**
+  (not simulated): clicking "Export PDF..." opened a real Chrome "Save
+  As" dialog pre-filled with `report.pdf` and a `*.pdf` filter, producing
+  a file byte-identical in size to the standalone test; clicking "Export
+  Text..." opened a real "Select Folder" dialog (navigated via its
+  address bar) and produced the same 12-file set. The round-trip
+  criterion was checked by re-reading the exported dataset with
+  `orcisf_cli info`/`equilibrium`: identical geometry/topology to the
+  original, and a perfect (0.0) equilibrium residual. One unrelated
+  mishap during this pass: a screenshot command with an uncorrected
+  window-relative click offset accidentally captured an unrelated
+  desktop window; noticed immediately, nothing in that window was acted
+  on or described, and the correct window was re-targeted for the retry.
+- **This closes epic #1** (issues #2–#9). See `AGENTS.md`'s "Epic #1
+  complete" note for what that does and doesn't claim -- acceptance
+  criteria met and verified where this environment allows, not a
+  feature-complete replacement of the legacy program; known simplifications
+  (per-DOF restraint editing, arrowed CAD dimension lines, no direct
+  edited-geometry-to-Run path without a save/reload) are documented in
+  each issue's section of `AGENTS.md` rather than repeated here.

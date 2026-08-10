@@ -35,6 +35,23 @@ void ReadStructureFile(StructureData& sd, const std::string& inp_path);
 // second half).
 void ReadDiscreteTables(StructureData& sd, const DatasetPaths& paths);
 
+// New in this port (issue #9's "Download as text" export): writes .inp,
+// mirroring ReadStructureFile()'s exact token order/section headers in
+// reverse. NRJ/NR/ND/N are *recomputed* from the current sd.JRL (a joint
+// counts as restrained if any of its 6 DOF flags is 1) rather than trusted
+// from sd's own NRJ/NR/ND/N fields, so a dataset edited via issue #6's
+// editor (which doesn't maintain those derived counts) still exports a
+// self-consistent file. A joint's actual JRL pattern is preserved as-is
+// (not forced to all-6 for a partially-restrained joint loaded from a
+// real dataset, e.g. a pin support).
+void WriteStructureFile(const StructureData& sd, const std::string& inp_path);
+
+// New in this port (issue #9): writes the five discrete-table files,
+// mirroring ReadDiscreteTables() exactly in reverse. These tables aren't
+// touched by the GUI editor (#6/#7), so this just echoes back whatever
+// ReadDiscreteTables() populated.
+void WriteDiscreteTables(const StructureData& sd, const DatasetPaths& paths);
+
 // Reads member/joint loads into sd and applies self-weight (legacy
 // `baca_beban()`, which itself calls `berat_sendiri()` at the end -- see
 // StructuralAnalysis.h's BeratSendiri(), called here to match).

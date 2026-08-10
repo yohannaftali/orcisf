@@ -14,6 +14,8 @@
 #include "engine/Engine.h"
 #include "engine/LegacyIO.h"
 #include "engine/MemberResults.h"
+#include "report/PdfExport.h"
+#include "report/TextExport.h"
 
 namespace orcisf::app {
 
@@ -57,6 +59,8 @@ Application::Application() {
     toolbar_.SetOnRedo([this]() { OnRedo(); });
     toolbar_.SetOnAddJoint([this]() { OnAddJointRequested(); });
     toolbar_.SetOnSaveLoads([this]() { OnSaveLoadsRequested(); });
+    toolbar_.SetOnExportText([this]() { OnExportTextRequested(); });
+    toolbar_.SetOnExportPdf([this]() { OnExportPdfRequested(); });
 }
 
 void Application::LoadStructure(engine::StructureData sd, const std::vector<engine::MemberResult>* results,
@@ -69,6 +73,9 @@ void Application::LoadStructure(engine::StructureData sd, const std::vector<engi
     editor_options_.connect_mode = false;
     editor_options_.connect_first_joint = -1;
 
+    has_run_results_ = (results != nullptr);
+    current_results_ = results ? *results : std::vector<engine::MemberResult>{};
+
     scene_ = gui::BuildSceneModel(loaded_sd_, results, loaded_dataset_path_);
     validation_issues_ = editable_->Validate();
     viewport_panel_.FrameScene(scene_);
@@ -76,6 +83,8 @@ void Application::LoadStructure(engine::StructureData sd, const std::vector<engi
 
 void Application::RebuildSceneAfterEdit() {
     if (!editable_) return;
+    has_run_results_ = false;
+    current_results_.clear();
     scene_ = gui::BuildSceneModel(loaded_sd_, nullptr, loaded_dataset_path_);
     validation_issues_ = editable_->Validate();
 }
@@ -181,6 +190,61 @@ void Application::OnSaveLoadsRequested() {
     }
 }
 
+void Application::OnExportTextRequested() {
+    if (!editable_) return;
+
+    nfdu8char_t* out_path = nullptr;
+    nfdresult_t result = NFD_PickFolderU8(&out_path, nullptr);
+    if (result != NFD_OKAY) {
+        if (result == NFD_ERROR) log_panel_.AddLine(std::string("Folder dialog error: ") + NFD_GetError());
+        return;
+    }
+    std::string folder = out_path;
+    NFD_FreePathU8(out_path);
+
+    // Reuse the loaded dataset's own base filename in the chosen folder
+    // (e.g. "aplikasi"), matching the generic-name convention everywhere
+    // else in this project -- falls back to "struktur" for a blank
+    // in-memory structure that was never loaded from a path.
+    std::string basename = "struktur";
+    if (!loaded_dataset_path_.empty()) {
+        basename = std::filesystem::path(loaded_dataset_path_).filename().string();
+    }
+    std::string dest_generic = (std::filesystem::path(folder) / basename).string();
+
+    std::string err = report::WriteTextExport(loaded_sd_, dest_generic, has_run_results_, loaded_dataset_path_);
+    if (err.empty()) {
+        log_panel_.AddLine("Exported legacy text file set to: " + folder);
+    } else {
+        log_panel_.AddLine("Text export failed: " + err);
+    }
+}
+
+void Application::OnExportPdfRequested() {
+    if (!has_run_results_) return;
+
+    nfdu8filteritem_t filter{"PDF", "pdf"};
+    nfdu8char_t* out_path = nullptr;
+    nfdsavedialogu8args_t args{};
+    args.filterList = &filter;
+    args.filterCount = 1;
+    args.defaultName = "report.pdf";
+    nfdresult_t result = NFD_SaveDialogU8_With(&out_path, &args);
+    if (result != NFD_OKAY) {
+        if (result == NFD_ERROR) log_panel_.AddLine(std::string("Save dialog error: ") + NFD_GetError());
+        return;
+    }
+    std::string pdf_path = out_path;
+    NFD_FreePathU8(out_path);
+
+    std::string err = report::WritePdfReport(loaded_sd_, current_results_, pdf_path);
+    if (err.empty()) {
+        log_panel_.AddLine("Exported PDF report to: " + pdf_path);
+    } else {
+        log_panel_.AddLine("PDF export failed: " + err);
+    }
+}
+
 void Application::BuildDockspace() {
     ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
     ImGui::DockSpaceOverViewport(dockspace_id, ImGui::GetMainViewport(),
@@ -213,7 +277,10 @@ void Application::BuildDockspace() {
 
 void Application::OnFrame() {
     bool can_save = editable_.has_value() && !loaded_dataset_path_.empty();
-    toolbar_.Draw(undo_stack_.CanUndo(), undo_stack_.CanRedo(), can_save, editor_options_);
+    bool can_export_text = editable_.has_value();
+    bool can_export_pdf = has_run_results_;
+    toolbar_.Draw(undo_stack_.CanUndo(), undo_stack_.CanRedo(), can_save, can_export_text, can_export_pdf,
+                  editor_options_);
     BuildDockspace();
 
     gui::EditableStructure* editable_ptr = editable_ ? &*editable_ : nullptr;
