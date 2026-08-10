@@ -596,3 +596,19 @@ history only; don't duplicate current-state description here.
   (per-DOF restraint editing, arrowed CAD dimension lines, no direct
   edited-geometry-to-Run path without a save/reload) are documented in
   each issue's section of `AGENTS.md` rather than repeated here.
+
+## 2026-08-10 — CI build-src.yml failing on Linux and Windows
+
+- Issue #10 created on GitHub: "fix(src): CI build-src.yml failing on
+  Linux and Windows targets".
+- Scope: `.github/workflows/build-src.yml`
+- Labels: bug, infra
+- A notification claimed CI "only works for Windows, fails for Linux and
+  macOS" -- checked the actual latest run
+  (https://github.com/yohannaftali/orcisf/actions/runs/31344377690,
+  commit a0796f3) before filing, which showed the opposite pattern for two
+  of the three targets: `macos-latest` passed, while `ubuntu-latest`
+  failed at the Configure step and `windows-latest` failed at the Build
+  step. Detailed logs weren't accessible (403, needs admin/write access)
+  so root cause isn't identified yet -- filed with job/step-level status
+  only.

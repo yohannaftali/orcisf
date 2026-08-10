@@ -785,15 +785,16 @@ for skills that apply to the current task and follow them.
 ## Tracked Issues
 | ID | Title | Status | Last Checked |
 |----|-------|--------|--------------|
-| #1 | epic(src): port ORCISF to a modern cross-platform GUI application | open | 2026-08-09 |
-| #2 | feat(src): choose GUI stack & scaffold cross-platform CMake build (Win/macOS/Linux) | closed | 2026-08-09 |
-| #3 | feat(src): port structural-analysis + RC-design + Flexible-Polyhedron engine as a headless library | closed | 2026-08-09 |
+| #1 | epic(src): port ORCISF to a modern cross-platform GUI application | open | 2026-08-10 |
+| #2 | feat(src): choose GUI stack & scaffold cross-platform CMake build (Win/macOS/Linux) | closed | 2026-08-10 |
+| #3 | feat(src): port structural-analysis + RC-design + Flexible-Polyhedron engine as a headless library | closed | 2026-08-10 |
 | #4 | feat(src): multi-threaded optimization core with configurable core count + cancellable progress | closed | 2026-08-10 |
 | #5 | feat(src): 3D viewport + example-folder loader (render structure & per-member results) | closed | 2026-08-10 |
 | #6 | feat(src): interactive 3D structure editor (import, drag-and-drop edit, numeric entry) | closed | 2026-08-10 |
 | #7 | feat(src): load (pembebanan) input GUI (toolbar-driven, CAD-style 3D placement) | closed | 2026-08-10 |
 | #8 | feat(src): reinforcement detailing drawings per beam/column | closed | 2026-08-10 |
 | #9 | feat(src): PDF + legacy-text export of results | closed | 2026-08-10 |
+| #10 | fix(src): CI build-src.yml failing on Linux and Windows targets | open | 2026-08-10 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
