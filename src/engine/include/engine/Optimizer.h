@@ -44,6 +44,31 @@ struct OptimizationOptions {
     // change the result, and available to callers that want reproducible
     // runs for testing/debugging.
     unsigned int rng_seed = 0;
+
+    // Issue #16: "re-optimize from last best result". When true and
+    // seed_var_b/seed_var_k are non-empty and match this run's member
+    // classification exactly in size (12*jum_balok / 5*jum_kolom -- only
+    // known once PrepareOptimization() has run, so RunOptimization()
+    // validates the size match itself), population slot 0 is seeded with
+    // this design instead of being randomized, so the search continues
+    // from an already-decent starting point rather than from scratch. A
+    // size mismatch (e.g. the dataset's geometry was edited since the
+    // seed was captured, changing which/how many members are beams vs.
+    // columns) is treated as "no usable seed" and silently falls back to
+    // a normal random slot 0 -- this is an engine-level safety net, not
+    // where user-facing validation belongs (see gui/RunPanel.cpp for the
+    // GUI-side check that only offers this option after a real completed
+    // run against the same dataset).
+    //
+    // Doesn't affect determinism (see engine/README.md's "Threading
+    // determinism" section): seeding replaces one RNG-consuming call
+    // (Randomisasi() for slot 0) with a plain copy, entirely inside the
+    // single-threaded population-generation step that runs before any
+    // worker threads exist -- worker_threads still only changes
+    // wall-clock time, never the numeric result, with or without seeding.
+    bool seed_from_previous_best = false;
+    std::vector<int> seed_var_b; // flat, 0-based, [jsum + 12*isum] layout matching StructureData::var_b's row
+    std::vector<int> seed_var_k; // flat, 0-based, [jsum + 5*isum] layout matching StructureData::var_k's row
 };
 
 struct ProgressInfo {

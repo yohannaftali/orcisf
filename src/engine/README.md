@@ -70,6 +70,52 @@ second):
   called (not necessarily the best), while its `.opt`/`.kdl` sections
   explicitly switch to the best (`JSTD-1`) structure.
 
+## Re-optimize from last best (issue #16)
+
+`OptimizationOptions::seed_from_previous_best` + `seed_var_b`/`seed_var_k`
+let a caller continue refining an already-decent design instead of always
+starting `optimasi()`'s initial population fully random. This is a new
+engine capability, not a legacy-fidelity deviation (the original program
+had no such option).
+
+- **Where it plugs in:** `AcakVariabel()` (the port of `Pengacakan.hpp`'s
+  `acak_variabel()`) normally does `Randomisasi()` (fully random) for
+  population slot 0, `CariStrukturAwal()` (all-max-index reference design)
+  for slot 1, and `Randomisasi()` for every other slot. When a valid seed
+  is supplied, slot 0 is populated by a plain copy (`SeedStrukturAwal()`)
+  instead of `Randomisasi()` -- everything else about the initial
+  population (slot 1's reference design, slots 2..JSTD-1's randomization)
+  is unchanged.
+- **Validity check lives in the engine, not just the GUI**: the seed is
+  only used if its size exactly matches `12*jum_balok` / `5*jum_kolom` for
+  *this* run (computed by `PrepareOptimization()`, which must run before
+  `RunOptimization()` per its existing precondition). A mismatch (e.g. the
+  dataset's geometry was edited between the seeded run and this one,
+  changing which/how many members classify as beams vs. columns) silently
+  falls back to a normal random slot 0 -- never a crash or out-of-bounds
+  write. The GUI (`RunPanel`) additionally only *offers* the option after
+  a real completed run against the dataset currently being run, but the
+  engine doesn't trust that alone.
+- **Determinism/threading (issue #4) unaffected:** seeding replaces one
+  RNG draw (`Randomisasi()` for slot 0) with a plain array copy, entirely
+  within the single-threaded population-generation step that runs before
+  any worker threads are created. `worker_threads` still only changes
+  wall-clock time, never the numeric result, whether or not seeding is
+  used.
+- **Why the seeded design's cost can't get worse:** the seeded slot 0 is
+  evaluated by the same `EvaluateCandidateFull()` every other initial
+  slot goes through (including beam/column adaptive stirrup-tightening,
+  which can only improve or preserve a design's fitness, never degrade
+  it), then the whole population is sorted by fitness. The search loop
+  afterward (`GantiBaru`/`Penyusutan`) only ever replaces the worst slot
+  with something better or shrinks toward the current best -- it never
+  discards a fitter candidate already in the population. So the final
+  best (`fitstr[JSTD-1]` after the last `Sort()`) is always >= the
+  evaluated fitness of the seeded design, meaning the re-optimized
+  result's cost is never worse than the seed's, given equal constraint
+  satisfaction (`kendala`) -- this was reasoned through analytically (see
+  Validation below for why it wasn't exercised with a real run).
+
 ## Validation
 
 No Borland C++ 5.02 toolchain exists to run the original binary
@@ -103,6 +149,16 @@ bit-reproducible anyway, per point 2 above), so validation targets what
 4. **Output files are well-formed**, matching the legacy `.opt`/`.kdl`
    layout (per-member dimensions, reinforcement, cost, and constraint
    breakdown) — see `LegacyIO.cpp`.
+
+**Issue #16 (re-optimize from last best) was not exercised with a real
+build/run** -- no local `cmake` toolchain was available in the environment
+this was implemented in. The "cost never gets worse" claim above is
+reasoned through analytically from the existing (already-validated)
+`EvaluateCandidateFull`/`Sort`/`GantiBaru`/`Penyusutan` logic, not
+confirmed empirically. Before treating #16 as fully done, run a real
+optimization, capture its best design, re-run with
+"Re-optimize from last best" checked against the same dataset, and
+confirm the second run's final cost is <= the first run's.
 
 **⚠️ Always point the CLI/GUI at a scratch copy of a dataset, not the
 checked-in `Optimasi Beton/Example/` archive** — output filenames are

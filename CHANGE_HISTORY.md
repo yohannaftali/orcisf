@@ -1255,3 +1255,30 @@ history only; don't duplicate current-state description here.
   (re-optimize using the last best result) is still open (deferred
   earlier for needing real engine-level optimizer changes, not just
   GUI), so #13 isn't actually done yet.
+
+## 2026-08-11 — feat(src): implement issue #16 (re-optimize from last best)
+
+- Added `OptimizationOptions::seed_from_previous_best`/`seed_var_b`/
+  `seed_var_k` (`engine/include/engine/Optimizer.h`): when set and their
+  size matches the run's `12*jum_balok`/`5*jum_kolom` exactly,
+  `Optimizer.cpp`'s `AcakVariabel()` seeds population slot 0 with the
+  given design (`SeedStrukturAwal()`) instead of randomizing it. A size
+  mismatch silently falls back to a normal random slot 0 -- validated in
+  the engine itself, not only the GUI.
+- Documented in `engine/README.md`'s new "Re-optimize from last best"
+  section: where it plugs into `AcakVariabel()`, why it doesn't affect
+  issue #4's threading determinism (seeding replaces one RNG draw before
+  any worker threads exist), and an analytical argument for why the
+  re-optimized cost can never be worse than the seed's.
+- `gui/RunPanel.{h,cpp}`: new "Re-optimize from last best result"
+  checkbox, enabled only when a completed (not cancelled/errored) run's
+  result exists for the *exact* dataset path currently entered
+  (`has_result_`/`result_dataset_path_`). `StartRun()` extracts the
+  previous best design (population slot `JSTD-1`) from `result_sd_`
+  before it gets overwritten by the new run.
+- No local `cmake` toolchain was available this session -- not compiled
+  or interactively run; the "cost never worse" claim is reasoned
+  analytically, not empirically confirmed. CI is the first real build
+  check. Issue #16 status set to `ready-for-review`, not `done`, until a
+  real run confirms the acceptance criterion. Epic #13 can be revisited
+  for closure once that's confirmed.

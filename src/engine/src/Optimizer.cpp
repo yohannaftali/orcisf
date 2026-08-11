@@ -140,12 +140,38 @@ void Randomisasi(StructureData& sd, Rng& rng) {
     }
 }
 
-void AcakVariabel(StructureData& sd, Rng& rng) {
+// Issue #16: copies a previous run's best design vector into the current
+// slot verbatim (no RNG draw) -- the seed is trusted to already contain
+// valid discrete-table indices for this dataset's bounds since the size
+// check in AcakVariabel() below only passes when jum_balok/jum_kolom
+// (hence the layout) matches exactly.
+void SeedStrukturAwal(StructureData& sd, const std::vector<int>& seed_var_b, const std::vector<int>& seed_var_k) {
+    for (size_t i = 0; i < seed_var_b.size(); ++i) {
+        sd.var_b[sd.no_struktur][static_cast<int>(i)] = seed_var_b[i];
+    }
+    for (size_t i = 0; i < seed_var_k.size(); ++i) {
+        sd.var_k[sd.no_struktur][static_cast<int>(i)] = seed_var_k[i];
+    }
+}
+
+void AcakVariabel(StructureData& sd, Rng& rng, const OptimizationOptions& options) {
     LoadBatasAtas(sd);
+
+    // See OptimizationOptions::seed_from_previous_best's comment -- a size
+    // mismatch means the seed was captured against a differently-shaped
+    // dataset (edited geometry) and is silently ignored here.
+    bool use_seed = options.seed_from_previous_best &&
+                     static_cast<int>(options.seed_var_b.size()) == 12 * sd.jum_balok &&
+                     static_cast<int>(options.seed_var_k.size()) == 5 * sd.jum_kolom;
+
     for (int iav = 0; iav < sd.JSTD; ++iav) {
         sd.no_struktur = iav;
         if (iav == 1) {
             CariStrukturAwal(sd);
+            continue;
+        }
+        if (iav == 0 && use_seed) {
+            SeedStrukturAwal(sd, options.seed_var_b, options.seed_var_k);
             continue;
         }
         Randomisasi(sd, rng);
@@ -750,7 +776,7 @@ void PrepareOptimization(StructureData& sd, const OptimizationOptions& options) 
 void RunOptimization(StructureData& sd, const OptimizationOptions& options, const ProgressCallback& on_progress,
                       const DetailLogCallback& on_detail, const std::atomic<bool>* cancel) {
     Rng rng(options.rng_seed != 0 ? options.rng_seed : std::random_device{}());
-    AcakVariabel(sd, rng);
+    AcakVariabel(sd, rng, options);
 
     // `workers` holds worker_threads-1 extra StructureData clones; `sd`
     // itself is always lane 0. Created once (not per-generation) since a

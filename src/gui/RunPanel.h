@@ -81,6 +81,17 @@ private:
     bool has_error_ = false;
     bool was_running_ = false; // detects the running:true -> false edge for a one-shot completion log line
     engine::StructureData result_sd_; // only touched while !running_
+
+    // Issue #16: true only while result_sd_ holds a *completed* run's
+    // final population (not a cancelled/errored run's partial state, and
+    // not a run against a different dataset than dataset_path_ currently
+    // names) -- gates the "Re-optimize from last best" checkbox below.
+    // Cleared the moment a new run starts (StartRun() reads result_sd_'s
+    // best slot into the new run's seed *before* clearing this, then
+    // result_sd_ itself gets overwritten by the new run in progress).
+    bool has_result_ = false;
+    std::string result_dataset_path_; // dataset_path_ at the time result_sd_ was captured
+    bool reoptimize_from_last_ = false;
 };
 
 } // namespace orcisf::gui

@@ -822,6 +822,56 @@ touching `gui/viewport/Camera.{h,cpp}`, `gui/viewport/Math3D.h`'s
   confirms the three plane views actually render correctly and
   click-to-place lands exactly on the locked plane.
 
+**"Re-optimize from last best result" (issue #16, part of epic #13) — read
+before touching `engine::OptimizationOptions`'s `seed_*` fields,
+`Optimizer.cpp`'s `AcakVariabel()`, or `RunPanel`'s `has_result_`/
+`reoptimize_from_last_`:**
+- **This is a real engine-level change, not just a GUI option** -- per
+  the issue's own explicit warning. `AcakVariabel()` (port of
+  `Pengacakan.hpp`'s `acak_variabel()`) normally randomizes population
+  slot 0; when `OptimizationOptions::seed_from_previous_best` is true and
+  `seed_var_b`/`seed_var_k` exactly match this run's `12*jum_balok`/
+  `5*jum_kolom` sizes, a new `SeedStrukturAwal()` copies that design into
+  slot 0 instead. Slot 1 (`CariStrukturAwal()`'s all-max-index reference
+  design) and slots 2..JSTD-1 (random) are untouched either way.
+  `engine/README.md` has the full writeup, including why the seeded
+  design's cost can never come out worse than the seed's own cost
+  (the evaluation-then-sort-then-search-only-improves-or-shrinks
+  argument) -- read that before changing any of this logic.
+- **The size-match validity check runs in the engine itself, not only in
+  the GUI** -- a mismatch (edited geometry since the seed was captured,
+  changing beam/column classification) silently falls back to a normal
+  random slot 0, never a crash or OOB write. `RunPanel` additionally only
+  *offers* the checkbox when its own `has_result_`/`result_dataset_path_`
+  say a completed run exists for the exact dataset path currently
+  entered -- defense in depth, not the only check.
+- **`RunPanel::has_result_` is stricter than "a run finished which
+  didn't error"** -- it's specifically "the run that finished was neither
+  cancelled nor errored, and hasn't been superseded by a newer run
+  starting" (cleared unconditionally at the top of every `StartRun()`,
+  set true only in `Draw()`'s success branch). This matters because
+  `result_sd_` is reused as the *next* run's output buffer too -- reading
+  its best-slot design for seeding must happen in `StartRun()` (UI
+  thread, before the worker thread starts overwriting `result_sd_`), not
+  lazily later.
+- **Doesn't affect issue #4's threading determinism**: seeding replaces
+  one RNG draw (`Randomisasi()` for slot 0) with a plain array copy,
+  entirely inside the single-threaded population-generation step that
+  runs *before* any worker threads exist -- `worker_threads` still only
+  changes wall-clock time, never the numeric result, with or without
+  seeding.
+- **What was verified vs. not:** the "cost never gets worse" claim was
+  reasoned through analytically from the already-validated
+  `EvaluateCandidateFull`/`Sort`/`GantiBaru`/`Penyusutan` logic (see
+  `engine/README.md`'s new "Re-optimize from last best" section for the
+  full argument), not confirmed with a real run. **No local `cmake`
+  toolchain was available in this environment this session** -- not
+  compiled or interactively run. Before treating #16 as fully done: run a
+  real optimization, capture its best design, re-run with "Re-optimize
+  from last best result" checked against the *same* dataset path, and
+  confirm the second run's final cost is ≤ the first's (the issue's own
+  stated acceptance criterion).
+
 **UCS icon overlay (issue #23, part of epic #20) — read before touching
 `ViewportPanel.cpp`'s `DrawUcsIcon()`:**
 - **Hand-drawn `ImDrawList` overlay, not a 3D gizmo mesh added to
@@ -1263,7 +1313,7 @@ for skills that apply to the current task and follow them.
 | #13 | epic(src): more user-friendly GUI (icon toolbar, view presets, re-optimize, editing guidance) | open | 2026-08-11 |
 | #14 | feat(src): add a configurable icon toolbar below the menu bar | closed | 2026-08-11 |
 | #15 | feat(src): add Default/Design/Optimization view-layout presets | closed | 2026-08-11 |
-| #16 | feat(src): re-optimize using the last best result | open | 2026-08-11 |
+| #16 | feat(src): re-optimize using the last best result | ready-for-review | 2026-08-11 |
 | #17 | feat(src): add a Regenerate Seed button to the Run panel | closed | 2026-08-11 |
 | #18 | feat(src): AutoCAD-style in-progress guidance while adding joints/members | closed | 2026-08-11 |
 | #19 | feat(src): custom borderless window chrome + modern ImGui theme (cross-platform) | closed | 2026-08-11 |

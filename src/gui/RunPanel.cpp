@@ -58,9 +58,32 @@ void RunPanel::StartRun() {
     options.worker_threads = static_cast<unsigned int>(std::max(1, worker_threads_));
     options.rng_seed = rng_seed_;
 
+    // Issue #16: extract the previous run's best design (population slot
+    // JSTD-1, always the best after the last Sort() -- see Optimizer.h's
+    // DetailLogCallback comment) from result_sd_ *before* it gets
+    // overwritten by this new run. Only offered by the checkbox (below)
+    // when has_result_ is true and the dataset path hasn't changed since
+    // that result was captured; the engine independently re-validates the
+    // seed's size against this run's actual jum_balok/jum_kolom and
+    // silently ignores it on a mismatch (see Optimizer.h's comment), so
+    // this is a defense-in-depth check, not the only one.
+    if (reoptimize_from_last_ && has_result_ && result_dataset_path_ == dataset_path) {
+        int jb = result_sd_.jum_balok;
+        int jk = result_sd_.jum_kolom;
+        int best_slot = result_sd_.JSTD - 1;
+        options.seed_from_previous_best = true;
+        options.seed_var_b.assign(result_sd_.var_b[best_slot], result_sd_.var_b[best_slot] + 12 * jb);
+        options.seed_var_k.assign(result_sd_.var_k[best_slot], result_sd_.var_k[best_slot] + 5 * jk);
+    }
+    has_result_ = false;
+
     if (log_sink_) {
-        log_sink_("Starting optimization: " + dataset_path +
-                   " (worker_threads=" + std::to_string(options.worker_threads) + ")");
+        std::string msg = "Starting optimization: " + dataset_path +
+                           " (worker_threads=" + std::to_string(options.worker_threads) + ")";
+        if (options.seed_from_previous_best) {
+            msg += " [re-optimizing from last best result]";
+        }
+        log_sink_(msg);
     }
 
     worker_ = std::thread([this, dataset_path, options]() {
@@ -105,6 +128,8 @@ void RunPanel::Draw(bool* open) {
             if (log_sink_) log_sink_("Optimization run cancelled.");
         } else {
             if (log_sink_) log_sink_("Optimization run finished.");
+            has_result_ = true;
+            result_dataset_path_ = dataset_path_;
             if (on_result_) on_result_(result_sd_, std::string(dataset_path_));
         }
     }
@@ -169,6 +194,27 @@ void RunPanel::Draw(bool* open) {
         rng_seed_ = static_cast<unsigned int>(dist(rd));
     }
     ImGui::EndDisabled();
+
+    // Issue #16: only offered once a completed run's best design exists
+    // for the *currently entered* dataset path -- switching the path
+    // after a run (or a cancelled/errored run, which never sets
+    // has_result_) correctly disables it rather than silently seeding
+    // from an unrelated dataset.
+    bool seed_available = has_result_ && result_dataset_path_ == dataset_path_;
+    ImGui::BeginDisabled(running || !seed_available);
+    if (!seed_available) reoptimize_from_last_ = false;
+    ImGui::Checkbox("Re-optimize from last best result", &reoptimize_from_last_);
+    ImGui::EndDisabled();
+    if (!seed_available) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "Available after a completed run against this exact dataset path.\n"
+                "Seeds one population slot with the previous best design instead\n"
+                "of starting fully from scratch.");
+        }
+    }
 
     ImGui::Spacing();
     bool can_run = !running && dataset_path_[0] != '\0';
