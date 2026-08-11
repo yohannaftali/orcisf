@@ -8,7 +8,8 @@ A 1998–1999 undergraduate-thesis (Tugas Akhir S1) engineering program by
 M.Sc. and Ir. Ch. Arief Sudibyo) that analyzes a 3D reinforced-concrete
 building frame and then automatically optimizes every beam and column's
 dimensions and reinforcement to minimize material cost, subject to strength
-and serviceability constraints.
+and serviceability constraints. This repository also hosts a **modern,
+cross-platform GUI port** of the same engine (see below).
 
 > For AI coding agents: read [`AGENTS.md`](AGENTS.md) first — it is the single
 > source of truth for this repository's architecture and working rules.
@@ -40,20 +41,31 @@ optimization-run history log.
 
 ## Status
 
-This repository is primarily an **archive** of the original 1999 thesis
-deliverable: source code, the compiled Windows binary, sample datasets, and
-the full written manuscript (in Indonesian). It is not under active
-development as a modern application — see [`src/`](src/) in `AGENTS.md`, which
-is reserved (currently empty) for a possible future modernized/ported version.
+- **`Optimasi Beton/`** is a historical **archive** of the original 1999
+  thesis deliverable: source code, the compiled Windows binary, sample
+  datasets, and the full written manuscript (in Indonesian). It is not
+  under active development and is kept as-is.
+- **`src/`** is an actively-developed, ground-up **modern GUI port**
+  (Windows/macOS/Linux desktop app) of the same analysis/design/optimization
+  engine, with an interactive 3D editor, threaded optimizer, reinforcement
+  detailing drawings, and PDF/legacy-text export. See the
+  [**GUI application tutorial**](#gui-application-tutorial) below, or grab a
+  prebuilt Windows binary from the
+  [Releases page](https://github.com/yohannaftali/orcisf/releases).
 
 ## Repository contents
 
 ```
 orcisf/
-├── AGENTS.md              # architecture & working rules (read this first)
+├── AGENTS.md               # architecture & working rules (read this first)
 ├── CHANGE_HISTORY.md       # dated project history
-├── src/                    # reserved, currently empty
-└── Optimasi Beton/         # the original 1998-1999 thesis deliverable
+├── src/                    # modern cross-platform GUI port (actively developed)
+│   ├── app/                # GLFW/OpenGL3/ImGui bootstrap, docking layout
+│   ├── gui/                # panels: Viewport, Properties, Loads, Joints/Members,
+│   │                       # Detailing, Run Optimization, Log
+│   ├── engine/             # headless analysis/design/optimizer library + CLI
+│   └── report/             # PDF + legacy-text export
+└── Optimasi Beton/         # the original 1998-1999 thesis deliverable (archive)
     ├── BacaSaya.txt                 # original Indonesian user manual
     ├── orcisf.exe / cw3230.dll      # compiled Win32 console binary + runtime
     ├── Optimasi Struktur Beton.doc  # (2006) — empty, no recoverable content
@@ -66,7 +78,142 @@ orcisf/
 See [`AGENTS.md`](AGENTS.md) for the full breakdown of the source modules, the
 input/output file-format convention, and the optimization algorithm.
 
-## Running it
+---
+
+## GUI application tutorial
+
+The modern GUI (`src/`, built as `orcisf_gui`) covers the full legacy
+pipeline — load or create a dataset, view and edit it in 3D, apply loads,
+run the threaded optimizer, inspect reinforcement detailing, and export a
+PDF report or the full legacy text file set.
+
+### Getting the app
+
+- **Prebuilt binary**: download the latest Windows build from the
+  [Releases page](https://github.com/yohannaftali/orcisf/releases).
+- **Build from source**: see [`src/README.md`](src/README.md) (needs CMake,
+  a C++20 compiler, and [vcpkg](https://vcpkg.io/)):
+  ```sh
+  cd src
+  cmake --preset windows-release   # or macos-release / linux-release
+  cmake --build --preset windows-release
+  ```
+  The built app is `src/build/<preset>/orcisf_gui.exe` (or the equivalent
+  binary name on macOS/Linux).
+
+### The window
+
+On launch you'll see a custom (borderless) title bar, a menu bar
+(**File / Edit / Loads / Run / View**), an icon toolbar below it
+(New Data / Open Data / Save / Undo / Redo / Add Joint / Connect Joints /
+Run), and a docked set of panels: **Viewport** (3D view), **Detailing**
+(2D reinforcement drawings), **Properties**, **Joints/Members**, **Loads**,
+**Run Optimization**, and **Log**. Use **View > Default / Design /
+Optimization** to switch between layout presets sized for different stages
+of the workflow — no panel is ever hidden by a preset, just resized/re-tabbed.
+
+### 1. Start a dataset
+
+- **File > New Data** — prompts for a save location, then starts a blank,
+  empty structure you build up from scratch.
+- **File > Open Data...** — pick a folder containing an existing legacy
+  dataset (e.g. one of `Optimasi Beton/Example/Apl1-1/`'s `.inp`-rooted file
+  sets) and it loads directly into the 3D viewport.
+
+> Always work against a **copy** of a bundled `Example/` dataset, not the
+> original — running/saving overwrites files in place, and on Windows the
+> filenames are case-insensitive (`GEDUNG.opt` and `gedung.opt` collide).
+
+### 2. Build/edit the geometry
+
+- **Add Joint** (toolbar icon or Edit menu) is a click-to-place mode: click
+  in the Viewport to place a joint; it stays active so you can place several
+  in a row. Click the button again (or pick another mode) to stop.
+- **Connect Joints** is the same click-to-place pattern for members: click
+  a first joint, then a second, to create a member between them.
+- Drag a selected joint's translate gizmo in the 3D view to move it, or type
+  exact X/Y/Z coordinates in the **Properties** panel.
+- The **Joints/Members** panel lists every joint (editable X/Y/Z, a
+  restrained toggle, Delete) and member (Delete) in a table — deleting a
+  joint that still has members attached shows a confirmation listing which
+  members will also be deleted (members always need two joints, so this is
+  a cascade, not a partial delete).
+- **Edit > Snap to Grid** plus a grid-size slider snaps placements/moves to
+  a regular spacing.
+- **View > View Plane** locks the viewport to an orthographic X-Y / X-Z /
+  Y-Z plane at an adjustable offset (typeable or via slider) along the
+  locked axis — useful for drawing a single floor plan or elevation exactly
+  on-plane. A small readout at the bottom of the viewport shows which plane
+  and offset is active; a UCS (axis) icon in the corner always shows the
+  current camera orientation, in every view mode.
+- **Properties** panel's "General" section (shown when nothing is selected)
+  edits structure-wide fields: title, `E`/`G`/`FC`/`FY`/`FYS` material
+  properties.
+
+### 3. Apply loads
+
+Use the **Loads** menu to enter a placement mode, then click in the
+viewport:
+- **Add Member Load** — click a member to apply a uniform distributed load
+  (fine-tune the exact value afterward).
+- **Add Joint Load** — click a joint to apply a 6-DOF force/moment (covers
+  point loads, moments, and lateral/wind loads — the legacy format doesn't
+  distinguish them, they're all just a joint action).
+
+The **Loads** panel lists every member/joint with a nonzero load in an
+editable table. **File > Save Loads (.bbn)** writes them back to the
+dataset's load file.
+
+### 4. Run the optimizer
+
+Open the **Run Optimization** panel:
+1. Enter the dataset's generic path (no extension) if it isn't already
+   filled in.
+2. Set cost/design parameters: concrete/steel unit prices, column/beam
+   cover thickness, penalty factor, max generations, and the population-size
+   `fak_plus`/`fak_kali` factors (same meaning as the legacy console
+   program's prompts).
+3. Under **Performance**, choose how many worker threads to use — more
+   threads only changes wall-clock time, never the numeric result, for a
+   given RNG seed.
+4. Click **Run**. Progress (generation, best fitness/cost/constraint,
+   elapsed time) updates live; **Cancel** stops early with the best design
+   found so far.
+5. Once a run completes against a given dataset path, a **"Re-optimize from
+   last best result"** checkbox becomes available — check it before your
+   next **Run** to continue refining that design instead of starting from a
+   fresh random population.
+
+When a run finishes, the Viewport/Detailing panels automatically refresh
+with the new results.
+
+### 5. Inspect results
+
+- The **Viewport** colors members by constraint status and scales their
+  cross-section to the optimized dimensions.
+- Select a beam or column (click it in the 3D view, or via
+  Joints/Members) to see its numeric results in **Properties**, and its
+  2D reinforcement drawing (bar counts/diameters/spacing, stirrups,
+  dimensions) in **Detailing**.
+
+### 6. Export
+
+From the **File** menu:
+- **Export PDF...** — a full report (cover/input summary, per-member
+  results table, one detailing page per member), available once a run has
+  completed.
+- **Export Text...** — the full legacy file set
+  (`.inp/.isd/.idl/.ijl/.ids/.ijs/.bbn`, plus `.opt/.str/.kdl/.inf/.his`
+  if a completed run exists) to a folder you choose.
+- **Export INF Preview...** — just the input-echo portion (`.inf`),
+  generated directly from the current in-GUI dataset, independent of a
+  completed run.
+- **Save** / **Save As...** write the editable dataset back to its legacy
+  file set (same formats the original console program reads).
+
+---
+
+## Running the original 1999 console program
 
 `Optimasi Beton/orcisf.exe` is a Win32 console application (requires
 `cw3230.dll` in the same folder — a Borland C++ runtime DLL). Run it from a
@@ -88,12 +235,15 @@ sample datasets.
 
 ## Building from source
 
-The source (`Optimasi Beton/Source/`) targets **Borland C++ 5.02** and uses
-pre-standard, DOS-console-era headers — it will not compile unmodified with a
-modern compiler. Rebuilding as originally written requires Borland C++ 5.02 (or
-a compatible Borland/Turbo C++ toolchain) and the project file
-`Optimasi Beton/Source/ORCISF.ide`. See [`AGENTS.md`](AGENTS.md) for details
-and for guidance on porting to a modern toolchain.
+- **Modern GUI (`src/`)**: see [`src/README.md`](src/README.md) and the
+  [GUI application tutorial](#gui-application-tutorial) above.
+- **Legacy console program (`Optimasi Beton/Source/`)**: targets
+  **Borland C++ 5.02** and uses pre-standard, DOS-console-era headers — it
+  will not compile unmodified with a modern compiler. Rebuilding as
+  originally written requires Borland C++ 5.02 (or a compatible
+  Borland/Turbo C++ toolchain) and the project file
+  `Optimasi Beton/Source/ORCISF.ide`. See [`AGENTS.md`](AGENTS.md) for
+  details.
 
 ## Documentation
 
@@ -112,6 +262,13 @@ The full thesis manuscript (Indonesian, legacy MS Word `.doc` format) is under
   C++ source. `latex/main.pdf` is the compiled result;
   `latex/LEGACY_TRANSCRIPTION_NOTES.md` documents exactly what's verbatim
   vs. reconstructed vs. unrecoverable (figures).
+
+## Releases
+
+Prebuilt binaries of the modern GUI are published on the
+[Releases page](https://github.com/yohannaftali/orcisf/releases). The
+project is in an early **alpha** stage — expect rough edges, and please
+report issues.
 
 ## License
 

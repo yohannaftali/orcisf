@@ -1313,3 +1313,23 @@ history only; don't duplicate current-state description here.
   toolchain exists. #16's `## Tracked Issues` status confirmed `closed`
   (already auto-closed via its commit's `Closes #16` trailer, now backed
   by a real empirical check rather than only analytical reasoning).
+
+## 2026-08-11 — Closed epic #13; rewrote README.md with a GUI tutorial
+
+- Closed epic **#13** (more user-friendly GUI) -- all five sub-issues
+  (#14/#15/#16/#17/#18) are closed, #16 now backed by a real empirical
+  verification (see the entry above) rather than only analytical
+  reasoning.
+- **Rewrote `README.md`**: it previously described `src/` as "reserved,
+  currently empty," which had been stale since epic #1 landed. Added a
+  full "GUI application tutorial" section (getting the app, the window
+  layout, building/editing geometry, applying loads, running the
+  optimizer including re-optimize-from-last-best, inspecting results,
+  exporting), updated the repository-contents tree, and added a
+  "Releases" section pointing at prebuilt binaries.
+- **`AGENTS.md`**: added "Epic #13 complete"/"Epic #20 complete" summary
+  notes (mirroring the existing "Epic #1 complete" one), documented the
+  local Windows build toolchain location (CMake/MSVC BuildTools/Ninja --
+  not on default `PATH`, an earlier session incorrectly reported none
+  available) in the Validation section, and added a "Releases" note to
+  the GitHub Workflow section (alpha versioning scheme: `v0.0.x-alpha`).

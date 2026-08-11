@@ -1300,6 +1300,12 @@ for skills that apply to the current task and follow them.
   windows-latest/macos-latest/ubuntu-latest for every push/PR touching
   `src/**`. Nothing else in the repo has CI (no build step applies to the
   legacy archive or the docs).
+- **Releases:** GitHub Releases publish prebuilt GUI binaries. The project
+  is currently in **alpha** — tags/releases use a `v0.0.x-alpha` scheme
+  (first one: `v0.0.1-alpha`). Bump the patch number for each subsequent
+  alpha; move to a `v0.x.0` (beta) or `v1.0.0` scheme only once the user
+  explicitly decides the project has left alpha. Only create a release
+  when the user asks — it's a user-visible, hard-to-quietly-undo action.
 
 ## Tracked Issues
 | ID | Title | Status | Last Checked |
@@ -1316,7 +1322,7 @@ for skills that apply to the current task and follow them.
 | #10 | fix(src): CI build-src.yml failing on Linux and Windows targets | closed | 2026-08-10 |
 | #11 | feat(src): add File > New Data action, rename Open Folder... to Open Data... | closed | 2026-08-11 |
 | #12 | fix(src): orcisf_gui.exe opens an extra console window on Windows | closed | 2026-08-11 |
-| #13 | epic(src): more user-friendly GUI (icon toolbar, view presets, re-optimize, editing guidance) | open | 2026-08-11 |
+| #13 | epic(src): more user-friendly GUI (icon toolbar, view presets, re-optimize, editing guidance) | closed | 2026-08-11 |
 | #14 | feat(src): add a configurable icon toolbar below the menu bar | closed | 2026-08-11 |
 | #15 | feat(src): add Default/Design/Optimization view-layout presets | closed | 2026-08-11 |
 | #16 | feat(src): re-optimize using the last best result | closed | 2026-08-11 |
@@ -1350,6 +1356,18 @@ a `Run` without a save/reload step) are called out in their respective
 sections above. Treat any *new* work here as a fresh issue against this
 now-shipped baseline, not as "finishing" epic #1.
 
+**Epic #13 complete (#14, #15, #16, #17, #18 all landed):** icon
+toolbar, Default/Design/Optimization view-layout presets, re-optimize
+from last best result (engine-level change, empirically verified — see
+its own "read before touching" section above), the Regenerate Seed
+button, and AutoCAD-style click-to-place guidance for Add Joint/Connect
+Joints.
+
+**Epic #20 complete (#21, #22, #23 all landed):** the Joints/Members
+list panel (editable, cascade-delete-with-warning), 2D plane-locked
+orthographic drawing (X-Y/X-Z/Y-Z with adjustable offset), and the UCS
+icon overlay — see each issue's own "read before touching" section above.
+
 ---
 
 ## Validation (before pushing)
@@ -1370,6 +1388,15 @@ now-shipped baseline, not as "finishing" epic #1.
   can't fully build locally in your environment (e.g. no vcpkg/compiler
   available), say so explicitly rather than claiming it was verified, and
   let CI confirm the other platforms.
+  - **On this project's Windows dev environment, a local toolchain does
+    exist even though it's not on the default `PATH`**: CMake at
+    `C:\Qt\Tools\CMake_64\bin\cmake.exe`, MSVC via
+    `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools`
+    (run `VC\Auxiliary\Build\vcvars64.bat` to set up the environment),
+    Ninja bundled with that MSVC install. An earlier agent session in
+    this repo incorrectly reported "no cmake toolchain available" without
+    checking beyond the default `PATH` — check for these before assuming
+    a build genuinely can't happen locally.
 
 ---
 
