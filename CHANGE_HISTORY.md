@@ -1551,3 +1551,13 @@ history only; don't duplicate current-state description here.
     panel and plane-offset-overlay behavior end-to-end), and explicitly
     asks to confirm which build/commit the original report was made
     against.
+
+## 2026-08-11 — Published GitHub Release v0.0.3-alpha
+
+- Tag `v0.0.3-alpha` (pre-release), with a prebuilt Windows x64 binary
+  (`orcisf_gui-v0.0.3-alpha-windows-x64.zip`, now including the `icons/`
+  PNG subfolder issue #26 needs for the runtime taskbar/window icon)
+  built from the same `windows-release` MSVC/Ninja build used to verify
+  #26. Bumped from `v0.0.2-alpha` per `AGENTS.md`'s alpha versioning
+  scheme. Release notes summarize #26 (fixed) and #27-#29 (filed, not
+  yet fixed) from this session's retest pass.
