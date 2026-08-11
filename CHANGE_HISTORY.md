@@ -2132,3 +2132,32 @@ automation script, not WinUI3), core objective verified, issue closed
 - Scope: `src/gui/Toolbar.{h,cpp}`, `src/gui/RunPanel.cpp`,
   `src/app/Application.{h,cpp}`, `src/gui/IconToolbar.{h,cpp}`
 - Labels: bug, enhancement, gui
+
+## [2026-08-11] — fix(src): implement issue #35 -- panel icons on dock tab button
+
+- Corrects #28 Part 2: each panel's hand-drawn icon now renders directly
+  on its own dock tab button, immediately before the title text, instead
+  of as a duplicate-title content-row header inside the panel body
+  (`DrawPanelIconHeader()`, removed from all 7 panels).
+- New `gui/PanelTitles.{h,cpp}`: every panel's `ImGui::Begin()` title is
+  now `<N spaces><label>###<stable_id>` -- the leading spaces (recomputed
+  every frame from live font metrics) reserve room for the icon overlay
+  without ever changing the window's dock identity, since Dear ImGui's
+  `"###"` marker excludes everything before it from the ID hash.
+- New `app/DockTabIcons.{h,cpp}`: walks each panel's dock tab (via
+  `imgui_internal.h`'s `ImGuiDockNode`/`ImGuiTabBar`, the same
+  semi-public "Docking Builder" internals `Application.cpp` already used
+  for issue #15) and draws its icon at the tab's actual label position.
+- `PanelIcons.cpp`'s icon-drawing functions now take an explicit `size`
+  parameter instead of a fixed 16px constant, so the same shapes can be
+  reused at whatever size a dock tab needs.
+- Verified via real screenshots at 100% and 200% `ORCISF_UI_SCALE`: all 7
+  panels' icons render correctly positioned with no text overlap at both
+  scales; the three view-layout presets' dock placement is unchanged
+  from before this fix.
+- Files: `src/gui/PanelIcons.{h,cpp}`, `src/gui/PanelTitles.{h,cpp}`
+  (new), `src/app/DockTabIcons.{h,cpp}` (new), `src/app/Application.{h,cpp}`,
+  `src/gui/ViewportPanel.cpp`, `src/gui/PropertiesPanel.cpp`,
+  `src/gui/LoadsPanel.cpp`, `src/gui/JointsMembersPanel.cpp`,
+  `src/gui/DetailingPanel.cpp`, `src/gui/RunPanel.cpp`, `src/gui/LogPanel.cpp`,
+  `src/CMakeLists.txt`, `AGENTS.md`

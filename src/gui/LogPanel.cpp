@@ -2,7 +2,7 @@
 
 #include <imgui.h>
 
-#include "gui/PanelIcons.h"
+#include "gui/PanelTitles.h"
 
 namespace orcisf::gui {
 
@@ -15,12 +15,10 @@ void LogPanel::Clear() {
 }
 
 void LogPanel::Draw(bool* open) {
-    if (!ImGui::Begin("Log", open)) {
+    if (!ImGui::Begin(PanelWindowTitle(kLogId, "Log").c_str(), open)) {
         ImGui::End();
         return;
     }
-    DrawPanelIconHeader(PanelIcon::Log, "Log");
-
     if (ImGui::Button("Clear")) {
         Clear();
     }

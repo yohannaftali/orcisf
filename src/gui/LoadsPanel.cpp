@@ -4,7 +4,7 @@
 
 #include <imgui.h>
 
-#include "gui/PanelIcons.h"
+#include "gui/PanelTitles.h"
 
 namespace orcisf::gui {
 
@@ -112,12 +112,10 @@ void DrawJointLoadsTable(const SceneModel& scene, Selection& selection, Editable
 
 void LoadsPanel::Draw(bool* open, const SceneModel& scene, Selection& selection, EditableStructure* editable,
                        UndoStack* undo, const std::function<void()>& on_geometry_changed) {
-    if (!ImGui::Begin("Loads", open)) {
+    if (!ImGui::Begin(PanelWindowTitle(kLoadsId, "Loads").c_str(), open)) {
         ImGui::End();
         return;
     }
-    DrawPanelIconHeader(PanelIcon::Loads, "Loads");
-
     if (scene.Empty()) {
         ImGui::TextDisabled("No dataset loaded.");
         ImGui::End();

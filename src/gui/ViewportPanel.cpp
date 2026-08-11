@@ -7,6 +7,7 @@
 #include <ImGuizmo.h>
 
 #include "gui/PanelIcons.h"
+#include "gui/PanelTitles.h"
 #include "gui/UiScale.h"
 
 namespace orcisf::gui {
@@ -243,12 +244,10 @@ void ViewportPanel::DrawGizmo(const SceneModel& scene, Selection& selection, Edi
 void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selection, EditableStructure* editable,
                           UndoStack* undo, EditorOptions& options,
                           const std::function<void()>& on_geometry_changed) {
-    if (!ImGui::Begin("Viewport", open)) {
+    if (!ImGui::Begin(PanelWindowTitle(kViewportId, "Viewport").c_str(), open)) {
         ImGui::End();
         return;
     }
-    DrawPanelIconHeader(PanelIcon::Viewport, "Viewport");
-
     ImVec2 avail = ImGui::GetContentRegionAvail();
     int width = static_cast<int>(avail.x);
     int height = static_cast<int>(avail.y);

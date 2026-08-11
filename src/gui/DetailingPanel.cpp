@@ -5,7 +5,7 @@
 
 #include <imgui.h>
 
-#include "gui/PanelIcons.h"
+#include "gui/PanelTitles.h"
 #include "gui/detailing/DetailingLayout.h"
 
 namespace orcisf::gui {
@@ -59,12 +59,10 @@ void DrawSection(ImDrawList* dl, const DetailingSection& sec, ImVec2 region_size
 } // namespace
 
 void DetailingPanel::Draw(bool* open, const SceneModel& scene, const Selection& selection) {
-    if (!ImGui::Begin("Detailing", open)) {
+    if (!ImGui::Begin(PanelWindowTitle(kDetailingId, "Detailing").c_str(), open)) {
         ImGui::End();
         return;
     }
-    DrawPanelIconHeader(PanelIcon::Detailing, "Detailing");
-
     if (selection.kind != SelectionKind::Member) {
         ImGui::TextDisabled("Select a member (beam or column) in the Viewport to see its reinforcement detailing.");
         ImGui::End();

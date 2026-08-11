@@ -10,6 +10,7 @@
 #include "gui/JointsMembersPanel.h"
 #include "gui/LoadsPanel.h"
 #include "gui/LogPanel.h"
+#include "gui/PanelTitles.h"
 #include "gui/PropertiesPanel.h"
 #include "gui/RunPanel.h"
 #include "gui/Toolbar.h"

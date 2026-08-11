@@ -1,4 +1,5 @@
 #include "app/Application.h"
+#include "app/DockTabIcons.h"
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
@@ -369,13 +370,13 @@ void BuildDefaultLayout(ImGuiID dock_main) {
     ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.25f, nullptr, &dock_main);
     ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.25f, nullptr, &dock_main);
 
-    ImGui::DockBuilderDockWindow("Viewport", dock_main);
-    ImGui::DockBuilderDockWindow("Detailing", dock_main);
-    ImGui::DockBuilderDockWindow("Properties", dock_right);
-    ImGui::DockBuilderDockWindow("Run Optimization", dock_right);
-    ImGui::DockBuilderDockWindow("Loads", dock_bottom);
-    ImGui::DockBuilderDockWindow("Joints/Members", dock_bottom);
-    ImGui::DockBuilderDockWindow("Log", dock_bottom);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kViewportId).c_str(), dock_main);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kDetailingId).c_str(), dock_main);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kPropertiesId).c_str(), dock_right);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kRunOptimizationId).c_str(), dock_right);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLoadsId).c_str(), dock_bottom);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kJointsMembersId).c_str(), dock_bottom);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLogId).c_str(), dock_bottom);
 }
 
 // "Design" preset: focuses on geometry/load input -- Viewport+Detailing
@@ -389,13 +390,13 @@ void BuildDesignLayout(ImGuiID dock_main) {
     ImGuiID dock_bottom_right =
         ImGui::DockBuilderSplitNode(dock_bottom, ImGuiDir_Right, 0.3f, nullptr, &dock_bottom);
 
-    ImGui::DockBuilderDockWindow("Viewport", dock_main);
-    ImGui::DockBuilderDockWindow("Detailing", dock_main);
-    ImGui::DockBuilderDockWindow("Properties", dock_right);
-    ImGui::DockBuilderDockWindow("Loads", dock_bottom);
-    ImGui::DockBuilderDockWindow("Joints/Members", dock_bottom);
-    ImGui::DockBuilderDockWindow("Run Optimization", dock_bottom_right);
-    ImGui::DockBuilderDockWindow("Log", dock_bottom_right);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kViewportId).c_str(), dock_main);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kDetailingId).c_str(), dock_main);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kPropertiesId).c_str(), dock_right);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLoadsId).c_str(), dock_bottom);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kJointsMembersId).c_str(), dock_bottom);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kRunOptimizationId).c_str(), dock_bottom_right);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLogId).c_str(), dock_bottom_right);
 }
 
 // "Optimization" preset: focuses on running -- Run Optimization + Log get
@@ -407,13 +408,13 @@ void BuildOptimizationLayout(ImGuiID dock_main) {
     ImGuiID dock_right_bottom =
         ImGui::DockBuilderSplitNode(dock_right, ImGuiDir_Down, 0.5f, nullptr, &dock_right);
 
-    ImGui::DockBuilderDockWindow("Run Optimization", dock_main);
-    ImGui::DockBuilderDockWindow("Log", dock_main);
-    ImGui::DockBuilderDockWindow("Viewport", dock_right);
-    ImGui::DockBuilderDockWindow("Detailing", dock_right);
-    ImGui::DockBuilderDockWindow("Properties", dock_right_bottom);
-    ImGui::DockBuilderDockWindow("Loads", dock_right_bottom);
-    ImGui::DockBuilderDockWindow("Joints/Members", dock_right_bottom);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kRunOptimizationId).c_str(), dock_main);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLogId).c_str(), dock_main);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kViewportId).c_str(), dock_right);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kDetailingId).c_str(), dock_right);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kPropertiesId).c_str(), dock_right_bottom);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLoadsId).c_str(), dock_right_bottom);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kJointsMembersId).c_str(), dock_right_bottom);
 }
 
 } // namespace
@@ -510,6 +511,11 @@ void Application::OnFrame() {
     detailing_panel_.Draw(&detailing_open_, scene_, selection_);
     run_panel_.Draw(&run_open_);
     log_panel_.Draw(&log_open_);
+
+    // Issue #35: every panel above has now called Begin()/End() for this
+    // frame, so each one's ImGuiWindow::DockNode/tab-bar geometry is final
+    // -- the precondition DrawDockTabIcons() documents for itself.
+    DrawDockTabIcons();
 }
 
 } // namespace orcisf::app

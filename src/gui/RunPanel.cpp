@@ -8,7 +8,7 @@
 #include <imgui.h>
 
 #include "engine/Engine.h"
-#include "gui/PanelIcons.h"
+#include "gui/PanelTitles.h"
 
 namespace orcisf::gui {
 
@@ -118,12 +118,10 @@ void RunPanel::TriggerRun() {
 }
 
 void RunPanel::Draw(bool* open) {
-    if (!ImGui::Begin("Run Optimization", open)) {
+    if (!ImGui::Begin(PanelWindowTitle(kRunOptimizationId, "Run Optimization").c_str(), open)) {
         ImGui::End();
         return;
     }
-    DrawPanelIconHeader(PanelIcon::Run, "Run Optimization");
-
     bool running = IsRunning();
     if (was_running_ && !running) {
         if (has_error_) {

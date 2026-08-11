@@ -7,7 +7,7 @@
 #include <imgui.h>
 
 #include "engine/LegacyIO.h"
-#include "gui/PanelIcons.h"
+#include "gui/PanelTitles.h"
 
 namespace orcisf::gui {
 
@@ -218,12 +218,10 @@ void DrawMemberProperties(const SceneModel& scene, Selection& selection, Editabl
 void PropertiesPanel::Draw(bool* open, const SceneModel& scene, Selection& selection, EditableStructure* editable,
                             UndoStack* undo, const std::vector<std::string>& validation_issues,
                             const std::function<void()>& on_geometry_changed) {
-    if (!ImGui::Begin("Properties", open)) {
+    if (!ImGui::Begin(PanelWindowTitle(kPropertiesId, "Properties").c_str(), open)) {
         ImGui::End();
         return;
     }
-    DrawPanelIconHeader(PanelIcon::Properties, "Properties");
-
     switch (selection.kind) {
         case SelectionKind::Joint:
             DrawJointProperties(scene, selection, editable, undo, on_geometry_changed);

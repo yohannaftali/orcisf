@@ -148,6 +148,11 @@ src/
 │   │                        # calls only, no native handles
 │   ├── Theme.{h,cpp}        # #19 Phase 0: ApplyModernTheme(), dark-slate
 │   │                        # ImGui style override (rounding/padding/colors)
+│   ├── DockTabIcons.{h,cpp} # #35: draws each panel's PanelIcons.cpp icon
+│   │                        # directly on its own dock tab button (before
+│   │                        # the title), via imgui_internal.h's
+│   │                        # ImGuiDockNode/TabBar -- see its own AGENTS.md
+│   │                        # section before touching
 │   └── Application.{h,cpp}  # docking layout (Viewport | Properties/RunPanel/Loads/Log);
 │                            # owns loaded_sd_ (the one editable StructureData,
 │                            # loaded via ReadDataset+ReadLoadsRaw -- not
@@ -163,6 +168,15 @@ src/
 │   │                            # by main.cpp and read via Scaled() by every
 │   │                            # hand-drawn ImDrawList glyph in the app --
 │   │                            # see the #31 note below before adding chrome
+│   ├── PanelIcons.{h,cpp}       # #35 (was #28 Part 2): the 7 panels' hand-
+│   │                            # drawn icon shapes, DrawPanelIcon(icon, dl,
+│   │                            # origin, color, size) -- actually drawn onto
+│   │                            # each dock tab by app/DockTabIcons.cpp, not
+│   │                            # by these panels themselves
+│   ├── PanelTitles.{h,cpp}      # #35: PanelWindowTitle()/PanelWindowId() +
+│   │                            # the kXxxId stable-identity constants every
+│   │                            # panel's Begin() and Application.cpp's
+│   │                            # DockBuilderDockWindow() both reference
 │   ├── Toolbar.{h,cpp}          # menu bar; File > Open Folder... (#5), the
 │   │                            # Edit menu (#6: Undo/Redo, Add Joint, Connect
 │   │                            # Joints, Snap to Grid), the Loads menu +
@@ -869,6 +883,20 @@ and issue #30:**
   confirmations across genuinely different panels is treated as
   sufficient confidence for the rest rather than clicking through every
   remaining tab for marginal additional certainty.
+- **Superseded by issue #35 (2026-08-11): this was not what was
+  requested, and the technical rejection above turned out to be
+  incomplete.** The user clarified the actual ask was an icon on the
+  panel's own dock **tab button**, not a duplicate-title content row --
+  the tab already shows the title. `DrawPanelIconHeader()` and its
+  content-row call sites (all 7 panels) were removed entirely; see the
+  `gui/PanelTitles.{h,cpp}` / `app/DockTabIcons.{h,cpp}` section below
+  for what replaced it, and for the technique this section's own
+  "no public API, would need imgui_internal.h (fragile)" reasoning
+  missed: `imgui_internal.h` access for dock-tab-bar geometry
+  (`ImGuiDockNode`/`ImGuiTabBar`/`ImGuiTabItem`) is no more fragile than
+  what `Application.cpp`'s `DockBuilder*` calls (issue #15) already
+  depend on -- both are the same semi-public "Docking Builder" section
+  of `imgui_internal.h`, not a deeper internal hack.
 
 **Part 1 (Alt-mnemonics) was reverted -- Dear ImGui does NOT parse
 `&`-prefixed labels; this was a wrong assumption, caught by actually
@@ -947,6 +975,80 @@ touching `Toolbar.cpp`'s `BeginMnemonicMenu()`:**
   exact library should be verified empirically before trusting them,
   don't treat this as fully confirmed until a real interactive pass
   (Alt held + screenshot, Alt+letter + screenshot) succeeds.
+
+**`gui/PanelTitles.{h,cpp}` + `app/DockTabIcons.{h,cpp}` (issue #35,
+correcting #28 Part 2) — read before touching any panel's `ImGui::Begin()`
+call, any `DockBuilderDockWindow()` call, or the dock-tab icon mechanism:**
+- **The technique**: every panel's window title is now
+  `<N leading spaces><display label>###<stable_id>`, built by
+  `gui::PanelWindowTitle(stable_id, display_label)`, not a plain string
+  literal. The leading spaces reserve exactly enough horizontal room in
+  the tab for `DockTabIcons.cpp` to draw an icon in front of the label
+  without overlapping it; `N` is recomputed every frame from
+  `ImGui::CalcTextSize(" ")` against the *current* font, so it always
+  matches whatever DPI scale (issue #31) is active right now.
+- **Why the leading-space count can safely change every frame without
+  breaking docking**: Dear ImGui's `"###stable_id"` marker (see
+  `ImHashSkipUncontributingPrefix()` in `imgui_internal.h`) makes
+  everything *before* the `###` -- the variable-length spaces, the
+  display label -- not contribute to the window's ID hash at all; only
+  `stable_id` does. `gui::kViewportId`/`kDetailingId`/`kPropertiesId`/
+  `kRunOptimizationId`/`kJointsMembersId`/`kLoadsId`/`kLogId`
+  (`PanelTitles.h`) are the single source of truth for these stable
+  strings -- `Application.cpp`'s `DockBuilderDockWindow()` calls and
+  `DockTabIcons.cpp`'s `FindWindowByName()` calls both reference the
+  *same* constant via `gui::PanelWindowId(stable_id)` (just the
+  `"###stable_id"` part, no display text), so a typo can't silently
+  desync a panel from its own dock-layout/icon wiring the way two
+  independently-typed string literals could.
+- **This sidesteps the alternative (baking a custom glyph into the font
+  atlas) on purpose**, not just for convenience: this project's issue
+  #31 already rebuilds the font atlas live on every DPI change
+  (`style.FontScaleDpi`), and Dear ImGui does not own/regenerate a
+  manually-drawn custom rect's pixel content across that kind of
+  rebuild -- a one-shot `AddCustomRectFontGlyph()` bake (obsoleted in
+  this project's pinned 1.92.8 anyway, superseded by a custom
+  `ImFontLoader`) would need to be redrawn on every rescale, which is
+  real additional complexity a draw-list overlay (redrawn every frame
+  regardless, like every other hand-drawn icon in this codebase) doesn't
+  have. This reasoning -- not just "avoid a new dependency" -- is why
+  `imgui_internal.h`'s dock-tab-bar structures were chosen over the
+  font-glyph route once both were actually weighed against this specific
+  codebase's DPI architecture.
+- **`app/DockTabIcons.cpp`'s `DrawDockTabIcons()`** walks a fixed table of
+  `(stable_id, PanelIcon)` pairs, looks up each window via
+  `ImGui::FindWindowByName(gui::PanelWindowId(stable_id).c_str())`, reads
+  its `ImGuiWindow::DockNode->TabBar` (skipping windows that aren't
+  currently docked/active or whose node has no tab bar -- e.g. a
+  single-window node with `ImGuiDockNodeFlags_AutoHideTabBar`), finds its
+  own `ImGuiTabItem` within that bar (`tab.Window == window`), and draws
+  the icon at `tab_bar->BarRect.Min + (tab.Offset + FramePadding.x, half
+  the bar height)` on the foreground draw list -- matching Dear ImGui's
+  own tab-item label layout (`TabItemLabelAndCloseButton()`) closely
+  enough that the icon sits flush against the label with no gap or
+  overlap. Called once per frame from the very end of
+  `Application::OnFrame()`, after every panel's `Draw()` (so each
+  window's tab-bar geometry is final for the frame) and before
+  `ImGui::Render()`.
+- **Lives under `app/`, not `gui/`**, since it operates on dock-node/
+  tab-bar internals that are an Application-level concern -- the same
+  boundary `Application.cpp`'s own `BuildDockspace()` (issue #15)
+  already draws by being the only other file in this port that includes
+  `imgui_internal.h`. `PanelIcons.{h,cpp}` (now just the per-icon
+  `DrawPanelIcon()` primitive, parameterized on `size` instead of a
+  fixed 16px constant) and `PanelTitles.{h,cpp}` stay under `gui/` since
+  they don't touch dock internals themselves.
+- **What was verified:** compiled cleanly (MSVC/Ninja, `windows-release`)
+  and confirmed via real screenshots at 100% and 200% `ORCISF_UI_SCALE`:
+  all 7 panels' dock tabs show their icon correctly positioned
+  immediately before the title text with no overlap, at both scales; the
+  three view-layout presets' dock placement is pixel-identical to before
+  this change (confirming the `"###stable_id"`-only `DockBuilderDockWindow()`/
+  `FindWindowByName()` lookups resolve to the same windows as the old
+  plain-string names did); no panel body shows a duplicate title/header
+  row anymore. Tab close buttons are still visually present in every
+  screenshot -- whether clicking them actually closes the panel is
+  issue #37's own bug to investigate, not verified here.
 
 **Issue #29 (interactive retest of RunPanel dataset gating + plane-offset
 overlay) — still blocked, not resolved this pass; read before attempting
@@ -2049,7 +2151,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #30 | feat(src): implement real Alt-mnemonic menu navigation (Dear ImGui has no built-in "&" parsing) | ready-for-review | 2026-08-11 |
 | #31 | fix(src): application is not DPI-aware -- UI too small on high-DPI monitors in multi-monitor setups | closed | 2026-08-11 |
 | #32 | chore(src): add one-shot build scripts (build.ps1 for Windows, build.sh for macOS/Linux) | ready-for-review | 2026-08-11 |
-| #35 | fix(src): move panel icons onto the dock tab button, remove the in-content icon+title header row (#28 correction) | open | 2026-08-11 |
+| #35 | fix(src): move panel icons onto the dock tab button, remove the in-content icon+title header row (#28 correction) | ready-for-review | 2026-08-11 |
 | #36 | feat(src): split Joints/Members panel into separate Joints and Members panels; order Loads tab immediately after them | open | 2026-08-11 |
 | #37 | feat(src): View menu Menubar/Subwindows/Layout sections + fix tab close button + rename "Run Optimization" panel | open | 2026-08-11 |
 

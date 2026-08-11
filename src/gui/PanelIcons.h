@@ -1,25 +1,28 @@
 #pragma once
 
-// Issue #28: a small hand-drawn icon before each docked panel's title,
-// matching this project's established "small, dependency-free ImDrawList
-// icons, no icon font" approach (see IconToolbar.cpp / ViewportPanel.cpp's
-// UCS icon). Dear ImGui offers no public way to embed an arbitrary glyph
-// inside a dock-tab's own label text without either an icon font (a new
-// asset/dependency this project doesn't otherwise need) or reaching into
-// imgui_internal.h to hook the shared dock-node tab bar (fragile, and only
-// this project's `report/PdfExport.cpp` reaches past the public API, for
-// libharu's C callback model -- not a precedent for touching ImGui's own
-// internals). Instead, each panel calls DrawPanelIconHeader() as the very
-// first thing after ImGui::Begin(): it draws the icon + a bold-ish label
-// row inside the panel's own content area -- visible whenever that panel
-// is the active tab, which is the common case a user is looking at it.
+#include <imgui.h>
+
+// Issue #35 (correcting #28 Part 2): each docked panel's small hand-drawn
+// icon renders directly on that panel's own dock tab button, immediately
+// before its title text -- see app/DockTabIcons.{h,cpp} for where it's
+// actually drawn. #28 Part 2 originally drew the icon as a content-row
+// header inside each panel's body instead (DrawPanelIconHeader(), now
+// removed); that duplicated the title already shown on the tab and wasted
+// a line of vertical space. This header now only exposes the low-level
+// per-icon draw primitive (DrawPanelIcon()) so both DockTabIcons.cpp and
+// (should a future issue want it) any other caller can render one of these
+// icons at an arbitrary position/size, matching this project's established
+// "small, dependency-free ImDrawList icons, no icon font" approach (see
+// IconToolbar.cpp / ViewportPanel.cpp's UCS icon).
 namespace orcisf::gui {
 
 enum class PanelIcon { Viewport, Detailing, Properties, JointsMembers, Loads, Run, Log };
 
-// Draws `icon` followed by `label` as a header row at the current cursor
-// position (call immediately after ImGui::Begin(), before any other
-// content) and a separator beneath it.
-void DrawPanelIconHeader(PanelIcon icon, const char* label);
+// Draws `icon` into `dl`, `size`x`size` pixels, top-left corner at `origin`.
+// `size` is the caller's responsibility to DPI-scale (via gui::Scaled()) --
+// this function does no scaling of its own, so it can be reused at any
+// resolution the caller needs (e.g. DockTabIcons.cpp sizes it off the tab
+// bar's own font metrics, not a fixed constant).
+void DrawPanelIcon(PanelIcon icon, ImDrawList* dl, ImVec2 origin, ImU32 color, float size);
 
 } // namespace orcisf::gui
