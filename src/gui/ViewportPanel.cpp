@@ -2,7 +2,6 @@
 
 #include <cmath>
 #include <cstdint>
-#include <cstdio>
 
 #include <imgui.h>
 #include <ImGuizmo.h>
@@ -289,52 +288,87 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
     ImGuiIO& io = ImGui::GetIO();
 
     // Issue #23: UCS icon, always visible (free/perspective and
-    // plane-locked views alike) in the bottom-left corner. Reserves ~76px
-    // of width there -- the plane-offset readout below (issue #22) starts
-    // past it instead of overlapping.
-    constexpr float kUcsRadius = 26.f;
-    constexpr float kUcsMargin = 40.f;
-    ImVec2 ucs_center(image_min.x + kUcsMargin, image_min.y + image_size.y - kUcsMargin);
+    // plane-locked views alike) in the bottom-left corner. Issue #24
+    // raised its vertical position from the very bottom (kUcsBottomGap)
+    // so the interactive plane-offset control below has room to render
+    // underneath it without running off the bottom of the viewport.
+    constexpr float kUcsRadius = 22.f;
+    constexpr float kUcsMargin = 34.f;      // horizontal distance from the left edge
+    constexpr float kUcsBottomGap = 96.f;   // vertical distance from the bottom edge
+    ImVec2 ucs_center(image_min.x + kUcsMargin, image_min.y + image_size.y - kUcsBottomGap);
     DrawUcsIcon(ImGui::GetForegroundDrawList(), ucs_center, kUcsRadius, camera_);
 
-    // Issue #22: read-only "which plane, at what offset" readout pinned to
-    // the bottom-left of the viewport image (past the UCS icon above) --
-    // the actual plane-select/offset-edit controls live in Toolbar's
-    // View > View Plane menu (see Toolbar.cpp), this is purely the
-    // always-visible confirmation the issue asked for ("shown at the
-    // bottom ... e.g. Plane X-Y is on Z=0"). Drawn directly on the
-    // foreground draw list so it overlays the rendered scene without
-    // affecting layout/input.
+    // Issue #24: the plane-offset control used to live only in Toolbar's
+    // "View Plane" menu, which had to be reopened for every adjustment --
+    // with the default 0.000 offset there was no discoverable way to
+    // actually move the locked plane while looking at the 3D view. This
+    // is now a real interactive ImGui overlay (not just the old
+    // foreground-drawlist read-only text), docked directly under the UCS
+    // icon: a typeable field and a slider, both editing the same
+    // options.plane_offset_xy/xz/yz field Toolbar's plane *selector* (kept
+    // there) and Camera::SetViewPlane/ViewportPanel::HandlePicking already
+    // read every frame -- see the top of this function for the sync and
+    // the add_joint_mode branch above for where placement consumes it.
+    // Positioned via SetCursorScreenPos within this same "Viewport" window
+    // (not a separate Begin/End) so it draws on top of the already-submitted
+    // Image() and naturally take input priority over it -- ImGui gives a
+    // later-drawn widget at the same screen position hover/click priority
+    // over an earlier one, so orbit/pan/click-to-place on the rest of the
+    // image is unaffected; only actually interacting with this widget
+    // captures input.
+    // Set below (only relevant while a plane is locked) if the mouse
+    // interacted with the offset overlay this frame -- `hovered`, captured
+    // above right after Image(), predates these widgets being submitted,
+    // so it alone can't tell orbit-click-start (below) to back off when
+    // the user is actually dragging the slider/typing in the field.
+    bool offset_overlay_capturing = false;
+
     if (options.view_plane != ViewPlane::Free) {
-        const char* plane_name = "";
-        float offset = 0.f;
+        float* offset = nullptr;
+        const char* axis_label = "";
         switch (options.view_plane) {
-            case ViewPlane::XY: plane_name = "Plane X-Y is at Z ="; offset = options.plane_offset_xy; break;
-            case ViewPlane::XZ: plane_name = "Plane X-Z is at Y ="; offset = options.plane_offset_xz; break;
-            case ViewPlane::YZ: plane_name = "Plane Y-Z is at X ="; offset = options.plane_offset_yz; break;
-            case ViewPlane::Free: break;
+            case ViewPlane::XY: offset = &options.plane_offset_xy; axis_label = "Plane X-Y -- Z offset (m)"; break;
+            case ViewPlane::XZ: offset = &options.plane_offset_xz; axis_label = "Plane X-Z -- Y offset (m)"; break;
+            case ViewPlane::YZ: offset = &options.plane_offset_yz; axis_label = "Plane Y-Z -- X offset (m)"; break;
+            case ViewPlane::Free: offset = nullptr; break;
         }
-        char text[64];
-        std::snprintf(text, sizeof(text), "%s %.3f m", plane_name, offset);
-        ImVec2 text_size = ImGui::CalcTextSize(text);
-        ImVec2 pad(8.f, 5.f);
-        float left = image_min.x + kUcsMargin * 2.f + 10.f;
-        ImVec2 box_min(left, image_min.y + image_size.y - text_size.y - pad.y * 2.f - 8.f);
-        ImVec2 box_max(box_min.x + text_size.x + pad.x * 2.f, box_min.y + text_size.y + pad.y * 2.f);
-        ImDrawList* fg = ImGui::GetForegroundDrawList();
-        fg->AddRectFilled(box_min, box_max, IM_COL32(20, 20, 24, 200), 4.f);
-        fg->AddText(ImVec2(box_min.x + pad.x, box_min.y + pad.y), IM_COL32(255, 209, 38, 255), text);
+        if (offset) {
+            constexpr float kControlWidth = 168.f;
+            ImVec2 pos(image_min.x + 8.f, ucs_center.y + kUcsRadius + 8.f);
+
+            ImDrawList* fg = ImGui::GetForegroundDrawList();
+            ImVec2 bg_min(pos.x - 6.f, pos.y - 4.f);
+            ImVec2 bg_max(pos.x + kControlWidth + 6.f, pos.y + 62.f);
+            fg->AddRectFilled(bg_min, bg_max, IM_COL32(20, 20, 24, 200), 4.f);
+
+            ImGui::SetCursorScreenPos(pos);
+            ImGui::PushID("plane_offset_overlay");
+            ImGui::TextColored(ImVec4(1.f, 0.82f, 0.15f, 1.f), "%s", axis_label);
+            ImGui::SetCursorScreenPos(ImVec2(pos.x, pos.y + 20.f));
+            ImGui::SetNextItemWidth(kControlWidth);
+            ImGui::InputFloat("##offset_input", offset, 0.f, 0.f, "%.3f");
+            offset_overlay_capturing |= ImGui::IsItemHovered() || ImGui::IsItemActive();
+            ImGui::SetCursorScreenPos(ImVec2(pos.x, pos.y + 44.f));
+            ImGui::SetNextItemWidth(kControlWidth);
+            ImGui::SliderFloat("##offset_slider", offset, -20.f, 20.f, "%.3f");
+            offset_overlay_capturing |= ImGui::IsItemHovered() || ImGui::IsItemActive();
+            ImGui::PopID();
+        }
     }
 
     DrawGizmo(scene, selection, editable, undo, options, on_geometry_changed, image_min.x, image_min.y,
               image_size.x, image_size.y);
     bool gizmo_capturing = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
 
-    if (hovered && !gizmo_capturing && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+    // Issue #24: also gate on !offset_overlay_capturing so a click/drag
+    // that starts on the plane-offset overlay (which sits on top of the
+    // image at that screen position) never starts an orbit/pan -- see the
+    // overlay's own comment above for why `hovered` alone can't tell.
+    if (hovered && !gizmo_capturing && !offset_overlay_capturing && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         orbiting_ = true;
         drag_pixels_ = 0.f;
     }
-    if (hovered && !gizmo_capturing && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+    if (hovered && !gizmo_capturing && !offset_overlay_capturing && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
         panning_ = true;
     }
 
@@ -365,7 +399,7 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
             panning_ = false;
         }
     }
-    if (hovered && !gizmo_capturing && io.MouseWheel != 0.f) {
+    if (hovered && !gizmo_capturing && !offset_overlay_capturing && io.MouseWheel != 0.f) {
         camera_.Zoom(io.MouseWheel);
     }
 

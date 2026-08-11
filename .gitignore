@@ -7,3 +7,8 @@ vcpkg/
 build/
 out/
 .cache/
+
+# ImGui's persisted window-layout state -- written next to wherever
+# orcisf_gui.exe's working directory is when launched (e.g. the repo
+# root, if launched from there rather than its own build dir).
+imgui.ini

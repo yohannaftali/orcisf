@@ -86,11 +86,13 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
         // between the normal perspective/orbit camera and an orthographic
         // view locked to X-Y/X-Z/Y-Z, each with its own independently-
         // remembered offset along the locked axis (see EditorOptions'
-        // plane_offset_* fields). Offset is both typeable (InputFloat) and
-        // slidable (SliderFloat) right here, per the issue's acceptance
-        // criteria -- the viewport itself only shows a read-only overlay
-        // of the active plane/offset (ViewportPanel::Draw()), it doesn't
-        // duplicate these controls.
+        // plane_offset_* fields). Just plane *selection* here -- issue #24
+        // moved the offset input/slider itself into the viewport (docked
+        // under the UCS icon, ViewportPanel::Draw()) since a menu that has
+        // to be reopened for every adjustment made the offset effectively
+        // undiscoverable/unreachable while actually looking at the locked
+        // plane. Don't re-add a second offset editor here; one place to
+        // edit `plane_offset_xy`/`_xz`/`_yz` is enough.
         if (ImGui::BeginMenu("View Plane")) {
             if (ImGui::MenuItem("Free (perspective/orbit)", nullptr, options.view_plane == ViewPlane::Free)) {
                 options.view_plane = ViewPlane::Free;
@@ -104,24 +106,6 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
             }
             if (ImGui::MenuItem("Y-Z plane (locks X)", nullptr, options.view_plane == ViewPlane::YZ)) {
                 options.view_plane = ViewPlane::YZ;
-            }
-            if (options.view_plane != ViewPlane::Free) {
-                ImGui::Separator();
-                float* offset = nullptr;
-                const char* axis_label = "";
-                switch (options.view_plane) {
-                    case ViewPlane::XY: offset = &options.plane_offset_xy; axis_label = "Z offset (m)"; break;
-                    case ViewPlane::XZ: offset = &options.plane_offset_xz; axis_label = "Y offset (m)"; break;
-                    case ViewPlane::YZ: offset = &options.plane_offset_yz; axis_label = "X offset (m)"; break;
-                    case ViewPlane::Free: break;
-                }
-                if (offset) {
-                    ImGui::TextUnformatted(axis_label);
-                    ImGui::SetNextItemWidth(120.f);
-                    ImGui::InputFloat("##plane_offset_input", offset, 0.f, 0.f, "%.3f");
-                    ImGui::SetNextItemWidth(160.f);
-                    ImGui::SliderFloat("##plane_offset_slider", offset, -20.f, 20.f, "%.3f");
-                }
             }
             ImGui::EndMenu();
         }

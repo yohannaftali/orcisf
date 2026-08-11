@@ -1339,3 +1339,49 @@ history only; don't duplicate current-state description here.
   `windows-release` MSVC/Ninja build used to verify #16 above) attached
   as a release asset. Release notes summarize what's included (epics #1,
   #13, #20 complete) and link to the README's new GUI tutorial.
+
+## 2026-08-11 — feat(src): 2D plane offset control unreachable from the viewport
+
+- Issue #24 created on GitHub (label: `bug`).
+- Scope: `src/gui/ViewportPanel.cpp` / `src/gui/Toolbar.cpp`
+- User-reported gap: issue #22's plane-offset slider/input only lives in
+  Toolbar's "View Plane" menu, which has to be reopened for every
+  adjustment -- with a plane locked at the default 0.000 offset there is
+  no discoverable way to actually move it while looking at the 3D view.
+  Requested fix: an interactive slider + typeable field docked under the
+  UCS icon (#23) in the viewport's bottom-left corner, not just the
+  existing read-only readout there.
+
+## 2026-08-11 — fix(src): implement issue #24 (plane offset control moved into viewport)
+
+- Moved the plane-offset `InputFloat`/`SliderFloat` from `Toolbar`'s
+  "View Plane" menu into `ViewportPanel::Draw()`, docked directly under
+  the UCS icon (issue #23) in the viewport's bottom-left corner, as a
+  real interactive ImGui overlay (`SetCursorScreenPos` within the same
+  "Viewport" window, drawn after `Image()` so it renders on top and wins
+  hover/click priority naturally). `Toolbar`'s menu now only selects the
+  active plane (Free/X-Y/X-Z/Y-Z) -- the old menu offset widgets were
+  deleted, not duplicated, so there's exactly one place to edit
+  `plane_offset_xy`/`_xz`/`_yz`.
+- Raised the UCS icon's vertical position (`kUcsBottomGap`) to leave room
+  for the new control underneath it, and replaced the old read-only
+  "Plane X-Y is at Z = ..." text readout with the interactive fields
+  themselves.
+- **Found and fixed a real bug while implementing this**: `hovered` (used
+  to gate starting an orbit/pan drag) is captured once right after
+  `Image()`, before the new overlay widgets are submitted later in the
+  same frame -- without a fix, clicking the slider would also start an
+  orbit-drag underneath it. Fixed with a new `offset_overlay_capturing`
+  flag (`IsItemHovered()`/`IsItemActive()` on the two new widgets), ANDed
+  into every orbit/pan/zoom-start gate, mirroring how `gizmo_capturing`
+  already gates the same lines for ImGuizmo. Caught by reasoning through
+  ImGui's submission-order hover model, not by interactive testing.
+- Files: `src/gui/ViewportPanel.cpp`, `src/gui/Toolbar.cpp`.
+- **Compiled successfully** (MSVC/Ninja, `windows-release` preset) and
+  the built app was launched and confirmed running (process alive, no
+  crash) after the change. **Not interactively click-tested** -- whether
+  dragging the slider avoids triggering orbit, and whether a placed
+  joint's coordinate exactly matches a nonzero offset, are the issue's
+  own acceptance criteria and still need a real interactive pass. Issue
+  #24 status set to `ready-for-review`, not `done`, until that's
+  confirmed.

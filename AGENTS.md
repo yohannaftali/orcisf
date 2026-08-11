@@ -805,14 +805,13 @@ touching `gui/viewport/Camera.{h,cpp}`, `gui/viewport/Math3D.h`'s
   user can navigate within the plane. `ImGuizmo::SetOrthographic()` is
   now set from `camera_.IsOrthographic()` each frame (was hardcoded
   `false`) so the gizmo's own hit-testing matches the actual projection.
-- **The plane selector + offset input/slider live in `Toolbar`'s new
-  "View Plane" menu, not in the viewport itself.** The viewport
-  (`ViewportPanel::Draw()`) only draws a small read-only overlay
-  ("Plane X-Y is at Z = 0.000 m") pinned to the bottom-left of the 3D
-  image via `ImGui::GetForegroundDrawList()` -- satisfies the issue's
-  "shown at the bottom" acceptance criterion without needing a literal
-  ViewCube widget (none exists in this project; see issue #23 for the
-  separate UCS icon).
+- **The plane selector lives in `Toolbar`'s "View Plane" menu; the offset
+  itself is edited in the viewport** (moved there by issue #24 after the
+  original menu-only placement proved unreachable/undiscoverable while
+  looking at a locked plane -- see #24's own section below for the full
+  story). Originally (as first implemented here) the viewport only drew a
+  read-only text readout; that's now a real interactive control docked
+  under the UCS icon (issue #23).
 - **What was verified:** the cross-product/up-vector math was
   hand-derived and re-checked (catching the Y-Z sign bug above); the
   code was reviewed against `Camera.h`/`.cpp`'s existing patterns
@@ -900,21 +899,64 @@ before touching `engine::OptimizationOptions`'s `seed_*` fields,
   can't intercept orbit/pan/click-to-place input -- satisfies that
   acceptance criterion by construction, not by an explicit input-passthrough
   check.
-- **Shares the viewport's bottom-left corner with #22's plane-offset
-  readout** -- the UCS icon reserves a fixed ~76px-wide area there
-  (`kUcsMargin`/`kUcsRadius` in `ViewportPanel.cpp`) and is drawn first,
-  unconditionally (every frame, every view mode); the plane-offset text
-  box (only shown when a plane is locked) starts past that reserved area
-  instead of overlapping it.
+- **Shares the viewport's bottom-left corner with #24's plane-offset
+  control** -- the UCS icon is drawn first, unconditionally (every frame,
+  every view mode), positioned with enough clearance below it
+  (`kUcsBottomGap` in `ViewportPanel.cpp`) for that control to render
+  underneath without running off the bottom of the viewport. Originally
+  (issue #23) it shared the corner with a read-only text readout to its
+  *right* instead -- #24 replaced that readout with an interactive
+  control docked *below* the icon; see #24's own section for why.
 - **What was verified:** the dot-product projection math was
   hand-checked for a few reference orientations (default orbit camera:
   X should point right-ish, Y up, Z out-of-screen-ish) and the code
   reuses already-verified `Camera` methods rather than new vector math.
-  **Compiled successfully** in a later session (MSVC/Ninja,
-  `windows-release` preset) -- see the #16 entry below. The icon's live
-  rotation-with-camera behavior and its non-overlap with #22's readout
-  were not interactively exercised in a running app; still the next step
-  for full confidence.
+  **Compiled successfully** (MSVC/Ninja, `windows-release` preset) and
+  the app was launched and confirmed running without crashing (see #24's
+  entry below for the same check after that issue's changes). The icon's
+  live rotation-with-camera behavior was not interactively click-tested
+  pixel-by-pixel; still a good next step for full confidence.
+
+**Plane-offset control moved into the viewport (issue #24, follow-up to
+#22/#23) — read before touching `ViewportPanel.cpp`'s plane-offset
+overlay or `Toolbar.cpp`'s "View Plane" menu:**
+- **User-reported gap, not a speculative improvement**: #22 put the
+  offset `InputFloat`/`SliderFloat` inside Toolbar's "View Plane" menu --
+  reopening a dropdown for every adjustment made the offset practically
+  unreachable while a plane was locked at the default 0.000 and the user
+  was looking at the 3D view. Fixed by moving the actual editing widgets
+  into `ViewportPanel::Draw()`, docked directly under the UCS icon (#23)
+  in the viewport's bottom-left corner; `Toolbar`'s menu now only selects
+  *which* plane is active (Free/X-Y/X-Z/Y-Z), not its offset -- **one
+  place edits `plane_offset_xy`/`_xz`/`_yz`, not two** (the old menu
+  slider/input was deleted, not just supplemented, per the issue's own
+  "don't leave two inconsistent widgets" acceptance criterion).
+- **A real ImGui overlay, not a foreground-drawlist-only readout like
+  #23's UCS icon.** `ImGui::SetCursorScreenPos()` places a label +
+  `InputFloat` + `SliderFloat` at an arbitrary screen position *within
+  the already-open "Viewport" window* (no separate `Begin`/`End`), drawn
+  after `ImGui::Image()` so they render on top of it and naturally win
+  hover/click priority over the image at that screen position -- the
+  same "later-submitted widget wins" rule any overlapping ImGui widgets
+  follow, no special-casing needed for the rendering itself.
+- **`hovered` (captured once, right after `Image()`) can't tell the
+  orbit-click-start logic about these widgets, because they're submitted
+  *after* that capture** -- a real bug that would have let a click on the
+  slider also start an orbit-drag underneath it. Fixed with a separate
+  `offset_overlay_capturing` flag (`ImGui::IsItemHovered() ||
+  IsItemActive()` on each of the two widgets), ANDed into every
+  orbit/pan/zoom-start gate below (mirroring how `gizmo_capturing`
+  already gates those same lines for ImGuizmo) -- caught by reasoning
+  through ImGui's submission-order hover model while writing this, not
+  by interactive testing.
+- **What was verified:** compiled cleanly (MSVC/Ninja, `windows-release`
+  preset) and the app was launched and confirmed running (process alive,
+  no crash) after the change. **Not interactively click-tested** --
+  specifically, whether dragging the slider/typing in the field actually
+  avoids triggering orbit, and whether a placed joint's locked coordinate
+  exactly matches a nonzero slider value, are the issue's own stated
+  acceptance criteria and still need a real interactive pass (or a
+  screenshot-based check) before treating #24 as fully done.
 
 **Custom borderless window chrome (issue #19, Phase 0) — read before
 touching `app/CustomTitleBar.{h,cpp}`/`app/Theme.{h,cpp}`/`main.cpp`'s
@@ -1333,6 +1375,7 @@ for skills that apply to the current task and follow them.
 | #21 | feat(src): add a Joints/Members list panel (editable, delete-with-cascade-warning) | closed | 2026-08-11 |
 | #22 | feat(src): 2D plane-locked drawing (X-Y/X-Z/Y-Z orthographic views + adjustable offset) | closed | 2026-08-11 |
 | #23 | feat(src): UCS icon overlay in the viewport | closed | 2026-08-11 |
+| #24 | fix(src): 2D plane offset control unreachable from the viewport (move it under the UCS icon) | ready-for-review | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
