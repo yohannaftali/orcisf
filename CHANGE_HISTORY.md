@@ -999,3 +999,86 @@ history only; don't duplicate current-state description here.
   and tightened the "verified" acceptance criteria to require actually
   confirming drag works (or is a documented no-op on Wayland) rather
   than just confirming the code compiles/runs per platform.
+
+## 2026-08-11 — feat(src): #19 Phase 0 implemented (borderless chrome + theme)
+
+- `main.cpp`: `glfwWindowHint(GLFW_DECORATED, GLFW_FALSE)` before window
+  creation; `ImGui::StyleColorsDark()` replaced with new
+  `orcisf::app::ApplyModernTheme()`.
+- New `src/app/Theme.{h,cpp}`: dark-slate ImGui style override --
+  `WindowRounding`/`FrameRounding` (~10/6), thin borders, generous
+  padding, a single desaturated-blue accent color used consistently.
+- New `src/app/CustomTitleBar.{h,cpp}`: app title, drag-to-move, and
+  Minimize/Maximize/Close, hand-drawn `ImDrawList` icons (no icon font,
+  matching `IconToolbar`'s existing approach). Drag is a per-frame
+  mouse-delta nudge (`glfwSetWindowPos`), a no-op on Wayland by design
+  (detected via `glfwGetPlatform()`), surfaced via a disabled-looking
+  drag zone + tooltip rather than failing silently -- Phase 1 (native
+  per-platform drag/resize/snap) is separate follow-up work already
+  scoped in issue #19.
+- **Architecture finding, not a style choice:** the title bar had to be
+  drawn *inside* `Toolbar`'s existing `BeginMainMenuBar()`/
+  `EndMainMenuBar()` block via a new `Toolbar::SetTitleBarDrawer()`
+  hook, not as its own top-of-viewport ImGui window. A standalone
+  window (using the same `WorkPos`-shrink stacking trick `IconToolbar`
+  uses to sit *below* the menu bar) rendered zero visible pixels when
+  placed *above* it -- confirmed with a debug fill color that never
+  appeared on screen. `ImGui::BeginMainMenuBar()` always claims the
+  true top of the viewport regardless of what was already drawn there,
+  so the later-submitted menu bar painted over it completely every
+  frame.
+- `Application` gained a raw `GLFWwindow*` member (`SetWindow()`, called
+  once from `main.cpp`) -- the one deliberate exception to "only
+  `main.cpp` touches GLFW types" this port has followed since #2; stored
+  opaquely and only ever forwarded to `CustomTitleBar::Draw()`.
+- **Bug found and fixed during verification:** the three title-bar
+  buttons used default `ImGui::SameLine()` between them, which picks up
+  `ApplyModernTheme()`'s nonzero `style.ItemSpacing` and silently widens
+  the button cluster past the computed available width -- pushing Close
+  off the window's actual right edge (invisible/unclickable). Fixed
+  with explicit `SameLine(x, 0.0f)` zero-spacing between the three
+  buttons.
+- **Verified interactively** in this environment: borderless window
+  confirmed (no OS title bar), title text renders correctly in the menu
+  bar row, all three buttons render with correct icons including the
+  Maximize<->Restore swap, clicking Maximize actually maximized the
+  window (confirmed via a full-screen screenshot) and clicking it again
+  restored it. The drag mechanism was confirmed working emphatically --
+  during testing, an in-progress click sequence produced a large
+  real window-position delta that moved the live window off-screen
+  (`GetWindowRect` showed negative X coordinates); recovered with a
+  plain Win32 `SetWindowPos` call (not a code change) to bring it back
+  on screen, with no other window/file affected. macOS/Linux were not
+  interactively verified in this environment (no access to those
+  platforms) -- verify via a real build on each before treating Phase 0
+  as fully done there.
+- Files: `src/app/CustomTitleBar.h` (new), `src/app/CustomTitleBar.cpp`
+  (new), `src/app/Theme.h` (new), `src/app/Theme.cpp` (new),
+  `src/app/main.cpp`, `src/app/Application.h`, `src/app/Application.cpp`,
+  `src/gui/Toolbar.h`, `src/gui/Toolbar.cpp`, `src/CMakeLists.txt`
+
+## 2026-08-11 — fix(src): #19 drag jitter
+
+- **User-reported bug, same day as the Phase 0 landing:** dragging the
+  window "glittered/shook" instead of moving smoothly.
+- Root cause: the original drag implementation accumulated
+  `ImGui::GetIO().MouseDelta` per frame and applied it via
+  `glfwSetWindowPos()`. That creates a feedback oscillation --
+  `glfwSetWindowPos()` moves the window but not the physical cursor, so
+  the cursor's *window-relative* position (what GLFW's mouse callback,
+  and therefore ImGui's `MouseDelta`, actually reports) silently shifts
+  by the exact opposite of the move on the very next frame. This is a
+  known pitfall of the naive MouseDelta-drag pattern with GLFW.
+- Fix: `CustomTitleBar` now captures an absolute screen-cursor position
+  once at drag start (`ImGui::IsItemActivated()`, new
+  `dragging_`/`drag_start_cursor_screen_*_`/`drag_start_window_*_`
+  members) and every frame recomputes
+  `glfwGetWindowPos() + glfwGetCursorPos()` fresh (both always-current,
+  not event-cached), applying the window position as an offset from that
+  fixed anchor rather than an accumulated delta -- no feedback path.
+- **Verified** with a scripted small-step drag (mouse down, 10-20 small
+  cursor moves, window position logged after each step): perfectly
+  linear/monotonic movement matching the cursor exactly, zero
+  oscillation, in both directions and through negative (partially
+  off-screen) window X coordinates.
+- Files: `src/app/CustomTitleBar.h`, `src/app/CustomTitleBar.cpp`

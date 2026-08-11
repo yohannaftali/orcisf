@@ -3,6 +3,7 @@
 #include <optional>
 #include <vector>
 
+#include "app/CustomTitleBar.h"
 #include "engine/MemberResults.h"
 #include "gui/DetailingPanel.h"
 #include "gui/IconToolbar.h"
@@ -29,6 +30,12 @@ namespace orcisf::app {
 class Application {
 public:
     Application();
+
+    // Issue #19: the GLFWwindow* CustomTitleBar needs for its drag/
+    // minimize/maximize/close commands. Must be called once, before the
+    // first OnFrame(), since main.cpp is the only file that owns a
+    // GLFWwindow* (kept that way deliberately -- see CustomTitleBar.h).
+    void SetWindow(GLFWwindow* window);
 
     // Builds the dockspace and draws every panel for the current frame.
     void OnFrame();
@@ -63,6 +70,8 @@ private:
 
     gui::Toolbar toolbar_;
     gui::IconToolbar icon_toolbar_;
+    CustomTitleBar title_bar_;
+    GLFWwindow* window_ = nullptr;
     gui::ViewportPanel viewport_panel_;
     gui::PropertiesPanel properties_panel_;
     gui::LoadsPanel loads_panel_;

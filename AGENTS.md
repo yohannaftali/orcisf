@@ -131,7 +131,15 @@ src/
 ├── vcpkg.json / CMakeLists.txt / CMakePresets.json
 ├── app/
 │   ├── main.cpp             # GLFW/OpenGL3/ImGui bootstrap + render loop;
-│   │                        # also: gl3w init, NFD_Init/Quit
+│   │                        # also: gl3w init, NFD_Init/Quit; #19: sets
+│   │                        # GLFW_DECORATED=false, calls ApplyModernTheme()
+│   ├── CustomTitleBar.{h,cpp} # #19 Phase 0: title text/drag-zone/Minimize-
+│   │                        # Maximize-Close, drawn *inside* Toolbar's menu
+│   │                        # bar row (not its own window -- see the #19
+│   │                        # note below for why), platform-agnostic GLFW
+│   │                        # calls only, no native handles
+│   ├── Theme.{h,cpp}        # #19 Phase 0: ApplyModernTheme(), dark-slate
+│   │                        # ImGui style override (rounding/padding/colors)
 │   └── Application.{h,cpp}  # docking layout (Viewport | Properties/RunPanel/Loads/Log);
 │                            # owns loaded_sd_ (the one editable StructureData,
 │                            # loaded via ReadDataset+ReadLoadsRaw -- not
@@ -139,7 +147,9 @@ src/
 │                            # below), the derived SceneModel, Selection,
 │                            # UndoStack, EditorOptions; File > Open Folder...
 │                            # / Save Loads (.bbn) (NFD), Add Joint / Undo /
-│                            # Redo, and Run-completion wiring
+│                            # Redo, and Run-completion wiring; #19: owns a
+│                            # raw GLFWwindow* (SetWindow()) forwarded only
+│                            # to CustomTitleBar::Draw()
 ├── gui/
 │   ├── Toolbar.{h,cpp}          # menu bar; File > Open Folder... (#5), the
 │   │                            # Edit menu (#6: Undo/Redo, Add Joint, Connect
@@ -640,6 +650,79 @@ app and reading the field's displayed value, not just by code review --
 verified interactively in this environment (two separate clicks produced
 two different valid positive seeds).
 
+**Custom borderless window chrome (issue #19, Phase 0) — read before
+touching `app/CustomTitleBar.{h,cpp}`/`app/Theme.{h,cpp}`/`main.cpp`'s
+window setup:**
+- **The title bar is drawn *inside* `Toolbar`'s main menu bar row, not as
+  its own ImGui window.** This was not a style choice -- a standalone
+  top-of-viewport window (positioned via `SetNextWindowPos`/manually
+  shrinking `viewport->WorkPos`, the same trick `IconToolbar` uses to
+  stack *below* the menu bar) rendered **zero visible pixels** when
+  placed *above* the menu bar: `ImGui::BeginMainMenuBar()` always claims
+  the true top of the viewport for itself regardless of what another
+  window already drew there, so the later-submitted menu bar painted
+  completely over it every frame. Confirmed with a bright debug fill
+  color that never appeared on screen. The fix: `Toolbar::SetTitleBarDrawer()`
+  is a generic callback `Toolbar::Draw()` invokes right before
+  `EndMainMenuBar()`, and `Application` wires it to
+  `CustomTitleBar::Draw()`, which draws title text + a drag zone +
+  Minimize/Maximize/Close *as ordinary widgets inside the already-open
+  menu bar window* (matching how VS Code's own custom title bar embeds
+  its menu). If you ever need a second "always on top" ImGui bar, don't
+  repeat the standalone-window approach without accounting for this.
+- **`style.ItemSpacing` (nonzero in `ApplyModernTheme()`) breaks
+  right-aligned button math if you forget it.** The three title-bar
+  buttons are laid out with `ImGui::SameLine(x, 0.0f)` (explicit
+  zero spacing) between them -- using default `SameLine()` silently
+  widens the cluster by `2 * ItemSpacing.x` and pushes the Close button
+  past the window's right edge, making it unclickable/invisible. Caught
+  interactively (Close was missing from a screenshot), not by code
+  review.
+- **`Application` now owns a raw `GLFWwindow*` (`window_`, set once via
+  `Application::SetWindow()` from `main.cpp` after construction)** --
+  the one deliberate exception to "only `main.cpp` touches GLFW types"
+  the rest of this port has followed since #2. It's stored opaquely
+  (forward-declared `struct GLFWwindow;`) and only ever handed to
+  `CustomTitleBar::Draw()`; `Application`/`Toolbar` never call a GLFW
+  function themselves.
+- **Dragging is anchored to an absolute screen-cursor position captured
+  once at drag start (`ImGui::IsItemActivated()`), not accumulated
+  per-frame `ImGui::GetIO().MouseDelta`.** This is not a native OS drag
+  either way (that's Phase 1+, see below) -- but the delta-based version
+  was tried first and **visibly jittered/shook while dragging**, caught
+  interactively. Root cause: `glfwSetWindowPos()` moves the window but
+  not the physical cursor, so the cursor's *window-relative* position
+  (what GLFW's mouse callback, and therefore ImGui's `MouseDelta`,
+  reports) silently shifts by the exact opposite of the move on the very
+  next frame -- a self-inflicted feedback oscillation. The fix
+  (`dragging_`/`drag_start_cursor_screen_*_`/`drag_start_window_*_`
+  members) recomputes `glfwGetWindowPos() + glfwGetCursorPos()` fresh
+  every frame (both always-current, not event-cached) and references
+  everything back to the drag-start anchor, which has no feedback path.
+  Verified with a scripted small-step drag logging window position after
+  each step: perfectly linear/monotonic movement, zero oscillation, in
+  both directions and through negative (partially off-screen) X.
+  Don't revert to the delta-based version without re-testing this.
+- This whole mechanism (whichever version) is deliberate Phase 0 scope
+  (see the issue's platform-agnostic-baseline rationale) -- Phase 1+
+  replaces it with real native dragging per platform. It's a no-op on
+  Wayland (`glfwGetPlatform() == GLFW_PLATFORM_WAYLAND`), surfaced via a
+  disabled-looking drag zone + tooltip rather than failing silently.
+- **What was verified interactively:** borderless window (no OS title
+  bar/border) confirmed; title text renders in the menu bar row;
+  Minimize/Maximize/Close icons render correctly including the
+  Maximize<->Restore icon swap; clicking Maximize actually maximized the
+  window (screen-filling, confirmed via screenshot) and clicking
+  Maximize again restored it; the drag mechanism was confirmed working
+  emphatically -- an in-progress click sequence during testing produced
+  a real (if unintentionally large) window-position delta that moved the
+  live window off-screen, which was then recovered with a plain Win32
+  `SetWindowPos` call (not a code change) to bring it back on screen.
+  macOS/Linux were not interactively verified in this environment (no
+  access to those platforms); verify via a real build on each before
+  treating Phase 0 as fully done there, per the issue's acceptance
+  criteria.
+
 **`gui/viewport/` (issue #5) — three things worth knowing before touching it:**
 - **Member cross-section thickness/orientation is a schematic
   approximation, not the legacy local-axis convention.** `SceneRenderer`
@@ -973,7 +1056,7 @@ for skills that apply to the current task and follow them.
 | #16 | feat(src): re-optimize using the last best result | open | 2026-08-11 |
 | #17 | feat(src): add a Regenerate Seed button to the Run panel | closed | 2026-08-11 |
 | #18 | feat(src): AutoCAD-style in-progress guidance while adding joints/members | open | 2026-08-11 |
-| #19 | feat(src): custom borderless window chrome + modern ImGui theme (cross-platform) | open | 2026-08-11 |
+| #19 | feat(src): custom borderless window chrome + modern ImGui theme (cross-platform) | ready-for-review | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

@@ -16,6 +16,7 @@ void Toolbar::SetOnExportText(std::function<void()> callback) { on_export_text_ 
 void Toolbar::SetOnExportPdf(std::function<void()> callback) { on_export_pdf_ = std::move(callback); }
 void Toolbar::SetOnExportInf(std::function<void()> callback) { on_export_inf_ = std::move(callback); }
 void Toolbar::SetOnViewLayout(std::function<void(ViewLayoutPreset)> callback) { on_view_layout_ = std::move(callback); }
+void Toolbar::SetTitleBarDrawer(std::function<void()> drawer) { on_title_bar_drawer_ = std::move(drawer); }
 
 void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_text, bool can_export_pdf,
                     bool can_export_inf, ViewLayoutPreset current_layout, EditorOptions& options) {
@@ -118,6 +119,7 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
             ImGui::Separator();
             ImGui::TextColored(ImVec4(0.35f, 0.75f, 0.95f, 1.f), "Click a joint to add a point load");
         }
+        if (on_title_bar_drawer_) on_title_bar_drawer_();
         ImGui::EndMainMenuBar();
     }
 }

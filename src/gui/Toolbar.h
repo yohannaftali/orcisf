@@ -50,6 +50,15 @@ public:
     void SetOnExportInf(std::function<void()> callback);
     // Issue #15: fires when the user picks a View menu layout preset.
     void SetOnViewLayout(std::function<void(ViewLayoutPreset)> callback);
+    // Issue #19: called right-aligned inside the still-open main menu bar,
+    // after the last menu/status text and before EndMainMenuBar() --
+    // lets Application draw the custom title bar (app title, drag zone,
+    // Minimize/Maximize/Close) in the same row instead of a separate
+    // window (see CustomTitleBar.h for why it has to be this way). Kept
+    // as a generic hook rather than a GLFW-typed parameter so this file
+    // stays free of any window-toolkit dependency, matching the rest of
+    // gui/.
+    void SetTitleBarDrawer(std::function<void()> drawer);
 
 private:
     std::function<void()> on_new_data_;
@@ -64,6 +73,7 @@ private:
     std::function<void()> on_export_pdf_;
     std::function<void()> on_export_inf_;
     std::function<void(ViewLayoutPreset)> on_view_layout_;
+    std::function<void()> on_title_bar_drawer_;
 };
 
 } // namespace orcisf::gui

@@ -87,6 +87,9 @@ Application::Application() {
     toolbar_.SetOnExportPdf([this]() { OnExportPdfRequested(); });
     toolbar_.SetOnExportInf([this]() { OnExportInfRequested(); });
     toolbar_.SetOnViewLayout([this](gui::ViewLayoutPreset preset) { current_layout_ = preset; });
+    toolbar_.SetTitleBarDrawer([this]() {
+        if (window_) title_bar_.Draw(window_, "ORCISF - Optimasi Beton Bertulang Pada Struktur Portal Ruang");
+    });
 
     icon_toolbar_.SetOnNewData([this]() { OnNewDataRequested(); });
     icon_toolbar_.SetOnOpenFolder([this]() { OnOpenFolderRequested(); });
@@ -96,6 +99,8 @@ Application::Application() {
     icon_toolbar_.SetOnAddJoint([this]() { OnAddJointRequested(); });
     icon_toolbar_.SetOnRun([this]() { run_panel_.TriggerRun(); });
 }
+
+void Application::SetWindow(GLFWwindow* window) { window_ = window; }
 
 void Application::OnNewDataRequested() {
     // Asks where to put the new dataset up front (follow-up to #11) rather

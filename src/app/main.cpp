@@ -4,6 +4,7 @@
 // this file only wires up the window, render loop, and docking layout.
 
 #include "app/Application.h"
+#include "app/Theme.h"
 
 // gl3w must be included before any other header that pulls in GL/gl.h
 // (GLFW included with GLFW_INCLUDE_NONE below, so this is the only GL
@@ -65,6 +66,13 @@ int main(int, char**) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 #endif
 
+    // Issue #19 (Phase 0): borderless window, platform-agnostic via GLFW's
+    // own cross-platform hint -- no native handles needed. The custom
+    // title bar (drawn inside Application's menu bar every frame, see
+    // app::CustomTitleBar) replaces the removed OS chrome; its header
+    // documents the Wayland-drag limitation this implies.
+    glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+
     GLFWwindow* window = glfwCreateWindow(
         1600, 900, "ORCISF - Optimasi Beton Bertulang Pada Struktur Portal Ruang", nullptr, nullptr);
     if (window == nullptr) {
@@ -87,7 +95,7 @@ int main(int, char**) {
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-    ImGui::StyleColorsDark();
+    orcisf::app::ApplyModernTheme();
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
@@ -95,6 +103,7 @@ int main(int, char**) {
     NFD_Init();
 
     orcisf::app::Application app;
+    app.SetWindow(window);
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
