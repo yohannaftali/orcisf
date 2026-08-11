@@ -7,11 +7,13 @@
 #include "engine/MemberResults.h"
 #include "gui/DetailingPanel.h"
 #include "gui/IconToolbar.h"
+#include "gui/IconVisibility.h"
 #include "gui/JointsPanel.h"
 #include "gui/LoadsPanel.h"
 #include "gui/LogPanel.h"
 #include "gui/MembersPanel.h"
 #include "gui/PanelTitles.h"
+#include "gui/PanelVisibility.h"
 #include "gui/PropertiesPanel.h"
 #include "gui/RunPanel.h"
 #include "gui/Toolbar.h"
@@ -90,6 +92,11 @@ private:
     gui::Selection selection_;
     gui::EditorOptions editor_options_;
     std::string loaded_dataset_path_;
+
+    // Issue #37: backing storage for the View menu's Menubar section --
+    // Toolbar writes to this via checkable MenuItems, IconToolbar reads it
+    // to decide which buttons to draw.
+    gui::IconVisibility icon_visibility_;
 
     gui::SceneModel scene_;
     std::vector<std::string> validation_issues_;

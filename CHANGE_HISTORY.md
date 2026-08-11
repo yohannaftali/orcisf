@@ -2191,3 +2191,40 @@ automation script, not WinUI3), core objective verified, issue closed
   (new), `src/gui/JointsMembersPanel.{h,cpp}` (deleted), `src/gui/PanelIcons.{h,cpp}`,
   `src/gui/PanelTitles.{h,cpp}`, `src/app/Application.{h,cpp}`,
   `src/app/DockTabIcons.cpp`, `src/CMakeLists.txt`, `AGENTS.md`
+
+## [2026-08-11] — fix/feat(src): implement issue #37 -- close-button fix, View menu restructure, rename
+
+- **Real bug fixed**: docked panels' tab close buttons flipped the panel's
+  own open flag correctly but the tab never actually disappeared, because
+  `Application::OnFrame()` called every panel's `Draw()` unconditionally
+  every frame, trusting `ImGui::Begin(name, open)` to no-op once `*open`
+  went false -- true for floating windows, not for Dear ImGui's docked
+  tab-bar bookkeeping in this version. Root-caused via two temporary debug
+  probes (io.MousePos/GetHoveredID() per click; a before/after snapshot of
+  every panel's open flag around the Draw() calls), both reverted before
+  commit. Fixed by gating each panel's `Draw()` call on its own open flag
+  instead. Verified on two different panels (Viewport, Log) in two
+  different dock groups; also confirmed the bug predates and is unrelated
+  to #35's dynamic window-title mechanism (reproduced identically with a
+  fully static title).
+- **View menu restructured** into three sections (Toolbar.cpp's `View`
+  menu): **Menubar** (new `gui/IconVisibility.h`, 8 checkable toggles for
+  IconToolbar's buttons -- hidden buttons reflow cleanly, no gap), **
+  Subwindows** (new `gui/PanelVisibility.h`, 8 checkable toggles bound
+  directly to each panel's open-state bool -- doubles as how a closed
+  panel gets reopened), **Layout** (the pre-existing #15 presets, moved
+  from flat top-level items into their own submenu, unchanged otherwise).
+- **Renamed** the "Run Optimization" panel's display text to
+  "Optimization" (`RunPanel.cpp`'s window title + `ViewportPanel.cpp`'s
+  hint text) -- `gui::kRunOptimizationId` (the dock/window identity) is
+  unchanged, so no dock-layout code needed touching.
+- Verified interactively via real screenshots: close-button fix on two
+  panels; the full View > Subwindows close -> reopen cycle for Log (tab
+  disappears, then reappears in its correct #36-ordered position with
+  content intact); Menubar's New Data toggle hiding/reflowing the icon
+  row; Layout's three presets still switching correctly; the
+  "Optimization" rename showing correctly everywhere.
+- Files: `src/app/Application.{h,cpp}`, `src/gui/Toolbar.{h,cpp}`,
+  `src/gui/IconToolbar.{h,cpp}`, `src/gui/IconVisibility.h` (new),
+  `src/gui/PanelVisibility.h` (new), `src/gui/RunPanel.cpp`,
+  `src/gui/ViewportPanel.cpp`, `AGENTS.md`

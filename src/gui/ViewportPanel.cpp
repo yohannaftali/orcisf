@@ -268,7 +268,7 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
         ImGui::TextDisabled(
             "No dataset loaded.\n"
             "Use File > Open Folder... to load an Optimasi Beton/Example/* dataset,\n"
-            "or run an optimization from the Run Optimization panel.");
+            "or run an optimization from the Optimization panel.");
         ImGui::End();
         return;
     }

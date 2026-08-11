@@ -2,6 +2,8 @@
 
 #include <functional>
 
+#include "gui/IconVisibility.h"
+#include "gui/PanelVisibility.h"
 #include "gui/editor/Selection.h"
 
 namespace orcisf::gui {
@@ -21,8 +23,11 @@ enum class ViewLayoutPreset { Default, Design, Optimization };
 // RunPanel/IconToolbar's Run button, #14).
 class Toolbar {
 public:
+    // Issue #37: icon_visibility/panel_visibility back the View menu's new
+    // "Menubar"/"Subwindows" sections -- see IconVisibility.h/PanelVisibility.h.
     void Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_text, bool can_export_pdf,
-              bool can_export_inf, ViewLayoutPreset current_layout, EditorOptions& options);
+              bool can_export_inf, ViewLayoutPreset current_layout, EditorOptions& options,
+              IconVisibility& icon_visibility, const PanelVisibility& panel_visibility);
 
     // Issue #11: starts a brand-new, empty dataset in the editor.
     void SetOnNewData(std::function<void()> callback);

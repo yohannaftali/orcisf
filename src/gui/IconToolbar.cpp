@@ -112,7 +112,8 @@ void IconToolbar::SetOnRedo(std::function<void()> callback) { on_redo_ = std::mo
 void IconToolbar::SetOnAddJoint(std::function<void()> callback) { on_add_joint_ = std::move(callback); }
 void IconToolbar::SetOnRun(std::function<void()> callback) { on_run_ = std::move(callback); }
 
-void IconToolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_run, EditorOptions& options) {
+void IconToolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_run, EditorOptions& options,
+                        const IconVisibility& visibility) {
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
                               ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings;
     const float padding = Padding();
@@ -127,55 +128,82 @@ void IconToolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_run
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(padding, padding));
     ImGui::Begin("##IconToolbar", nullptr, flags);
 
-    if (IconButton("##new_data", "New Data", true, DrawNewDataIcon) && on_new_data_) on_new_data_();
-    ImGui::SameLine(0.f, padding);
-    if (IconButton("##open_data", "Open Data...", true, DrawOpenDataIcon) && on_open_folder_) on_open_folder_();
-    ImGui::SameLine(0.f, padding);
-    if (IconButton("##save", "Save (Ctrl+S)", can_save, DrawSaveIcon) && on_save_) on_save_();
+    // Issue #37: each button's slot is skipped entirely when hidden (not
+    // left as a blank gap) -- `first` tracks whether anything has been
+    // drawn yet so the very first *visible* button never gets a leading
+    // SameLine, regardless of which button that ends up being.
+    bool first = true;
+    auto Sep = [&](bool double_gap) {
+        if (!first) ImGui::SameLine(0.f, double_gap ? padding * 2.f : padding);
+        first = false;
+    };
 
-    ImGui::SameLine(0.f, padding * 2.f);
-    if (IconButton("##undo", "Undo", can_undo, DrawUndoIcon) && on_undo_) on_undo_();
-    ImGui::SameLine(0.f, padding);
-    if (IconButton("##redo", "Redo", can_redo, DrawRedoIcon) && on_redo_) on_redo_();
+    if (visibility.new_data) {
+        Sep(false);
+        if (IconButton("##new_data", "New Data", true, DrawNewDataIcon) && on_new_data_) on_new_data_();
+    }
+    if (visibility.open_data) {
+        Sep(false);
+        if (IconButton("##open_data", "Open Data...", true, DrawOpenDataIcon) && on_open_folder_) on_open_folder_();
+    }
+    if (visibility.save) {
+        Sep(false);
+        if (IconButton("##save", "Save (Ctrl+S)", can_save, DrawSaveIcon) && on_save_) on_save_();
+    }
 
-    ImGui::SameLine(0.f, padding * 2.f);
-    bool add_joint_active = options.add_joint_mode;
-    const char* add_joint_tooltip =
-        add_joint_active ? "Add Joint (active -- click in viewport to place, click here to stop)" : "Add Joint";
-    if (IconButton("##add_joint", add_joint_tooltip, true, DrawAddJointIcon)) {
-        options.add_joint_mode = !options.add_joint_mode;
-        if (options.add_joint_mode) {
-            options.connect_mode = false;
-            options.connect_first_joint = -1;
-            options.load_mode = LoadPlacementMode::None;
-            if (on_add_joint_) on_add_joint_();
+    if (visibility.undo) {
+        Sep(true);
+        if (IconButton("##undo", "Undo", can_undo, DrawUndoIcon) && on_undo_) on_undo_();
+    }
+    if (visibility.redo) {
+        Sep(false);
+        if (IconButton("##redo", "Redo", can_redo, DrawRedoIcon) && on_redo_) on_redo_();
+    }
+
+    if (visibility.add_joint) {
+        Sep(true);
+        bool add_joint_active = options.add_joint_mode;
+        const char* add_joint_tooltip =
+            add_joint_active ? "Add Joint (active -- click in viewport to place, click here to stop)" : "Add Joint";
+        if (IconButton("##add_joint", add_joint_tooltip, true, DrawAddJointIcon)) {
+            options.add_joint_mode = !options.add_joint_mode;
+            if (options.add_joint_mode) {
+                options.connect_mode = false;
+                options.connect_first_joint = -1;
+                options.load_mode = LoadPlacementMode::None;
+                if (on_add_joint_) on_add_joint_();
+            }
+        }
+        if (add_joint_active) {
+            ImVec2 min = ImGui::GetItemRectMin();
+            ImVec2 max = ImGui::GetItemRectMax();
+            ImGui::GetWindowDrawList()->AddRect(min, max, IM_COL32(90, 230, 110, 255), Scaled(3.f), 0, Stroke(2.f));
         }
     }
-    if (add_joint_active) {
-        ImVec2 min = ImGui::GetItemRectMin();
-        ImVec2 max = ImGui::GetItemRectMax();
-        ImGui::GetWindowDrawList()->AddRect(min, max, IM_COL32(90, 230, 110, 255), Scaled(3.f), 0, Stroke(2.f));
-    }
-    ImGui::SameLine(0.f, padding);
-    bool connect_active = options.connect_mode;
-    const char* connect_tooltip = connect_active ? "Connect Joints (active -- click to stop)" : "Connect Joints";
-    if (IconButton("##connect", connect_tooltip, true, DrawConnectIcon)) {
-        options.connect_mode = !options.connect_mode;
-        options.connect_first_joint = -1;
-        options.add_joint_mode = false;
-        options.load_mode = LoadPlacementMode::None;
-    }
-    if (connect_active) {
-        ImVec2 min = ImGui::GetItemRectMin();
-        ImVec2 max = ImGui::GetItemRectMax();
-        ImGui::GetWindowDrawList()->AddRect(min, max, IM_COL32(255, 209, 38, 255), Scaled(3.f), 0, Stroke(2.f));
+    if (visibility.connect_joints) {
+        Sep(false);
+        bool connect_active = options.connect_mode;
+        const char* connect_tooltip = connect_active ? "Connect Joints (active -- click to stop)" : "Connect Joints";
+        if (IconButton("##connect", connect_tooltip, true, DrawConnectIcon)) {
+            options.connect_mode = !options.connect_mode;
+            options.connect_first_joint = -1;
+            options.add_joint_mode = false;
+            options.load_mode = LoadPlacementMode::None;
+        }
+        if (connect_active) {
+            ImVec2 min = ImGui::GetItemRectMin();
+            ImVec2 max = ImGui::GetItemRectMax();
+            ImGui::GetWindowDrawList()->AddRect(min, max, IM_COL32(255, 209, 38, 255), Scaled(3.f), 0, Stroke(2.f));
+        }
     }
 
-    ImGui::SameLine(0.f, padding * 2.f);
-    if (IconButton("##run", can_run ? "Run Optimization" : "Run Optimization (load or create a dataset first)", can_run,
-                    DrawRunIcon) &&
-        on_run_) {
-        on_run_();
+    if (visibility.run) {
+        Sep(true);
+        if (IconButton("##run", can_run ? "Run Optimization" : "Run Optimization (load or create a dataset first)",
+                        can_run, DrawRunIcon) &&
+            on_run_) {
+            on_run_();
+        }
     }
 
     ImGui::End();

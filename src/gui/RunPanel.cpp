@@ -118,7 +118,11 @@ void RunPanel::TriggerRun() {
 }
 
 void RunPanel::Draw(bool* open) {
-    if (!ImGui::Begin(PanelWindowTitle(kRunOptimizationId, "Run Optimization").c_str(), open)) {
+    // Issue #37: display renamed "Run Optimization" -> "Optimization" for
+    // brevity -- kRunOptimizationId (the dock/window *identity*) is
+    // unchanged on purpose, so this rename doesn't touch DockBuilderDockWindow()
+    // associations or require re-docking anywhere.
+    if (!ImGui::Begin(PanelWindowTitle(kRunOptimizationId, "Optimization").c_str(), open)) {
         ImGui::End();
         return;
     }

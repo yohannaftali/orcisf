@@ -181,11 +181,21 @@ src/
 │   │                            # Edit menu (#6: Undo/Redo, Add Joint, Connect
 │   │                            # Joints, Snap to Grid), the Loads menu +
 │   │                            # File > Save Loads (.bbn) (#7), and File >
-│   │                            # Export PDF.../Export Text... (#9) are wired
+│   │                            # Export PDF.../Export Text... (#9) are wired;
+│   │                            # #37: View > Menubar/Subwindows/Layout
+│   ├── IconVisibility.h         # #37: 8-bool per-icon-toolbar-button
+│   │                            # visibility, written by Toolbar's View >
+│   │                            # Menubar, read by IconToolbar::Draw()
+│   ├── PanelVisibility.h        # #37: 8 bool* (one per panel), written by
+│   │                            # Toolbar's View > Subwindows -- also how a
+│   │                            # panel closed via its tab close button
+│   │                            # gets reopened
 │   ├── IconToolbar.{h,cpp}      # #14: icon-button row docked below the menu
 │   │                            # bar (New/Open/Save/Undo/Redo/Add Joint/
 │   │                            # Connect/Run) -- fixed curated set, hand-drawn
-│   │                            # ImDrawList icons, no icon-font dependency
+│   │                            # ImDrawList icons, no icon-font dependency;
+│   │                            # #37: each button's visibility gated on an
+│   │                            # IconVisibility, hidden slots skip cleanly
 │   ├── ViewportPanel.{h,cpp}    # #5: offscreen OpenGL render of a SceneModel,
 │   │                            # orbit/pan/zoom camera, click-to-pick a joint
 │   │                            # or member; #6: ImGuizmo translate handle for
@@ -1347,6 +1357,103 @@ interactive pass, ideally one that root-causes why this specific
 respond to synthesized clicks that worked fine everywhere else in the
 same session (tabs, toolbar icons, viewport clicks).
 
+**Docked-panel close-button bug + View menu Menubar/Subwindows/Layout
+sections + "Run Optimization" -> "Optimization" rename (issue #37) — read
+before touching `Application::OnFrame()`'s per-panel `Draw()` calls,
+`Toolbar.cpp`'s View menu, or `IconToolbar.cpp`'s per-button visibility:**
+- **Root cause of the close-button bug, found by direct instrumentation,
+  not by reading Dear ImGui source (not available -- this project links
+  a vcpkg-installed, headers-only copy of ImGui, no `.cpp` to read):**
+  `Application::OnFrame()` called every panel's `Draw(&panel_open_, ...)`
+  unconditionally, every frame, trusting `ImGui::Begin(name, open)` to
+  no-op once `*open` went false -- the standard, usually-correct idiom.
+  Two temporary debug probes (reverted before commit, not left in the
+  codebase) proved this trust was misplaced specifically for *docked*
+  windows: (1) logging `io.MousePos`/`ImGui::GetHoveredID()` on every
+  click confirmed clicks landed exactly where intended (no DPI/coordinate
+  mismatch -- an early, wrong hypothesis); (2) a before/after snapshot of
+  every panel's own open-flag around the `Draw()` calls proved the tab
+  close button's click **does** correctly flip `viewport_open_`/etc. to
+  `false` (confirmed on both `Viewport` and `Log`, in two different dock
+  groups) -- yet the tab kept rendering on every subsequent frame anyway.
+  Dear ImGui's docked-tab-bar bookkeeping does not remove a window from
+  its dock node purely because `*p_open` went false while `Begin()` for
+  that window keeps getting called; the tab lingers until the caller
+  actually stops calling `Begin()` for it. **Fix**: every panel's
+  `Draw()` call in `OnFrame()` is now wrapped in `if (panel_open_) { ... }`
+  -- skip the call entirely once closed, which is what actually lets
+  Dear ImGui drop the tab. Confirmed via real screenshots, for both
+  `Viewport` and `Log`, both closing correctly.
+- **This bug almost certainly predates #35/#36 and was not caused by
+  either** -- confirmed directly: it reproduced identically with
+  `ViewportPanel`'s title reverted to a plain, fully-static
+  `"Viewport###Viewport"` string (no dynamic leading-space reservation
+  at all), ruling out issue #35's dynamic-title mechanism as the cause
+  before landing on the real fix above.
+- **`gui/IconVisibility.h`** (new): a plain 8-bool struct, one per
+  `IconToolbar` button (`new_data`/`open_data`/`save`/`undo`/`redo`/
+  `add_joint`/`connect_joints`/`run`), all defaulting to visible. Owned
+  by `Application` (`icon_visibility_`), written by `Toolbar`'s new View
+  > Menubar checkable `MenuItem`s, read by `IconToolbar::Draw()`.
+- **`gui/PanelVisibility.h`** (new): 8 `bool*` fields (one per panel,
+  including `optimization` for `run_open_` -- the pointer name doesn't
+  need to track the #37 display rename), rebuilt fresh each frame in
+  `Application::OnFrame()` from the same `*_open_` fields each panel's
+  `Draw()` call is already gated on above -- not new state, just a
+  read/write *view* over the existing fields so `Toolbar` doesn't need
+  8 separate parameters or any Application-specific knowledge. Passed to
+  `Toolbar::Draw()` as `const PanelVisibility&`; the pointers themselves
+  are non-const so View > Subwindows' `MenuItem(label, nullptr, bool*)`
+  can toggle them directly (open **and** close -- this is also the
+  practical way to reopen a panel closed via its now-fixed tab close
+  button).
+- **`IconToolbar::Draw()`'s reflow logic**: a hidden button's slot is
+  skipped entirely (not left as a blank gap). Implemented via a small
+  `Sep(bool double_gap)` lambda that only emits `ImGui::SameLine()` when
+  something has already been drawn this row (tracked by a `first` bool)
+  -- so whichever button ends up being the first *visible* one never
+  gets a leading gap, regardless of which button that turns out to be.
+  Verified interactively: unchecking "New Data" in View > Menubar
+  removed it from the toolbar with the remaining icons shifting left
+  flush, no gap.
+- **View menu restructure**: `Toolbar.cpp`'s `View` top-level menu (still
+  opened via the existing Alt+V mnemonic, issue #30) now contains three
+  `ImGui::BeginMenu()` submenus separated by `ImGui::Separator()`:
+  **Menubar** (the 8 `IconVisibility` toggles), **Subwindows** (the 8
+  `PanelVisibility` toggles), **Layout** (issue #15's pre-existing
+  Default/Design/Optimization preset items, functionally unchanged, just
+  moved from flat top-level `View` items into their own submenu).
+- **Rename scope, deliberately narrow**: only the *display* text changed
+  (`RunPanel.cpp`'s `PanelWindowTitle(kRunOptimizationId, "Optimization")`
+  call, plus `ViewportPanel.cpp`'s "no dataset loaded" hint text) --
+  `gui::kRunOptimizationId` (the dock/window *identity* string) is
+  unchanged on purpose, so no `DockBuilderDockWindow()` call or
+  `DockTabIcons.cpp` table entry needed touching. `IconToolbar.cpp`'s Run
+  button tooltip ("Run Optimization") was deliberately left as-is -- it
+  describes the *action* the button performs (a verb phrase), not the
+  panel's title (a noun label), and the issue's own request was
+  specifically to rename the panel/tab, not every occurrence of the
+  phrase. Note the resulting naming overlap this creates: there is now
+  both an "Optimization" **panel** (Subwindows) and an "Optimization"
+  **layout preset** (Layout) -- both call themselves that on purpose (a
+  panel and a preset are different kinds of things a user picks from
+  different submenus), not a naming bug.
+- **What was verified interactively (real screenshots throughout, not
+  code review):** the close-button fix, confirmed on two different
+  panels in two different dock groups; the full View > Subwindows close
+  -> reopen cycle for `Log` (tab disappears, then reappears in its
+  correct #36-ordered position with its prior content intact, since the
+  panel object itself is never destroyed -- only skipped from drawing);
+  View > Menubar's "New Data" toggle hiding/reflowing the icon row; View
+  > Layout's three presets still switching correctly; the "Optimization"
+  rename showing correctly in both the tab title and the Viewport's hint
+  text.
+- **Not independently re-verified**: the remaining 6 panels' close
+  buttons (Properties/Detailing/Optimization/Joints/Members/Loads) --
+  all now go through the exact same `if (panel_open_) { Draw(...) }`
+  gating fix as `Viewport`/`Log`, so this is low risk, but a future pass
+  clicking through all 8 would remove all doubt.
+
 **2D plane-locked drawing (issue #22, part of epic #20) — read before
 touching `gui/viewport/Camera.{h,cpp}`, `gui/viewport/Math3D.h`'s
 `Orthographic()`, or `ViewportPanel`'s `add_joint_mode` branch:**
@@ -2194,7 +2301,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #32 | chore(src): add one-shot build scripts (build.ps1 for Windows, build.sh for macOS/Linux) | ready-for-review | 2026-08-11 |
 | #35 | fix(src): move panel icons onto the dock tab button, remove the in-content icon+title header row (#28 correction) | ready-for-review | 2026-08-11 |
 | #36 | feat(src): split Joints/Members panel into separate Joints and Members panels; order Loads tab immediately after them | ready-for-review | 2026-08-11 |
-| #37 | feat(src): View menu Menubar/Subwindows/Layout sections + fix tab close button + rename "Run Optimization" panel | open | 2026-08-11 |
+| #37 | feat(src): View menu Menubar/Subwindows/Layout sections + fix tab close button + rename "Run Optimization" panel | ready-for-review | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

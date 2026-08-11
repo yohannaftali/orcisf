@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "gui/IconVisibility.h"
 #include "gui/editor/Selection.h"
 
 namespace orcisf::gui {
@@ -46,7 +47,10 @@ public:
     void SetOnAddJoint(std::function<void()> callback);
     void SetOnRun(std::function<void()> callback);
 
-    void Draw(bool can_undo, bool can_redo, bool can_save, bool can_run, EditorOptions& options);
+    // Issue #37: visibility gates which buttons actually draw (a hidden
+    // one's slot is skipped, the row reflows) -- see IconVisibility.h.
+    void Draw(bool can_undo, bool can_redo, bool can_save, bool can_run, EditorOptions& options,
+              const IconVisibility& visibility);
 
 private:
     std::function<void()> on_new_data_;

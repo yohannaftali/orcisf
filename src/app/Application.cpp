@@ -364,9 +364,10 @@ namespace {
 
 // Issue #15's "Default" preset -- exactly the single fixed layout this app
 // always had (no regression for existing users): Viewport/Detailing
-// large+center, Properties/Run Optimization tabbed on the right,
-// Joints/Members/Loads/Log tabbed along the bottom (issue #36 split what
-// used to be a single combined Joints/Members tab into two).
+// large+center, Properties/Optimization (renamed from "Run Optimization",
+// issue #37) tabbed on the right, Joints/Members/Loads/Log tabbed along
+// the bottom (issue #36 split what used to be a single combined
+// Joints/Members tab into two).
 void BuildDefaultLayout(ImGuiID dock_main) {
     ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.25f, nullptr, &dock_main);
     ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.25f, nullptr, &dock_main);
@@ -387,7 +388,7 @@ void BuildDefaultLayout(ImGuiID dock_main) {
 
 // "Design" preset: focuses on geometry/load input -- Viewport+Detailing
 // stay large, Properties gets its own dedicated (not shared/tabbed) column,
-// Loads gets a bigger bottom strip. Run Optimization/Log are still present,
+// Loads gets a bigger bottom strip. Optimization/Log are still present,
 // just tabbed in less prominent corners rather than hidden -- nothing a
 // Design-focused user needs is ever unreachable.
 void BuildDesignLayout(ImGuiID dock_main) {
@@ -407,10 +408,13 @@ void BuildDesignLayout(ImGuiID dock_main) {
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLogId).c_str(), dock_bottom_right);
 }
 
-// "Optimization" preset: focuses on running -- Run Optimization + Log get
-// the large primary area, everything else (Viewport/Detailing/Properties/
-// Loads) moves to a secondary column, tabbed in pairs so all four stay one
-// click away instead of disappearing.
+// "Optimization" preset (a view-layout preset name, distinct from the
+// panel of the same name below -- issue #37's rename made these two
+// "Optimization"s coexist; see AGENTS.md's #37 notes): focuses on
+// running -- the Optimization panel + Log get the large primary area,
+// everything else (Viewport/Detailing/Properties/Loads) moves to a
+// secondary column, tabbed in pairs so all four stay one click away
+// instead of disappearing.
 void BuildOptimizationLayout(ImGuiID dock_main) {
     ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.35f, nullptr, &dock_main);
     ImGuiID dock_right_bottom =
@@ -480,8 +484,23 @@ void Application::OnFrame() {
     bool can_export_text = editable_.has_value();
     bool can_export_pdf = has_run_results_;
     bool can_export_inf = editable_.has_value();
+
+    // Issue #37: View > Subwindows binds directly to these fields --
+    // rebuilt fresh each frame (just 8 pointer copies) rather than kept as
+    // a persistent member, since the fields themselves are the persistent
+    // state and this struct is only ever a view over them.
+    gui::PanelVisibility panel_visibility;
+    panel_visibility.viewport = &viewport_open_;
+    panel_visibility.detailing = &detailing_open_;
+    panel_visibility.properties = &properties_open_;
+    panel_visibility.optimization = &run_open_;
+    panel_visibility.joints = &joints_open_;
+    panel_visibility.members = &members_open_;
+    panel_visibility.loads = &loads_open_;
+    panel_visibility.log = &log_open_;
+
     toolbar_.Draw(undo_stack_.CanUndo(), undo_stack_.CanRedo(), can_save, can_export_text, can_export_pdf,
-                  can_export_inf, current_layout_, editor_options_);
+                  can_export_inf, current_layout_, editor_options_, icon_visibility_, panel_visibility);
 
     // Ctrl+S was only ever a display hint on the File > Save menu item
     // (ImGui::MenuItem's shortcut text is cosmetic, it doesn't bind the
@@ -493,7 +512,7 @@ void Application::OnFrame() {
     }
 
     icon_toolbar_.Draw(undo_stack_.CanUndo(), undo_stack_.CanRedo(), can_export_text, run_panel_.CanRun(),
-                        editor_options_);
+                        editor_options_, icon_visibility_);
     // Reserve the icon toolbar's row (drawn as a plain window, not through
     // BeginMainMenuBar, so it doesn't shrink the work area on its own the
     // way the menu bar does) so DockSpaceOverViewport below doesn't place
@@ -512,10 +531,27 @@ void Application::OnFrame() {
     gui::EditableStructure* editable_ptr = editable_ ? &*editable_ : nullptr;
     auto on_geometry_changed = [this]() { RebuildSceneAfterEdit(); };
 
-    viewport_panel_.Draw(&viewport_open_, scene_, selection_, editable_ptr, &undo_stack_, editor_options_,
-                          on_geometry_changed);
-    properties_panel_.Draw(&properties_open_, scene_, selection_, editable_ptr, &undo_stack_, validation_issues_,
-                            on_geometry_changed);
+    // Issue #37: each Draw() call is gated on its own open flag instead of
+    // being called unconditionally and trusting ImGui::Begin(name, open)
+    // to no-op once *open goes false. That trust was misplaced specifically
+    // for *docked* windows: clicking a tab's close button does correctly
+    // flip the bool (confirmed by instrumenting it directly), but a docked
+    // window whose Begin() keeps getting called every frame regardless
+    // never actually leaves its dock node's tab bar -- the tab lingers
+    // forever, which is exactly the reported "close button does nothing"
+    // bug. Skipping the call entirely once closed is what actually lets
+    // Dear ImGui's docking system drop the tab. Root-caused by logging
+    // io.MousePos/GetHoveredID() per click plus a before/after snapshot of
+    // every open flag around the Draw() calls, not by reading engine
+    // source (not available for this vcpkg-installed, headers-only copy).
+    if (viewport_open_) {
+        viewport_panel_.Draw(&viewport_open_, scene_, selection_, editable_ptr, &undo_stack_, editor_options_,
+                              on_geometry_changed);
+    }
+    if (properties_open_) {
+        properties_panel_.Draw(&properties_open_, scene_, selection_, editable_ptr, &undo_stack_,
+                                validation_issues_, on_geometry_changed);
+    }
     // Issue #36: a docked tab bar's *displayed* order follows the order
     // each window's Begin() is called within the frame, not the order
     // BuildDefaultLayout()/etc.'s DockBuilderDockWindow() calls list them
@@ -523,12 +559,24 @@ void Application::OnFrame() {
     // screenshotting a mismatch between the two, not by reading the code).
     // Joints/Members/Loads are called in that order here specifically so
     // the tab row reads Joints, Members, Loads left-to-right, per #36.
-    joints_panel_.Draw(&joints_open_, scene_, selection_, editable_ptr, &undo_stack_, on_geometry_changed);
-    members_panel_.Draw(&members_open_, scene_, selection_, editable_ptr, &undo_stack_, on_geometry_changed);
-    loads_panel_.Draw(&loads_open_, scene_, selection_, editable_ptr, &undo_stack_, on_geometry_changed);
-    detailing_panel_.Draw(&detailing_open_, scene_, selection_);
-    run_panel_.Draw(&run_open_);
-    log_panel_.Draw(&log_open_);
+    if (joints_open_) {
+        joints_panel_.Draw(&joints_open_, scene_, selection_, editable_ptr, &undo_stack_, on_geometry_changed);
+    }
+    if (members_open_) {
+        members_panel_.Draw(&members_open_, scene_, selection_, editable_ptr, &undo_stack_, on_geometry_changed);
+    }
+    if (loads_open_) {
+        loads_panel_.Draw(&loads_open_, scene_, selection_, editable_ptr, &undo_stack_, on_geometry_changed);
+    }
+    if (detailing_open_) {
+        detailing_panel_.Draw(&detailing_open_, scene_, selection_);
+    }
+    if (run_open_) {
+        run_panel_.Draw(&run_open_);
+    }
+    if (log_open_) {
+        log_panel_.Draw(&log_open_);
+    }
 
     // Issue #35: every panel above has now called Begin()/End() for this
     // frame, so each one's ImGuiWindow::DockNode/tab-bar geometry is final

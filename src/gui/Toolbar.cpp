@@ -68,7 +68,8 @@ void Toolbar::SetOnViewLayout(std::function<void(ViewLayoutPreset)> callback) { 
 void Toolbar::SetTitleBarDrawer(std::function<void()> drawer) { on_title_bar_drawer_ = std::move(drawer); }
 
 void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_text, bool can_export_pdf,
-                    bool can_export_inf, ViewLayoutPreset current_layout, EditorOptions& options) {
+                    bool can_export_inf, ViewLayoutPreset current_layout, EditorOptions& options,
+                    IconVisibility& icon_visibility, const PanelVisibility& panel_visibility) {
     // Issue #30: real Alt-mnemonic menu access, see BeginMnemonicMenu()'s
     // comment above for how (issue #28's "&"-prefix attempt didn't work --
     // Dear ImGui doesn't parse that convention, see AGENTS.md). Letters:
@@ -188,15 +189,50 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
             ImGui::MenuItem("Cancel", nullptr, false, false);
             ImGui::EndMenu();
         }
+        // Issue #37: restructured into three labeled sections, separated by
+        // Separator() -- Menubar (per-icon-toolbar-button visibility),
+        // Subwindows (per-panel show/hide, doubling as the way to reopen a
+        // panel closed via its now-fixed tab close button), and Layout
+        // (the pre-existing #15 view-layout presets, relocated here
+        // unchanged from three flat top-level items into their own
+        // submenu).
         if (BeginMnemonicMenu("View", 0, ImGuiKey_V, alt_held)) {
-            if (ImGui::MenuItem("Default", nullptr, current_layout == ViewLayoutPreset::Default)) {
-                if (on_view_layout_) on_view_layout_(ViewLayoutPreset::Default);
+            if (ImGui::BeginMenu("Menubar")) {
+                ImGui::MenuItem("New Data", nullptr, &icon_visibility.new_data);
+                ImGui::MenuItem("Open Data...", nullptr, &icon_visibility.open_data);
+                ImGui::MenuItem("Save", nullptr, &icon_visibility.save);
+                ImGui::MenuItem("Undo", nullptr, &icon_visibility.undo);
+                ImGui::MenuItem("Redo", nullptr, &icon_visibility.redo);
+                ImGui::MenuItem("Add Joint", nullptr, &icon_visibility.add_joint);
+                ImGui::MenuItem("Connect Joints", nullptr, &icon_visibility.connect_joints);
+                ImGui::MenuItem("Run", nullptr, &icon_visibility.run);
+                ImGui::EndMenu();
             }
-            if (ImGui::MenuItem("Design", nullptr, current_layout == ViewLayoutPreset::Design)) {
-                if (on_view_layout_) on_view_layout_(ViewLayoutPreset::Design);
+            ImGui::Separator();
+            if (ImGui::BeginMenu("Subwindows")) {
+                if (panel_visibility.viewport) ImGui::MenuItem("Viewport", nullptr, panel_visibility.viewport);
+                if (panel_visibility.detailing) ImGui::MenuItem("Detailing", nullptr, panel_visibility.detailing);
+                if (panel_visibility.properties) ImGui::MenuItem("Properties", nullptr, panel_visibility.properties);
+                if (panel_visibility.optimization)
+                    ImGui::MenuItem("Optimization", nullptr, panel_visibility.optimization);
+                if (panel_visibility.joints) ImGui::MenuItem("Joints", nullptr, panel_visibility.joints);
+                if (panel_visibility.members) ImGui::MenuItem("Members", nullptr, panel_visibility.members);
+                if (panel_visibility.loads) ImGui::MenuItem("Loads", nullptr, panel_visibility.loads);
+                if (panel_visibility.log) ImGui::MenuItem("Log", nullptr, panel_visibility.log);
+                ImGui::EndMenu();
             }
-            if (ImGui::MenuItem("Optimization", nullptr, current_layout == ViewLayoutPreset::Optimization)) {
-                if (on_view_layout_) on_view_layout_(ViewLayoutPreset::Optimization);
+            ImGui::Separator();
+            if (ImGui::BeginMenu("Layout")) {
+                if (ImGui::MenuItem("Default", nullptr, current_layout == ViewLayoutPreset::Default)) {
+                    if (on_view_layout_) on_view_layout_(ViewLayoutPreset::Default);
+                }
+                if (ImGui::MenuItem("Design", nullptr, current_layout == ViewLayoutPreset::Design)) {
+                    if (on_view_layout_) on_view_layout_(ViewLayoutPreset::Design);
+                }
+                if (ImGui::MenuItem("Optimization", nullptr, current_layout == ViewLayoutPreset::Optimization)) {
+                    if (on_view_layout_) on_view_layout_(ViewLayoutPreset::Optimization);
+                }
+                ImGui::EndMenu();
             }
             ImGui::EndMenu();
         }

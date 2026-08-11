@@ -24,11 +24,13 @@ struct Entry {
     gui::PanelIcon icon;
 };
 
-// Issue #37 will edit this table's display: "Run Optimization" ->
-// "Optimization" is a display-only change, gui::kRunOptimizationId's
-// *identity* string doesn't need to change for that. Keep this table in
-// sync with whichever gui::kXxxId constants Application.cpp's panels
-// currently pass to PanelWindowTitle().
+// Issue #37 renamed the "Run Optimization" panel's *display* text to
+// "Optimization" (in RunPanel.cpp's PanelWindowTitle() call) without
+// touching gui::kRunOptimizationId here -- this table only needs a
+// panel's stable identity, not its current display label, so that
+// rename needed no change on this side. Keep this table in sync with
+// whichever gui::kXxxId constants Application.cpp's panels currently
+// pass to PanelWindowTitle().
 constexpr std::array<Entry, 8> kPanels = {{
     {gui::kViewportId, gui::PanelIcon::Viewport},
     {gui::kDetailingId, gui::PanelIcon::Detailing},
