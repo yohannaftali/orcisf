@@ -752,6 +752,76 @@ callers:**
   (`.github/workflows/build-src.yml`) is the first real compile check
   this change will get.
 
+**2D plane-locked drawing (issue #22, part of epic #20) — read before
+touching `gui/viewport/Camera.{h,cpp}`, `gui/viewport/Math3D.h`'s
+`Orthographic()`, or `ViewportPanel`'s `add_joint_mode` branch:**
+- **`ViewPlane` (`Free`/`XY`/`XZ`/`YZ`) lives in `gui/editor/Selection.h`,
+  not `Camera.h`**, alongside `LoadPlacementMode` -- `EditorOptions` needs
+  it (new `view_plane` + independently-remembered `plane_offset_xy`/
+  `plane_offset_xz`/`plane_offset_yz` fields), and `Camera.h` includes
+  `Selection.h` to reuse the same enum rather than duplicating it. This
+  makes the viewport layer depend on the editor layer's header (the
+  opposite direction from this project's usual layering) but doesn't
+  create an include cycle -- `Selection.h` has no dependencies of its own.
+- **`Camera` bypasses yaw/pitch entirely in a locked plane**, via two new
+  private members (`ortho_forward_`/`ortho_right_`) set by
+  `SetViewPlane()`. This isn't just style: `Forward()`'s usual yaw/pitch
+  formula can point straight along world Y (the XZ/top-down plane), and
+  `Right()`'s usual `Cross(Forward(), WorldUp())` degenerates to zero
+  when `Forward() == WorldUp()` -- a real gimbal-lock case, not a
+  hypothetical one, since a top-down structural view is exactly what
+  issue #22 asks for. `ViewMatrix()`'s up-vector hint has the matching
+  fix (`Cross(Right(), Forward())` instead of `WorldUp()` once locked).
+- **A real sign bug was caught by hand-deriving the cross product, not by
+  running it** (no build toolchain was available this session -- see
+  Validation below): the Y-Z (elevation) plane's `ortho_right_` was
+  initially `{0,0,1}`, which makes `Cross(right,forward)` (the up vector
+  every Camera method derives, matching `Pan()`/`ScreenRay()`'s existing
+  pattern) work out to world **-Y** -- since Y is this project's vertical
+  axis, that would have rendered the elevation view upside-down. Fixed to
+  `{0,0,-1}`. The X-Y and X-Z planes' basis vectors were hand-verified
+  the same way and are correct as written.
+- **Orthographic projection reuses `Camera::distance`** (the same field
+  `Zoom()` already scales via scroll) as the ortho frustum's half-height,
+  so zooming feels consistent switching between perspective and a locked
+  plane -- no separate "ortho zoom level" field.
+- **`ScreenRay()` returns parallel rays in locked-plane mode** (all
+  sharing `Forward()` as direction, fanned out by `right`/`up` instead of
+  converging at the eye) to match the orthographic projection.
+  `ViewportPanel::HandlePicking()`'s `add_joint_mode` branch exploits
+  this: since the ray direction *is* the locked axis, intersecting at any
+  `t` (it uses `camera_.distance`) lands exactly on the plane, and the
+  locked coordinate is then force-set to the exact configured offset
+  (not left to whatever the ray math produced) so floating-point drift
+  never nudges a placed point off a plane the user explicitly typed/slid
+  to. Grid-snap (if enabled) only snaps the two *free* axes for the same
+  reason -- snapping the locked axis too could silently override the
+  offset.
+- **Orbit (mouse-drag and arrow-key) is a no-op while a plane is
+  locked** -- orbiting would rotate away from the locked plane, which
+  would contradict "locked". Pan and zoom still work normally so the
+  user can navigate within the plane. `ImGuizmo::SetOrthographic()` is
+  now set from `camera_.IsOrthographic()` each frame (was hardcoded
+  `false`) so the gizmo's own hit-testing matches the actual projection.
+- **The plane selector + offset input/slider live in `Toolbar`'s new
+  "View Plane" menu, not in the viewport itself.** The viewport
+  (`ViewportPanel::Draw()`) only draws a small read-only overlay
+  ("Plane X-Y is at Z = 0.000 m") pinned to the bottom-left of the 3D
+  image via `ImGui::GetForegroundDrawList()` -- satisfies the issue's
+  "shown at the bottom" acceptance criterion without needing a literal
+  ViewCube widget (none exists in this project; see issue #23 for the
+  separate UCS icon).
+- **What was verified vs. not:** the cross-product/up-vector math was
+  hand-derived and re-checked (catching the Y-Z sign bug above); the
+  code was reviewed against `Camera.h`/`.cpp`'s existing patterns
+  (`Pan()`/`ScreenRay()`'s `Cross(right,forward)` up-derivation,
+  `EyePosition()`'s `target - Forward()*distance`). **No local `cmake`
+  build toolchain was available in this environment this session** -- this
+  was not compiled or interactively run. CI is the first real check;
+  don't treat #22 as fully done until that (or a real interactive pass)
+  confirms the three plane views actually render correctly and
+  click-to-place lands exactly on the locked plane.
+
 **Custom borderless window chrome (issue #19, Phase 0) — read before
 touching `app/CustomTitleBar.{h,cpp}`/`app/Theme.{h,cpp}`/`main.cpp`'s
 window setup:**
@@ -1161,7 +1231,7 @@ for skills that apply to the current task and follow them.
 | #19 | feat(src): custom borderless window chrome + modern ImGui theme (cross-platform) | closed | 2026-08-11 |
 | #20 | epic(src): joints/members list panel, 2D plane-locked drawing, UCS icon | open | 2026-08-11 |
 | #21 | feat(src): add a Joints/Members list panel (editable, delete-with-cascade-warning) | ready-for-review | 2026-08-11 |
-| #22 | feat(src): 2D plane-locked drawing (X-Y/X-Z/Y-Z orthographic views + adjustable offset) | open | 2026-08-11 |
+| #22 | feat(src): 2D plane-locked drawing (X-Y/X-Z/Y-Z orthographic views + adjustable offset) | ready-for-review | 2026-08-11 |
 | #23 | feat(src): UCS icon overlay in the viewport | open | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui

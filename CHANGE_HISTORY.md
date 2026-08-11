@@ -1184,3 +1184,37 @@ history only; don't duplicate current-state description here.
   actual API, but **not compiled or interactively run**. CI is the first
   real build check. Issue #21 status set to `ready-for-review`, not
   `done`, until that's confirmed.
+
+## 2026-08-11 — feat(src): implement issue #22 (2D plane-locked drawing)
+
+- Added `Camera::SetViewPlane()`/`IsOrthographic()` (`gui/viewport/
+  Camera.{h,cpp}`): switches between the perspective/orbit camera and an
+  orthographic view locked to X-Y/X-Z/Y-Z, bypassing yaw/pitch via two
+  new private fixed-basis members to avoid a real gimbal-lock case
+  (top-down XZ view: `Forward() == WorldUp()` degenerates the usual
+  `Cross(Forward(), WorldUp())` right-vector formula).
+- Added `Mat4::Orthographic()` (`gui/viewport/Math3D.h`).
+- Added `ViewPlane` enum + `EditorOptions::view_plane`/`plane_offset_xy`/
+  `plane_offset_xz`/`plane_offset_yz` (`gui/editor/Selection.h`) -- each
+  plane's offset is remembered independently across switches.
+- `Toolbar`'s new "View Plane" menu selects the plane and edits the
+  active plane's offset (typeable `InputFloat` + `SliderFloat`).
+  `ViewportPanel::Draw()` draws a read-only "Plane X-Y is at Z = ..."
+  overlay at the bottom-left of the 3D image, and syncs the camera's
+  plane/offset every frame.
+- `ViewportPanel::HandlePicking()`'s Add Joint branch now places points
+  exactly on the locked plane (exploiting that `ScreenRay()`'s direction
+  in ortho mode already *is* the locked axis) and force-sets the locked
+  coordinate to the exact configured offset rather than trusting ray-math
+  floating point; grid-snap only snaps the two free axes. Orbit
+  (mouse-drag and arrow-key) is disabled while a plane is locked; pan/
+  zoom still work. `ImGuizmo::SetOrthographic()` now follows
+  `camera_.IsOrthographic()` instead of being hardcoded false.
+- **A real bug was caught by hand-deriving the up-vector cross product**
+  (no build toolchain available to run it): the Y-Z elevation plane's
+  right-vector was initially wrong-signed, which would have rendered
+  that view upside-down (Y is this project's vertical axis). Fixed
+  before committing.
+- No local `cmake` toolchain was available this session -- not compiled
+  or interactively run. CI is the first real build check. Issue #22
+  status set to `ready-for-review`, not `done`, until confirmed.

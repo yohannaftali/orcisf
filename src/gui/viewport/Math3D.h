@@ -50,6 +50,21 @@ struct Mat4 {
         return r;
     }
 
+    // Issue #22's 2D plane-locked orthographic view. Standard OpenGL
+    // symmetric-frustum orthographic projection.
+    static Mat4 Orthographic(float left, float right, float bottom, float top, float znear, float zfar) {
+        Mat4 r;
+        for (float& f : r.m) f = 0.f;
+        r.m[0] = 2.f / (right - left);
+        r.m[5] = 2.f / (top - bottom);
+        r.m[10] = -2.f / (zfar - znear);
+        r.m[12] = -(right + left) / (right - left);
+        r.m[13] = -(top + bottom) / (top - bottom);
+        r.m[14] = -(zfar + znear) / (zfar - znear);
+        r.m[15] = 1.f;
+        return r;
+    }
+
     static Mat4 LookAt(const Vec3& eye, const Vec3& center, const Vec3& up) {
         Vec3 f = (center - eye).Normalized();
         Vec3 s = Cross(f, up).Normalized();

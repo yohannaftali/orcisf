@@ -82,6 +82,49 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
             ImGui::SliderFloat("Grid size (m)", &options.grid_size_m, 0.1f, 2.f, "%.2f");
             ImGui::EndMenu();
         }
+        // Issue #22: 2D plane-locked drawing -- switches the viewport
+        // between the normal perspective/orbit camera and an orthographic
+        // view locked to X-Y/X-Z/Y-Z, each with its own independently-
+        // remembered offset along the locked axis (see EditorOptions'
+        // plane_offset_* fields). Offset is both typeable (InputFloat) and
+        // slidable (SliderFloat) right here, per the issue's acceptance
+        // criteria -- the viewport itself only shows a read-only overlay
+        // of the active plane/offset (ViewportPanel::Draw()), it doesn't
+        // duplicate these controls.
+        if (ImGui::BeginMenu("View Plane")) {
+            if (ImGui::MenuItem("Free (perspective/orbit)", nullptr, options.view_plane == ViewPlane::Free)) {
+                options.view_plane = ViewPlane::Free;
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("X-Y plane (locks Z)", nullptr, options.view_plane == ViewPlane::XY)) {
+                options.view_plane = ViewPlane::XY;
+            }
+            if (ImGui::MenuItem("X-Z plane (locks Y)", nullptr, options.view_plane == ViewPlane::XZ)) {
+                options.view_plane = ViewPlane::XZ;
+            }
+            if (ImGui::MenuItem("Y-Z plane (locks X)", nullptr, options.view_plane == ViewPlane::YZ)) {
+                options.view_plane = ViewPlane::YZ;
+            }
+            if (options.view_plane != ViewPlane::Free) {
+                ImGui::Separator();
+                float* offset = nullptr;
+                const char* axis_label = "";
+                switch (options.view_plane) {
+                    case ViewPlane::XY: offset = &options.plane_offset_xy; axis_label = "Z offset (m)"; break;
+                    case ViewPlane::XZ: offset = &options.plane_offset_xz; axis_label = "Y offset (m)"; break;
+                    case ViewPlane::YZ: offset = &options.plane_offset_yz; axis_label = "X offset (m)"; break;
+                    case ViewPlane::Free: break;
+                }
+                if (offset) {
+                    ImGui::TextUnformatted(axis_label);
+                    ImGui::SetNextItemWidth(120.f);
+                    ImGui::InputFloat("##plane_offset_input", offset, 0.f, 0.f, "%.3f");
+                    ImGui::SetNextItemWidth(160.f);
+                    ImGui::SliderFloat("##plane_offset_slider", offset, -20.f, 20.f, "%.3f");
+                }
+            }
+            ImGui::EndMenu();
+        }
         if (ImGui::BeginMenu("Loads")) {
             bool none = options.load_mode == LoadPlacementMode::None;
             bool member_load = options.load_mode == LoadPlacementMode::MemberLoad;

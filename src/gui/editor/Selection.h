@@ -14,6 +14,17 @@ enum class SelectionKind { None, Joint, Member };
 // "wind/lateral load", both just a joint force in a particular direction.
 enum class LoadPlacementMode { None, MemberLoad, JointLoad };
 
+// Issue #22's AutoCAD-style 2D plane-locked drawing: `Free` is the normal
+// perspective/orbit camera; the other three switch the viewport to an
+// orthographic view looking straight down the named axis (XY locks Z, XZ
+// locks Y, YZ locks X) at that axis's current offset (`EditorOptions`'s
+// `plane_offset_*` fields below). Lives here (not in Camera.h) so
+// EditorOptions can reference it without the viewport/editor layers
+// depending on each other in the other direction -- Camera.h includes this
+// header for the same reason `gui/viewport/SceneModel.h` already sits
+// alongside editor-facing code in this project's layering.
+enum class ViewPlane { Free, XY, XZ, YZ };
+
 // Shared selection state: what's picked in the 3D viewport, read/written
 // by ViewportPanel (picking, gizmo drag) and read by PropertiesPanel
 // (numeric editing, delete button) -- both act on the same joint/member.
@@ -51,6 +62,17 @@ struct EditorOptions {
     float grid_size_m = 0.5f;
 
     LoadPlacementMode load_mode = LoadPlacementMode::None;
+
+    // Issue #22: which 2D plane (if any) the viewport is locked to, and
+    // each plane's independently-remembered offset along its locked axis
+    // (meters) -- switching XY -> XZ -> XY preserves XY's offset rather
+    // than resetting it. `ViewportPanel::HandlePicking()`'s add_joint_mode
+    // branch forces the locked axis of any placed point to the relevant
+    // offset below whenever view_plane != Free.
+    ViewPlane view_plane = ViewPlane::Free;
+    float plane_offset_xy = 0.f; // XY plane's Z
+    float plane_offset_xz = 0.f; // XZ plane's Y
+    float plane_offset_yz = 0.f; // YZ plane's X
 };
 
 } // namespace orcisf::gui
