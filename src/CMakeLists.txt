@@ -18,7 +18,11 @@ find_package(unofficial-libharu CONFIG REQUIRED)
 # dependencies of its own; see engine/README.md.
 add_subdirectory(engine)
 
-add_executable(orcisf_gui
+# WIN32 makes the linker use /SUBSYSTEM:WINDOWS instead of the default
+# /SUBSYSTEM:CONSOLE on MSVC/MinGW, so launching orcisf_gui.exe doesn't
+# also open a console window (see issue #12) -- CMake ignores this
+# keyword entirely on non-Windows generators, so it's safe unconditionally.
+add_executable(orcisf_gui WIN32
     app/main.cpp
     app/Application.cpp
     gui/Toolbar.cpp
@@ -54,6 +58,12 @@ target_link_libraries(orcisf_gui PRIVATE
 
 if(MSVC)
     target_compile_options(orcisf_gui PRIVATE /W4)
+    # WIN32 above switches MSVC to /SUBSYSTEM:WINDOWS, whose CRT startup
+    # expects a WinMain() by default; main.cpp intentionally keeps a plain
+    # main() (portable across all three platforms), so tell the linker to
+    # keep using the C entry point instead -- MinGW's CRT does this
+    # automatically with WIN32 + a plain main(), no equivalent flag needed.
+    target_link_options(orcisf_gui PRIVATE /ENTRY:mainCRTStartup)
 else()
     target_compile_options(orcisf_gui PRIVATE -Wall -Wextra)
 endif()

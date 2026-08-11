@@ -19,12 +19,30 @@
 #include <imgui_impl_opengl3.h>
 #include <nfd.h>
 
+#include <cstdarg>
 #include <cstdio>
 
 namespace {
 
+// orcisf_gui has no console (see issue #12: WIN32 subsystem on Windows),
+// so a plain fprintf(stderr, ...) is invisible there -- also append fatal
+// startup errors to a log file next to the executable so they're not lost.
+void LogStartupError(const char* format, ...) {
+    std::va_list args;
+    va_start(args, format);
+    std::vfprintf(stderr, format, args);
+    va_end(args);
+
+    if (std::FILE* f = std::fopen("orcisf_gui_startup.log", "a")) {
+        va_start(args, format);
+        std::vfprintf(f, format, args);
+        va_end(args);
+        std::fclose(f);
+    }
+}
+
 void GlfwErrorCallback(int error, const char* description) {
-    std::fprintf(stderr, "GLFW error %d: %s\n", error, description);
+    LogStartupError("GLFW error %d: %s\n", error, description);
 }
 
 } // namespace
@@ -57,7 +75,7 @@ int main(int, char**) {
     glfwSwapInterval(1); // vsync
 
     if (gl3wInit() != 0) {
-        std::fprintf(stderr, "Failed to initialize gl3w (OpenGL function loader)\n");
+        LogStartupError("Failed to initialize gl3w (OpenGL function loader)\n");
         glfwDestroyWindow(window);
         glfwTerminate();
         return 1;

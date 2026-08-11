@@ -666,3 +666,50 @@ history only; don't duplicate current-state description here.
   completed run (#9). Units stay meters-only per the legacy format;
   cm/mm support explicitly deferred to a future issue, not attempted
   here.
+
+## 2026-08-10 — orcisf_gui.exe opens an extra console window on Windows
+
+- Issue #12 created on GitHub: "fix(src): orcisf_gui.exe opens an extra
+  console window on Windows".
+- Scope: `src/CMakeLists.txt`
+- Labels: bug
+- User-reported: launching `orcisf_gui.exe` also opens a terminal window
+  that can't be closed independently -- closing it kills the GUI too.
+  Root cause identified by inspection (not yet locally reproduced on
+  this machine): `add_executable(orcisf_gui ...)` in `src/CMakeLists.txt`
+  doesn't pass `WIN32`, so it links `/SUBSYSTEM:CONSOLE` on MSVC/Windows
+  (the toolchain #10 fixed CI to actually use), allocating a console at
+  startup. `orcisf_cli`'s own target is unaffected and should stay a
+  console app.
+- **Investigated whether this also affects macOS/Linux (comment on
+  #12):** no. `WIN32` is a Windows-only CMake keyword (silently ignored
+  by non-Windows generators), and `src/CMakeLists.txt` has no
+  `MACOSX_BUNDLE` set either, so macOS/Linux builds are already plain
+  terminal-launched binaries with no packaging step -- out of scope for
+  #12, would need a separate future issue for `.app`/`.desktop`
+  packaging if ever wanted.
+- **Fixed:** added `WIN32` to `add_executable(orcisf_gui ...)` in
+  `src/CMakeLists.txt`, switching MSVC/MinGW to `/SUBSYSTEM:WINDOWS`.
+  This alone broke the MSVC build (`WIN32` subsystem's default CRT
+  startup expects `WinMain`, but `main.cpp` intentionally keeps a
+  portable plain `main()`) with `LNK2019: unresolved external symbol
+  WinMain`; fixed by adding `target_link_options(orcisf_gui PRIVATE
+  /ENTRY:mainCRTStartup)` under the existing `if(MSVC)` block, telling
+  the linker to keep using the C entry point (MinGW's CRT does this
+  automatically with `WIN32` + a plain `main()`, no equivalent flag
+  needed there). Also addressed the issue's "don't silently lose
+  startup diagnostics" acceptance criterion: `main.cpp`'s two fatal
+  startup-error `fprintf(stderr, ...)` call sites (GLFW init failure,
+  gl3w init failure) now go through a small `LogStartupError()` helper
+  that writes to both `stderr` (harmless no-op without a console) and
+  an `orcisf_gui_startup.log` file next to the executable.
+  - Verified on this machine with a real MSVC build (VS Build Tools
+    2022, vcpkg at the pinned commit): confirmed via
+    `Get-CimInstance Win32_Process` that the running `orcisf_gui.exe`
+    has no `conhost.exe` child process (no console), and that force-
+    closing the app's process leaves nothing else running (matching
+    the "closing the window fully exits" criterion -- couldn't test
+    the exact "click the window's own close button" interaction in
+    this environment, but the process-exit behavior is the same
+    either way since there's only one process).
+  - Files: `src/CMakeLists.txt`, `src/app/main.cpp`
