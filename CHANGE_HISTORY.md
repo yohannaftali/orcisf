@@ -1445,3 +1445,20 @@ history only; don't duplicate current-state description here.
   from `v0.0.1-alpha` per `AGENTS.md`'s alpha versioning scheme (patch
   number increments each alpha). Release notes summarize what changed
   since `v0.0.1-alpha`: issues #21-#25.
+
+## 2026-08-11 — feat(src): wire up the app icon set (icons/) for all platform builds
+
+- Issue #26 created on GitHub (label: `enhancement`).
+- Scope: `src/CMakeLists.txt`, `src/app/main.cpp`, new Windows `.rc`
+  resource file, new Linux `.desktop` file.
+- User-reported via `/planner`: a full generated icon set already exists
+  at repo-root `icons/` (Windows `.ico`, macOS `.icns`, Linux/general PNG
+  sets, per `icons/README.txt`) but nothing in `src/` references it --
+  confirmed by search, the built app currently has no icon on any
+  platform (no .exe icon resource, no window icon, no macOS bundle icon,
+  no Linux desktop-file icon). Scoped per-platform in the issue: Windows
+  `.rc` + runtime `glfwSetWindowIcon()`, macOS `MACOSX_BUNDLE` +
+  `.icns`, Linux `.desktop` file + runtime window icon (noting GLFW
+  doesn't support `glfwSetWindowIcon` on macOS). Left the PNG-decoder
+  choice for the runtime window icon (existing transitive `libpng` vs. a
+  small vendored decoder) as an implementation decision, not dictated.

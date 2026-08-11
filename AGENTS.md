@@ -68,6 +68,9 @@ orcisf/
 ├── .claude/skills/                  # agent skills (see Agent Skills below)
 ├── .github/workflows/build-src.yml  # CI: builds src/ on Windows/macOS/Linux
 ├── src/                             # modern cross-platform GUI port (in progress) — see below
+├── icons/                           # app icon set (issue #26 wires this into src/'s build --
+│                                    # windows/orcisf.ico, macos/orcisf.icns, linux/+png/ PNG
+│                                    # sizes, variants/ concepts; see icons/README.txt)
 └── Optimasi Beton/                  # the original 1998-1999 thesis deliverable
     ├── BacaSaya.txt                 # original Indonesian README / user manual
     ├── orcisf.exe / orcisf.ico      # compiled Win32 console binary + icon
@@ -1438,6 +1441,7 @@ for skills that apply to the current task and follow them.
 | #23 | feat(src): UCS icon overlay in the viewport | closed | 2026-08-11 |
 | #24 | fix(src): 2D plane offset control unreachable from the viewport (move it under the UCS icon) | ready-for-review | 2026-08-11 |
 | #25 | fix(src): Run panel dataset-path field is redundant; write each run into a timestamped output subfolder | ready-for-review | 2026-08-11 |
+| #26 | feat(src): wire up the app icon set (icons/) for Windows/macOS/Linux builds | open | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
