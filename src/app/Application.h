@@ -5,6 +5,7 @@
 
 #include "engine/MemberResults.h"
 #include "gui/DetailingPanel.h"
+#include "gui/IconToolbar.h"
 #include "gui/LoadsPanel.h"
 #include "gui/LogPanel.h"
 #include "gui/PropertiesPanel.h"
@@ -61,6 +62,7 @@ private:
     void RebuildSceneAfterEdit();
 
     gui::Toolbar toolbar_;
+    gui::IconToolbar icon_toolbar_;
     gui::ViewportPanel viewport_panel_;
     gui::PropertiesPanel properties_panel_;
     gui::LoadsPanel loads_panel_;

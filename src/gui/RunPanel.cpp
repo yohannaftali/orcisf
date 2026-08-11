@@ -84,6 +84,11 @@ void RunPanel::StartRun() {
 
 void RunPanel::RequestCancel() { cancel_.store(true); }
 
+bool RunPanel::CanRun() const { return !IsRunning() && dataset_path_[0] != '\0'; }
+void RunPanel::TriggerRun() {
+    if (CanRun()) StartRun();
+}
+
 void RunPanel::Draw(bool* open) {
     if (!ImGui::Begin("Run Optimization", open)) {
         ImGui::End();

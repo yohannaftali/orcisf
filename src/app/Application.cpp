@@ -86,6 +86,14 @@ Application::Application() {
     toolbar_.SetOnExportText([this]() { OnExportTextRequested(); });
     toolbar_.SetOnExportPdf([this]() { OnExportPdfRequested(); });
     toolbar_.SetOnExportInf([this]() { OnExportInfRequested(); });
+
+    icon_toolbar_.SetOnNewData([this]() { OnNewDataRequested(); });
+    icon_toolbar_.SetOnOpenFolder([this]() { OnOpenFolderRequested(); });
+    icon_toolbar_.SetOnSave([this]() { OnSaveRequested(); });
+    icon_toolbar_.SetOnUndo([this]() { OnUndo(); });
+    icon_toolbar_.SetOnRedo([this]() { OnRedo(); });
+    icon_toolbar_.SetOnAddJoint([this]() { OnAddJointRequested(); });
+    icon_toolbar_.SetOnRun([this]() { run_panel_.TriggerRun(); });
 }
 
 void Application::OnNewDataRequested() {
@@ -393,6 +401,16 @@ void Application::OnFrame() {
     if (can_export_text && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S)) {
         OnSaveRequested();
     }
+
+    icon_toolbar_.Draw(undo_stack_.CanUndo(), undo_stack_.CanRedo(), can_export_text, run_panel_.CanRun(),
+                        editor_options_);
+    // Reserve the icon toolbar's row (drawn as a plain window, not through
+    // BeginMainMenuBar, so it doesn't shrink the work area on its own the
+    // way the menu bar does) so DockSpaceOverViewport below doesn't place
+    // panels underneath it.
+    ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+    main_viewport->WorkPos.y += gui::IconToolbar::kHeight;
+    main_viewport->WorkSize.y -= gui::IconToolbar::kHeight;
 
     BuildDockspace();
 

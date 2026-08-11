@@ -39,6 +39,14 @@ public:
 
     void Draw(bool* open);
 
+    // Issue #14 (icon toolbar): lets an external "Run" button trigger the
+    // exact same start path the panel's own button uses, gated the same
+    // way (not already running, dataset_path_ set via this panel's own
+    // "Dataset generic path" field -- there's no dataset-path parameter
+    // here, this only starts a run the user has already configured).
+    bool CanRun() const;
+    void TriggerRun();
+
 private:
     void StartRun();
     void RequestCancel();

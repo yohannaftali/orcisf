@@ -872,3 +872,33 @@ history only; don't duplicate current-state description here.
     `Toolbar::Draw()` for connect-mode/load-placement-mode)
 - Scope: `src/gui/`, `src/app/Application.cpp`, `src/engine/` (#16 only)
 - Labels: enhancement
+
+## 2026-08-11 — feat(src): #14 implemented (icon toolbar)
+
+- New `src/gui/IconToolbar.{h,cpp}`: an icon-button row docked below the
+  main menu bar with New Data/Open Data/Save/Undo/Redo/Add Joint/Connect
+  Joints/Run, each reusing the exact callback the equivalent `File`/`Edit`
+  menu item already calls (no duplicated logic). Delivered as a fixed
+  curated set rather than full drag-to-reorder customization, per #14's
+  acceptance criteria allowing that scope-down.
+- Icons are hand-drawn `ImDrawList` primitives (lines/shapes), not an
+  icon font -- avoids a `vcpkg.json`/dependency change, matches this
+  project's existing preference for small hand-rolled GUI code.
+- `Application::OnFrame()` manually shrinks
+  `ImGui::GetMainViewport()->WorkPos`/`WorkSize` by
+  `IconToolbar::kHeight` after drawing the toolbar (a plain window, not
+  `BeginMainMenuBar()`, so it doesn't auto-reserve dockspace room the
+  way the menu bar does) so panels don't render underneath it.
+- `RunPanel` gained public `CanRun()`/`TriggerRun()` so the toolbar's Run
+  button can start a run through the exact same gated `StartRun()` path
+  the panel's own button uses, without exposing `dataset_path_` or
+  duplicating the run-start logic.
+- **Verified interactively** in this environment (synthesized Win32
+  input + screenshots): all 8 icons render with correct enabled/disabled
+  dimming; hover tooltips work; clicking "Add Joint" started a blank
+  structure and added joint 1 (Properties panel updated correctly,
+  Save/Undo icons became enabled immediately after, Redo/Run correctly
+  stayed disabled).
+- Files: `src/gui/IconToolbar.h` (new), `src/gui/IconToolbar.cpp` (new),
+  `src/gui/RunPanel.h`, `src/gui/RunPanel.cpp`, `src/app/Application.h`,
+  `src/app/Application.cpp`, `src/CMakeLists.txt`

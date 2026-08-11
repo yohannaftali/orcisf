@@ -146,6 +146,10 @@ src/
 │   │                            # Joints, Snap to Grid), the Loads menu +
 │   │                            # File > Save Loads (.bbn) (#7), and File >
 │   │                            # Export PDF.../Export Text... (#9) are wired
+│   ├── IconToolbar.{h,cpp}      # #14: icon-button row docked below the menu
+│   │                            # bar (New/Open/Save/Undo/Redo/Add Joint/
+│   │                            # Connect/Run) -- fixed curated set, hand-drawn
+│   │                            # ImDrawList icons, no icon-font dependency
 │   ├── ViewportPanel.{h,cpp}    # #5: offscreen OpenGL render of a SceneModel,
 │   │                            # orbit/pan/zoom camera, click-to-pick a joint
 │   │                            # or member; #6: ImGuizmo translate handle for
@@ -543,6 +547,45 @@ than risk showing numbers the user never entered.
   condition the menu item uses, and re-verified with the actual key
   chord (not a menu click).
 
+**`gui/IconToolbar.{h,cpp}` (issue #14, part of epic #13) — read before
+touching:**
+- **Fixed curated button set, not a fully user-customizable Quick Access
+  Toolbar.** #14's acceptance criteria allowed scoping down from full
+  drag-to-reorder/add-remove customization if that proved too large for
+  one issue -- it did, so this ships New Data/Open Data/Save/Undo/Redo/
+  Add Joint/Connect Joints/Run as a fixed row. A future issue can add
+  customization on top without changing how `IconButton()` draws/wires a
+  button.
+- **Icons are hand-drawn `ImDrawList` primitives, not an icon font.**
+  Matches this project's preference for small, dependency-free GUI code
+  (`SceneRenderer`'s hand-rolled GL primitives is the same philosophy) --
+  no `vcpkg.json` change needed. `IM_PI` isn't part of ImGui's public
+  API surface (only `imgui_internal.h` has it) -- `IconToolbar.cpp`
+  defines its own `kPi` constant rather than pulling in the internal
+  header for one constant.
+- **The toolbar is a plain ImGui window (`ImGuiWindowFlags_NoDecoration`
+  positioned/sized to span the viewport width at a fixed height), not
+  drawn via `BeginMainMenuBar()`-adjacent API**, so it doesn't
+  automatically shrink the dockspace's work area the way the main menu
+  bar does. `Application::OnFrame()` manually adjusts
+  `ImGui::GetMainViewport()->WorkPos.y`/`WorkSize.y` by
+  `IconToolbar::kHeight` right after drawing it and before
+  `BuildDockspace()` -- if you resize the toolbar, change `kHeight` (a
+  public static constexpr on `IconToolbar`), don't hardcode a second
+  number in `Application.cpp`.
+- **`RunPanel` gained a public `CanRun()`/`TriggerRun()`** so the
+  toolbar's Run button can start a run without duplicating `StartRun()`'s
+  logic or exposing `dataset_path_` -- both just call the exact same
+  private `StartRun()` the panel's own button already used, gated the
+  same way (`!IsRunning() && dataset_path_[0] != '\0'`).
+- **What was verified:** interactively, in this environment (synthesized
+  Win32 input + screenshots, same technique as #11's follow-up pass) --
+  all 8 icons render with correct disabled/enabled dimming, hover
+  tooltips work (confirmed "Connect Joints" appearing on hover), and
+  clicking "Add Joint" correctly started a blank structure and added a
+  joint (Properties panel updated, Save/Undo icons became enabled
+  immediately after, Redo/Run correctly stayed disabled).
+
 **`gui/viewport/` (issue #5) — three things worth knowing before touching it:**
 - **Member cross-section thickness/orientation is a schematic
   approximation, not the legacy local-axis convention.** `SceneRenderer`
@@ -871,7 +914,7 @@ for skills that apply to the current task and follow them.
 | #11 | feat(src): add File > New Data action, rename Open Folder... to Open Data... | closed | 2026-08-11 |
 | #12 | fix(src): orcisf_gui.exe opens an extra console window on Windows | closed | 2026-08-11 |
 | #13 | epic(src): more user-friendly GUI (icon toolbar, view presets, re-optimize, editing guidance) | open | 2026-08-11 |
-| #14 | feat(src): add a configurable icon toolbar below the menu bar | open | 2026-08-11 |
+| #14 | feat(src): add a configurable icon toolbar below the menu bar | ready-for-review | 2026-08-11 |
 | #15 | feat(src): add Default/Design/Optimization view-layout presets | open | 2026-08-11 |
 | #16 | feat(src): re-optimize using the last best result | open | 2026-08-11 |
 | #17 | feat(src): add a Regenerate Seed button to the Run panel | open | 2026-08-11 |
