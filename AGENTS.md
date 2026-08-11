@@ -159,6 +159,10 @@ src/
 │                            # raw GLFWwindow* (SetWindow()) forwarded only
 │                            # to CustomTitleBar::Draw()
 ├── gui/
+│   ├── UiScale.{h,cpp}          # #31: the current DPI/content scale, published
+│   │                            # by main.cpp and read via Scaled() by every
+│   │                            # hand-drawn ImDrawList glyph in the app --
+│   │                            # see the #31 note below before adding chrome
 │   ├── Toolbar.{h,cpp}          # menu bar; File > Open Folder... (#5), the
 │   │                            # Edit menu (#6: Undo/Redo, Add Joint, Connect
 │   │                            # Joints, Snap to Grid), the Loads menu +
@@ -818,6 +822,20 @@ report in this environment again:**
 - A comment explaining this was posted on issue #27 recommending it be
   closed as "cannot reproduce"; not closed automatically (per this
   project's usual caution around closing issues without confirmation).
+- **Correction (2026-08-11, during issue #31's second pass): the bug WAS
+  real, and this "not reproducible" conclusion was wrong.** The
+  DPI-measurement tooling problem described above was genuine and did
+  produce a misleading screenshot -- but there was also a real
+  right-alignment defect underneath it, of exactly the reported kind. The
+  claim above that "there was never a plausible code-level mechanism"
+  missed one: `ImGui::SameLine(offset_x)` measures from the *content*
+  origin and silently adds the enclosing group's `GroupOffset.x`, which
+  for a menu bar equals `WindowPadding.x` (14px at 100%, 28px at 200%) --
+  so the cluster really was shifted past the window's right edge. Fixed
+  under #31 by positioning with absolute screen coordinates; see that
+  section for the full explanation. Lesson worth keeping: "the math looks
+  right" is not the same as having checked what the API's offset is
+  actually relative to.
 
 **Panel icon headers (issue #28 Part 2) — read before touching
 `gui/PanelIcons.{h,cpp}`; Alt-mnemonics (Part 1) were reverted, see below
@@ -1484,60 +1502,94 @@ sequence or its `EnableWindowsDpiAwareness()`/font/style-scaling code:**
   the constant's documented fixed value (`-4`) are used instead, so this
   compiles regardless of SDK version and is a graceful no-op on older
   Windows 10 builds that don't export the function.
-- **Three cooperating pieces, all needed together**: (1)
+- **`gui/UiScale.{h,cpp}` is the one source of truth for the scale.**
+  `main.cpp` publishes it via `gui::SetUiScale()`; every hand-drawn piece
+  of chrome reads it via `gui::Scaled(base_value)`. It lives in `gui/`,
+  not `app/`, purely so `app/` (which already depends on `gui/`) can read
+  it without inverting this port's layering. **Any new hand-drawn
+  `ImDrawList` UI must write its pixel constants as `Scaled(x)`** --
+  ImGui scales its own widgets and font, but knows nothing about
+  `AddLine`/`AddRect`/`AddCircle` coordinates, which is exactly how the
+  toolbar icons ended up physically tiny on a 200% monitor while the text
+  beside them was correct. Already converted: `IconToolbar.cpp`,
+  `CustomTitleBar.cpp`, `PanelIcons.cpp`, `ViewportPanel.cpp`'s UCS icon
+  and plane-offset overlay.
+- **Four cooperating pieces, all needed together**: (1)
   `EnableWindowsDpiAwareness()` (Windows-only), (2)
   `glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE)` before
-  `glfwCreateWindow()` (cross-platform, lets GLFW size the window
-  correctly on whichever monitor it's created on), (3) reading
-  `glfwGetWindowContentScale()` once right after window creation and
-  using it to both `ImGui::GetStyle().ScaleAllSizes(dpi_scale)` (**after**
-  `ApplyModernTheme()`, since it scales whatever values are currently
-  set, not ImGui's hardcoded defaults -- calling it before would scale
-  the wrong numbers) and rebuild the default font at `13.0f * dpi_scale`
-  pixels via an explicit `io.Fonts->AddFontDefault(&font_cfg)` (chosen
-  over the cheaper `io.FontGlobalScale`, which just stretches the
-  existing 13px bitmap and looks blurry at non-integer scales -- a real
-  pixel-size font rebuild stays crisp).
-- **Live monitor-drag rescaling is explicitly out of scope**, per the
-  issue's own "decide and document" acceptance criterion -- the content
-  scale is read once at startup and never re-read. Handling a window
-  being dragged between two different-DPI monitors while running would
-  need a `glfwSetWindowContentScaleCallback`, rebuilding the font atlas,
-  and un-doing/redoing the style scale (naive repeated `ScaleAllSizes()`
-  calls compound multiplicatively, not idempotently) -- real additional
-  work, left as a deliberate follow-up if ever needed, not attempted here.
+  `glfwCreateWindow()`, (3) `main.cpp`'s `ApplyUiScale(scale)`, which is
+  the *only* place the scale is consumed -- style metrics, font size and
+  `gui::SetUiScale()` all in one function so the startup path and the
+  live-monitor-change path can never drift, and (4) a per-frame poll of
+  `glfwGetWindowContentScale()` between `glfwPollEvents()` and
+  `ImGui::NewFrame()` that calls `ApplyUiScale()` again on any change.
+- **`ApplyUiScale()` restores a snapshot of the *entire* `ImGuiStyle`
+  struct before scaling -- calling `ApplyModernTheme()` again is not a
+  substitute, and this is not a stylistic preference.**
+  `ImGuiStyle::ScaleAllSizes()` multiplies whatever is currently set (it
+  is not idempotent), and it scales dozens of fields the theme never
+  assigns: `WindowMinSize`, `CellPadding`, `DockingSeparatorSize`,
+  `TabMinWidth*`, `DisplaySafeAreaPadding`, `TouchExtraPadding`, ... Only
+  re-running the theme leaves all of those permanently compounded. The
+  observed symptom was **docked panels losing their tab bars for good
+  after a 100% -> 200% -> 100% round trip** (a doubled `WindowMinSize`/
+  `DockingSeparatorSize` surviving at 100%) -- found by actually driving
+  the round trip and screenshotting it, not by reading the code. The
+  snapshot is taken on the first call, before any scaling, and
+  `FontSizeBase` (maintained by ImGui per frame, not by the theme) is
+  carried across the restore rather than stamped from the snapshot.
+- **Fonts scale via `style.FontScaleDpi`, not a rebuilt atlas.** This
+  project is on Dear ImGui **1.92.8**, whose dynamic font system
+  re-rasterizes at the new pixel size automatically and stays crisp --
+  the previous `io.Fonts->AddFontDefault()` at `13.0f * dpi_scale` baked
+  the scale into the atlas at startup with no way to change it later, so
+  it could not have supported live rescaling at all. Don't reintroduce a
+  manual atlas rebuild here.
+- **`IconToolbar::kHeight` is now `IconToolbar::Height()`** (a function of
+  the scale; `kBaseHeight` is the 100% value). `Application::OnFrame()`'s
+  dockspace work-area reservation calls the same function -- never
+  reintroduce a second literal, or panels overlap the toolbar at any
+  scale != 1.0. `IconToolbar::Draw()` also positions itself from
+  `viewport->WorkPos` rather than re-deriving the menu bar height from
+  `GetFrameHeight()`, and `BuildDockspace()` seeds the builder from
+  `WorkPos`/`WorkSize` rather than the full viewport.
+- **`CustomTitleBar`'s button cluster is positioned with
+  `SetCursorScreenPos()`, never `SameLine(offset_x)`** -- this was the
+  actual root cause of the long-standing "Close button not flush /
+  clipped at the right edge" report (issue #27 previously closed it as
+  not-reproducible; it was real, just subtle). `SameLine()`'s offset is
+  measured from the content origin, and `BeginMenuBar()` opens a group
+  whose `GroupOffset.x == WindowPadding.x`, so the whole cluster was
+  silently pushed `WindowPadding.x` past the window's right edge. At 100%
+  that is `ApplyModernTheme()`'s 14px, which reads as "the X glyph sits
+  right of centre"; at 200% it is 28px of a 92px button, i.e. visibly cut
+  off. Absolute screen coordinates have no such hidden term.
+- **The window title is elided to fit the drag zone.** It is drawn
+  straight onto the draw list, which does no layout, so at a large scale
+  the (unchanged) title string simply grew until it ran underneath the
+  Minimize/Maximize/Close glyphs -- both unreadable. Now trimmed with an
+  ellipsis against the same `buttons_start_screen_x` anchor.
+- **`ORCISF_UI_SCALE` overrides the monitor's reported scale** (e.g.
+  `set ORCISF_UI_SCALE=2`). It exists mainly so high-DPI layout is
+  testable on a machine with only a 100% monitor attached -- which is how
+  these symptoms went unreproduced for several passes. Use it before
+  claiming a DPI-related layout bug can't be reproduced locally.
 - **What was verified:** compiled cleanly (MSVC/Ninja, `windows-release`)
-  and **visually confirmed via a real screenshot** on this environment's
-  actual high-DPI (200%-scaled) monitor -- menu bar/panel text is
-  noticeably larger and legible, a stark contrast to every prior
-  screenshot taken earlier in this session (which all showed the
-  cramped, tiny pre-fix rendering on this same monitor). **Not verified**:
-  behavior on an actual mid-resolution/100%-scaled monitor (only one
-  physical monitor is available in this environment) -- the mechanism
-  (`glfwGetWindowContentScale()`-driven scaling) is monitor-agnostic and
-  would naturally return `1.0` there, keeping the original unscaled
-  13px/1x metrics, consistent with the user's report that this case
-  already worked -- but this specific claim rests on reasoning about the
-  mechanism, not a second physical monitor test.
-- **Reopened 2026-08-11: this fix is incomplete, not wrong.** It only
-  ever scaled ImGui's own font + `ImGui::GetStyle()` metrics, both read
-  once at startup. A follow-up report (real dual-monitor use, two
-  different-DPI monitors side by side) found four more gaps that were
-  never in scope here: (1) `IconToolbar.cpp`'s hand-drawn `ImDrawList`
-  icon glyphs are fixed pixel constants, never multiplied by
-  `dpi_scale`, so they read as too-small at higher scales even though
-  the font around them is now correctly sized; (2)
-  `CustomTitleBar.cpp`'s Close-button-flush-right math (see issue #19's
-  own notes on this exact code) was tuned pre-DPI-scaling and can clip
-  at non-1.0 scale; (3) docked panel content clips at the top because
-  `Application.cpp`'s dockspace work-area math (`IconToolbar::kHeight`,
-  menu bar height) uses unscaled constants; (4) the "live monitor-drag
-  rescaling is out of scope" limitation documented above is exactly what
-  the user is now asking be handled, since they run two different-DPI
-  monitors in parallel and move the window between them live. See
-  `CHANGE_HISTORY.md`'s 2026-08-11 "#31 reopened" entry and the issue's
-  own updated acceptance criteria on GitHub for the full expanded scope
-  before starting this work.
+  and **visually confirmed via real DPI-aware screenshots** at 100%,
+  150% and 200%: toolbar/panel icons scale, the title bar buttons are
+  fully visible and correctly centred (measured -- the Close glyph sits
+  exactly half a button width from the true right edge at both 100% and
+  200%), the title elides instead of colliding with the buttons, and no
+  docked panel is clipped under the menu bar/toolbar. Live rescaling was
+  exercised through the real per-frame path via a temporary key-driven
+  scale toggle (since removed) across four consecutive
+  100%<->200% round trips, screenshotted each time: the final 100% state
+  is identical to a fresh 100% launch, confirming no compounding.
+  **Not verified**: an actual two-physical-monitor drag (only one
+  monitor is available in this environment) and macOS/Linux -- the
+  mechanism is the same `glfwGetWindowContentScale()` poll either way,
+  but the specific drag gesture is still the user's own office-machine
+  test.
 
 **`gui/viewport/` (issue #5) — three things worth knowing before touching it:**
 - **Member cross-section thickness/orientation is a schematic
@@ -1975,7 +2027,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #28 | feat(src): Alt-mnemonic menu navigation + icon before each panel title | ready-for-review | 2026-08-11 |
 | #29 | chore(src): interactively re-verify RunPanel dataset gating (#25) and 2D plane offset control (#22/#24) with a real loaded dataset | closed | 2026-08-11 |
 | #30 | feat(src): implement real Alt-mnemonic menu navigation (Dear ImGui has no built-in "&" parsing) | ready-for-review | 2026-08-11 |
-| #31 | fix(src): application is not DPI-aware -- UI too small on high-DPI monitors in multi-monitor setups | reopened (see below) | 2026-08-11 |
+| #31 | fix(src): application is not DPI-aware -- UI too small on high-DPI monitors in multi-monitor setups | ready-for-review | 2026-08-11 |
 | #32 | chore(src): add one-shot build scripts (build.ps1 for Windows, build.sh for macOS/Linux) | ready-for-review | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui

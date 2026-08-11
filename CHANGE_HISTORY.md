@@ -2021,3 +2021,49 @@ automation script, not WinUI3), core objective verified, issue closed
   moved the manual vcpkg bootstrap steps into the "manual control"
   section as an alternative, not a prerequisite.
 - Files: `src/build.ps1`, `src/build.sh`, `src/README.md`, `AGENTS.md`
+
+## [2026-08-11] — fix(src): complete DPI awareness (#31 reopened scope)
+
+- Issue #31 addressed on GitHub — the reopened, expanded scope: hand-drawn
+  chrome scaling, the clipped title-bar buttons, panel clipping under the
+  toolbar, and live monitor-to-monitor rescaling.
+- Added `src/gui/UiScale.{h,cpp}`: one published DPI/content scale
+  (`gui::UiScale()` / `gui::Scaled()`) that every hand-drawn `ImDrawList`
+  glyph in the app now multiplies its pixel constants by. Converted
+  `IconToolbar.cpp`, `CustomTitleBar.cpp`, `PanelIcons.cpp`, and
+  `ViewportPanel.cpp`'s UCS icon + plane-offset overlay.
+- `main.cpp`: consolidated all scale consumption into one `ApplyUiScale()`,
+  added a per-frame `glfwGetWindowContentScale()` poll so dragging the
+  window between different-DPI monitors rescales live, switched fonts to
+  Dear ImGui 1.92's `style.FontScaleDpi` (dynamic re-rasterisation) instead
+  of a startup-baked font atlas, and added an `ORCISF_UI_SCALE` override so
+  high-DPI layout is testable on a 100%-only machine.
+- **Two real bugs found by actually driving the app rather than by code
+  review**, both documented in full in `AGENTS.md`'s #31 section:
+  - The title-bar button cluster was positioned with
+    `ImGui::SameLine(offset_x)`, whose offset is relative to the content
+    origin and therefore silently added the menu bar group's
+    `WindowPadding.x` — pushing the cluster past the window's right edge
+    (14px at 100%, 28px at 200%). This is the true cause of the report
+    closed as "not reproducible" under #27; that closure was wrong and
+    `AGENTS.md`'s #27 section now says so.
+  - Re-running `ApplyModernTheme()` before `ScaleAllSizes()` is not a
+    style reset: the theme assigns ~15 fields while `ScaleAllSizes()`
+    scales dozens, so `WindowMinSize`/`CellPadding`/`DockingSeparatorSize`/
+    … compounded on every rescale. Symptom: docked panels permanently lost
+    their tab bars after a 100% → 200% → 100% round trip. Fixed by
+    snapshotting and restoring the whole `ImGuiStyle` struct.
+- Also: the window title now elides to fit its drag zone (it previously
+  grew until it overlapped the window buttons at high scale);
+  `IconToolbar::kHeight` became `IconToolbar::Height()` so the dockspace
+  work-area reservation tracks the real scaled row height; `BuildDockspace()`
+  seeds the dock builder from `WorkPos`/`WorkSize` rather than the full
+  viewport.
+- Verified with DPI-aware screenshots at 100%/150%/200% and across four
+  live 100%↔200% round trips (temporary key-driven toggle, since removed).
+  Not verified: a real two-physical-monitor drag, and macOS/Linux.
+- Files: `src/gui/UiScale.h`, `src/gui/UiScale.cpp`, `src/app/main.cpp`,
+  `src/app/CustomTitleBar.cpp`, `src/app/Application.cpp`,
+  `src/gui/IconToolbar.h`, `src/gui/IconToolbar.cpp`,
+  `src/gui/PanelIcons.cpp`, `src/gui/ViewportPanel.cpp`,
+  `src/CMakeLists.txt`, `src/README.md`, `AGENTS.md`

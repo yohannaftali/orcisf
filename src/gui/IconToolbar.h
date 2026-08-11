@@ -25,7 +25,18 @@ public:
     // Full row height (button + vertical padding) -- Application reserves
     // this much space below the main menu bar for the dockspace so panels
     // don't render underneath the toolbar.
-    static constexpr float kHeight = 36.f;
+    //
+    // Issue #31: a function of the current DPI scale, not a compile-time
+    // constant. It was `static constexpr float kHeight = 36.f`, which on a
+    // 200% monitor left the toolbar half the height of the menu bar above
+    // it (with correspondingly tiny 28px buttons) while every other metric
+    // around it had doubled. Application::OnFrame() shrinks the dockspace
+    // work area by exactly this, so the two can never disagree.
+    static float Height();
+
+    // Base (100%-scale) row height. Only exists so the scaling is stated
+    // in one place; call Height() everywhere else.
+    static constexpr float kBaseHeight = 36.f;
 
     void SetOnNewData(std::function<void()> callback);
     void SetOnOpenFolder(std::function<void()> callback);

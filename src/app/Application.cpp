@@ -431,7 +431,15 @@ void Application::BuildDockspace() {
 
     ImGui::DockBuilderRemoveNode(dockspace_id);
     ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
-    ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->Size);
+    // Issue #31: the *work* rect, not the full viewport -- the work rect
+    // already excludes the main menu bar and (per OnFrame() above) the icon
+    // toolbar. Seeding the builder with the full viewport size/origin made
+    // the freshly-built layout one menu-bar-plus-toolbar taller than its
+    // container and anchored at the viewport's top-left, so on the rebuild
+    // frame every panel's tab bar was drawn up underneath the toolbar
+    // before DockSpaceOverViewport() re-fitted it the frame after.
+    ImGui::DockBuilderSetNodePos(dockspace_id, ImGui::GetMainViewport()->WorkPos);
+    ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->WorkSize);
 
     switch (current_layout_) {
         case gui::ViewLayoutPreset::Design:
@@ -478,9 +486,14 @@ void Application::OnFrame() {
     // BeginMainMenuBar, so it doesn't shrink the work area on its own the
     // way the menu bar does) so DockSpaceOverViewport below doesn't place
     // panels underneath it.
+    // Issue #31: IconToolbar::Height() is DPI-scaled, so this reservation
+    // tracks the row's real height instead of a fixed 36px that left docked
+    // panels overlapping the toolbar on a high-DPI monitor. Both sides read
+    // the same function -- don't reintroduce a second literal here.
     ImGuiViewport* main_viewport = ImGui::GetMainViewport();
-    main_viewport->WorkPos.y += gui::IconToolbar::kHeight;
-    main_viewport->WorkSize.y -= gui::IconToolbar::kHeight;
+    const float icon_toolbar_height = gui::IconToolbar::Height();
+    main_viewport->WorkPos.y += icon_toolbar_height;
+    main_viewport->WorkSize.y -= icon_toolbar_height;
 
     BuildDockspace();
 

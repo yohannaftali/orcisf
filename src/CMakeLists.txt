@@ -39,6 +39,7 @@ add_executable(orcisf_gui WIN32
     app/AppIcon.cpp
     app/CustomTitleBar.cpp
     app/Theme.cpp
+    gui/UiScale.cpp
     gui/Toolbar.cpp
     gui/IconToolbar.cpp
     gui/PanelIcons.cpp

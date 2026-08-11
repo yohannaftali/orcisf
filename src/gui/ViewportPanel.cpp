@@ -7,6 +7,7 @@
 #include <ImGuizmo.h>
 
 #include "gui/PanelIcons.h"
+#include "gui/UiScale.h"
 
 namespace orcisf::gui {
 
@@ -48,12 +49,18 @@ void DrawUcsIcon(ImDrawList* dl, ImVec2 center, float radius, const Camera& came
         {{0.f, 0.f, 1.f}, IM_COL32(80, 140, 235, 255), "Z"},
     };
 
-    dl->AddCircleFilled(center, 3.f, IM_COL32(230, 230, 230, 255));
+    // Issue #31: the dot/line/label offsets are base (100%-scale) pixel
+    // values; without Scaled() the whole icon stays a few physical pixels
+    // across on a high-DPI monitor.
+    const float label_gap = Scaled(3.f);
+    const float label_back = Scaled(12.f);
+    const float label_rise = Scaled(7.f);
+    dl->AddCircleFilled(center, Scaled(3.f), IM_COL32(230, 230, 230, 255));
     for (const AxisSpec& a : axes) {
         ImVec2 tip = project(a.dir);
-        dl->AddLine(center, tip, a.color, 2.f);
-        dl->AddCircleFilled(tip, 3.f, a.color);
-        ImVec2 label_pos(tip.x + (tip.x >= center.x ? 3.f : -12.f), tip.y - 7.f);
+        dl->AddLine(center, tip, a.color, Scaled(2.f));
+        dl->AddCircleFilled(tip, Scaled(3.f), a.color);
+        ImVec2 label_pos(tip.x + (tip.x >= center.x ? label_gap : -label_back), tip.y - label_rise);
         dl->AddText(label_pos, a.color, a.label);
     }
 }
@@ -295,11 +302,15 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
     // raised its vertical position from the very bottom (kUcsBottomGap)
     // so the interactive plane-offset control below has room to render
     // underneath it without running off the bottom of the viewport.
-    constexpr float kUcsRadius = 22.f;
-    constexpr float kUcsMargin = 34.f;      // horizontal distance from the left edge
-    constexpr float kUcsBottomGap = 96.f;   // vertical distance from the bottom edge
-    ImVec2 ucs_center(image_min.x + kUcsMargin, image_min.y + image_size.y - kUcsBottomGap);
-    DrawUcsIcon(ImGui::GetForegroundDrawList(), ucs_center, kUcsRadius, camera_);
+    // Issue #31: DPI-scaled base values -- see gui/UiScale.h. The bottom
+    // gap in particular is a layout constant (it reserves room for the
+    // plane-offset overlay below), so leaving it unscaled would overlap the
+    // two on a high-DPI monitor, not merely shrink them.
+    const float ucs_radius = Scaled(22.f);
+    const float ucs_margin = Scaled(34.f);      // horizontal distance from the left edge
+    const float ucs_bottom_gap = Scaled(96.f);  // vertical distance from the bottom edge
+    ImVec2 ucs_center(image_min.x + ucs_margin, image_min.y + image_size.y - ucs_bottom_gap);
+    DrawUcsIcon(ImGui::GetForegroundDrawList(), ucs_center, ucs_radius, camera_);
 
     // Issue #24: the plane-offset control used to live only in Toolbar's
     // "View Plane" menu, which had to be reopened for every adjustment --
@@ -336,23 +347,32 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
             case ViewPlane::Free: offset = nullptr; break;
         }
         if (offset) {
-            constexpr float kControlWidth = 168.f;
-            ImVec2 pos(image_min.x + 8.f, ucs_center.y + kUcsRadius + 8.f);
+            // Issue #31: row offsets derived from the *current* text/frame
+            // heights rather than the hand-tuned 20/44/62 pixel literals
+            // this used to carry -- those were measured against the 13px
+            // font and silently overlapped once the font grew with DPI.
+            const float control_width = Scaled(168.f);
+            const float gap = Scaled(4.f);
+            const float text_h = ImGui::GetTextLineHeight();
+            const float frame_h = ImGui::GetFrameHeight();
+            ImVec2 pos(image_min.x + Scaled(8.f), ucs_center.y + ucs_radius + Scaled(8.f));
+            const float input_y = pos.y + text_h + gap;
+            const float slider_y = input_y + frame_h + gap;
 
             ImDrawList* fg = ImGui::GetForegroundDrawList();
-            ImVec2 bg_min(pos.x - 6.f, pos.y - 4.f);
-            ImVec2 bg_max(pos.x + kControlWidth + 6.f, pos.y + 62.f);
-            fg->AddRectFilled(bg_min, bg_max, IM_COL32(20, 20, 24, 200), 4.f);
+            ImVec2 bg_min(pos.x - Scaled(6.f), pos.y - gap);
+            ImVec2 bg_max(pos.x + control_width + Scaled(6.f), slider_y + frame_h + gap);
+            fg->AddRectFilled(bg_min, bg_max, IM_COL32(20, 20, 24, 200), Scaled(4.f));
 
             ImGui::SetCursorScreenPos(pos);
             ImGui::PushID("plane_offset_overlay");
             ImGui::TextColored(ImVec4(1.f, 0.82f, 0.15f, 1.f), "%s", axis_label);
-            ImGui::SetCursorScreenPos(ImVec2(pos.x, pos.y + 20.f));
-            ImGui::SetNextItemWidth(kControlWidth);
+            ImGui::SetCursorScreenPos(ImVec2(pos.x, input_y));
+            ImGui::SetNextItemWidth(control_width);
             ImGui::InputFloat("##offset_input", offset, 0.f, 0.f, "%.3f");
             offset_overlay_capturing |= ImGui::IsItemHovered() || ImGui::IsItemActive();
-            ImGui::SetCursorScreenPos(ImVec2(pos.x, pos.y + 44.f));
-            ImGui::SetNextItemWidth(kControlWidth);
+            ImGui::SetCursorScreenPos(ImVec2(pos.x, slider_y));
+            ImGui::SetNextItemWidth(control_width);
             ImGui::SliderFloat("##offset_slider", offset, -20.f, 20.f, "%.3f");
             offset_overlay_capturing |= ImGui::IsItemHovered() || ImGui::IsItemActive();
             ImGui::PopID();

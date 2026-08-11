@@ -1,5 +1,11 @@
 #include "app/CustomTitleBar.h"
 
+#include "gui/UiScale.h"
+
+#include <cmath>
+#include <cstring>
+#include <string>
+
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -8,8 +14,14 @@ namespace orcisf::app {
 
 namespace {
 
-constexpr float kButtonWidth = 46.0f;
-constexpr float kIconSize = 10.0f;
+using gui::Scaled;
+
+// Issue #31: hand-drawn chrome sizes itself in raw pixels, so every
+// constant here is a *base* (100%-scale) value that must go through
+// Scaled() -- otherwise the three window buttons stay 46 physical pixels
+// wide next to text that has doubled, and their glyphs become specks.
+float ButtonWidth() { return Scaled(46.0f); }
+float IconSize() { return Scaled(10.0f); }
 
 // Wayland compositors don't let a client position its own window (unlike
 // X11/Win32/Cocoa) -- glfwSetWindowPos silently does nothing there. See
@@ -24,7 +36,7 @@ bool IsWaylandNoDragPlatform() { return glfwGetPlatform() == GLFW_PLATFORM_WAYLA
 bool TitleBarButton(const char* id, float height, ImU32 hover_color,
                      void (*draw_icon)(ImDrawList*, ImVec2, ImVec2, ImU32)) {
     ImVec2 pos = ImGui::GetCursorScreenPos();
-    ImVec2 size(kButtonWidth, height);
+    ImVec2 size(ButtonWidth(), height);
     bool clicked = ImGui::InvisibleButton(id, size);
     bool hovered = ImGui::IsItemHovered();
 
@@ -32,37 +44,41 @@ bool TitleBarButton(const char* id, float height, ImU32 hover_color,
     if (hovered) {
         dl->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), hover_color);
     }
-    ImVec2 center(pos.x + size.x * 0.5f, pos.y + size.y * 0.5f);
+    // Rounded to whole pixels: at an odd button width the glyph would
+    // otherwise straddle a half-pixel and render visibly softer/off-centre
+    // than the neighbouring buttons.
+    ImVec2 center(std::round(pos.x + size.x * 0.5f), std::round(pos.y + size.y * 0.5f));
     ImU32 icon_color = IM_COL32(230, 230, 235, 255);
-    draw_icon(dl, center, ImVec2(kIconSize, kIconSize), icon_color);
+    draw_icon(dl, center, ImVec2(IconSize(), IconSize()), icon_color);
     return clicked;
 }
 
 void DrawMinimizeIcon(ImDrawList* dl, ImVec2 center, ImVec2 size, ImU32 color) {
-    dl->AddLine(ImVec2(center.x - size.x * 0.5f, center.y), ImVec2(center.x + size.x * 0.5f, center.y), color, 1.5f);
+    dl->AddLine(ImVec2(center.x - size.x * 0.5f, center.y), ImVec2(center.x + size.x * 0.5f, center.y), color,
+                Scaled(1.5f));
 }
 
 void DrawMaximizeIcon(ImDrawList* dl, ImVec2 center, ImVec2 size, ImU32 color) {
     ImVec2 half(size.x * 0.5f, size.y * 0.5f);
     dl->AddRect(ImVec2(center.x - half.x, center.y - half.y), ImVec2(center.x + half.x, center.y + half.y), color, 0.f,
-                0, 1.3f);
+                0, Scaled(1.3f));
 }
 
 void DrawRestoreIcon(ImDrawList* dl, ImVec2 center, ImVec2 size, ImU32 color) {
     ImVec2 half(size.x * 0.38f, size.y * 0.38f);
     ImVec2 offset(size.x * 0.18f, -size.y * 0.18f);
     dl->AddRect(ImVec2(center.x - half.x + offset.x, center.y - half.y + offset.y),
-                ImVec2(center.x + half.x + offset.x, center.y + half.y + offset.y), color, 0.f, 0, 1.2f);
+                ImVec2(center.x + half.x + offset.x, center.y + half.y + offset.y), color, 0.f, 0, Scaled(1.2f));
     dl->AddRect(ImVec2(center.x - half.x - offset.x, center.y - half.y - offset.y),
-                ImVec2(center.x + half.x - offset.x, center.y + half.y - offset.y), color, 0.f, 0, 1.2f);
+                ImVec2(center.x + half.x - offset.x, center.y + half.y - offset.y), color, 0.f, 0, Scaled(1.2f));
 }
 
 void DrawCloseIcon(ImDrawList* dl, ImVec2 center, ImVec2 size, ImU32 color) {
     ImVec2 half(size.x * 0.5f, size.y * 0.5f);
     dl->AddLine(ImVec2(center.x - half.x, center.y - half.y), ImVec2(center.x + half.x, center.y + half.y), color,
-                1.5f);
+                Scaled(1.5f));
     dl->AddLine(ImVec2(center.x - half.x, center.y + half.y), ImVec2(center.x + half.x, center.y - half.y), color,
-                1.5f);
+                Scaled(1.5f));
 }
 
 } // namespace
@@ -70,25 +86,66 @@ void DrawCloseIcon(ImDrawList* dl, ImVec2 center, ImVec2 size, ImU32 color) {
 void CustomTitleBar::Draw(GLFWwindow* window, const char* title) {
     const float height = ImGui::GetFrameHeight();
     const float window_width = ImGui::GetWindowWidth();
-    const float buttons_width = kButtonWidth * 3.0f;
-    const float drag_zone_start_x = ImGui::GetCursorPosX();
-    const float drag_zone_end_x = window_width - buttons_width;
-    const float drag_zone_width = drag_zone_end_x - drag_zone_start_x;
+    const float buttons_width = ButtonWidth() * 3.0f;
+
+    // The one screen-space anchor everything below is aligned against: the
+    // menu bar window's true right edge, minus the button cluster.
+    //
+    // This deliberately does NOT go through ImGui::SameLine(offset_x) any
+    // more. SameLine()'s offset is measured from the *content* origin, so
+    // it silently adds the enclosing window's padding
+    // (BeginMenuBar() opens a group whose GroupOffset.x == WindowPadding.x)
+    // on top of whatever offset is passed -- the cluster was therefore
+    // being pushed WindowPadding.x past the window's right edge and the
+    // Close button clipped by exactly that much. At 100% scale that is
+    // ApplyModernTheme()'s 14px, which reads as "the X glyph sits right of
+    // centre"; at 200% it is 28px of a 92px button, i.e. visibly cut off.
+    // Absolute screen coordinates have no such hidden term.
+    const float bar_right_x = ImGui::GetWindowPos().x + window_width;
+    const float buttons_start_screen_x = bar_right_x - buttons_width;
 
     const bool wayland_no_drag = IsWaylandNoDragPlatform();
     const bool maximized = glfwGetWindowAttrib(window, GLFW_MAXIMIZED) != 0;
 
-    if (drag_zone_width > 20.0f) {
-        ImGui::SameLine();
-        ImVec2 drag_pos = ImGui::GetCursorScreenPos();
+    ImGui::SameLine();
+    const ImVec2 row_origin = ImGui::GetCursorScreenPos();
+    const float drag_zone_width = buttons_start_screen_x - row_origin.x;
+
+    if (drag_zone_width > Scaled(20.0f)) {
+        ImVec2 drag_pos = row_origin;
         ImGui::InvisibleButton("##titlebar_drag", ImVec2(drag_zone_width, height));
 
         ImDrawList* dl = ImGui::GetWindowDrawList();
         ImVec4 text_col_v4 = wayland_no_drag ? ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]
                                               : ImGui::GetStyle().Colors[ImGuiCol_Text];
         ImU32 text_col = ImGui::ColorConvertFloat4ToU32(text_col_v4);
-        ImVec2 text_size = ImGui::CalcTextSize(title);
-        dl->AddText(ImVec2(drag_pos.x + 10.0f, drag_pos.y + (height - text_size.y) * 0.5f), text_col, title);
+        const float text_x = drag_pos.x + Scaled(10.0f);
+
+        // Issue #31: the title has to be truncated to the drag zone. It is
+        // drawn straight onto the draw list, which does no layout of its
+        // own, so at a large DPI scale the (unchanged) title string simply
+        // grew until it ran underneath the Minimize/Maximize/Close cluster
+        // -- text and glyphs overlapping, both unreadable. Trim to fit with
+        // an ellipsis rather than just clipping, so it degrades to a
+        // readable prefix instead of a word cut mid-glyph.
+        const char* text_end = title + std::strlen(title);
+        const float avail = (buttons_start_screen_x - Scaled(8.0f)) - text_x;
+        std::string elided;
+        if (avail > 0.f && ImGui::CalcTextSize(title, text_end).x > avail) {
+            const char* ellipsis = "...";
+            const float ellipsis_w = ImGui::CalcTextSize(ellipsis).x;
+            std::size_t keep = std::strlen(title);
+            while (keep > 0 && ImGui::CalcTextSize(title, title + keep).x + ellipsis_w > avail) {
+                --keep;
+            }
+            elided.assign(title, keep);
+            elided += ellipsis;
+        }
+        const char* draw_text = elided.empty() ? title : elided.c_str();
+        ImVec2 text_size = ImGui::CalcTextSize(draw_text);
+        if (avail > 0.f) {
+            dl->AddText(ImVec2(text_x, drag_pos.y + (height - text_size.y) * 0.5f), text_col, draw_text);
+        }
 
         if (wayland_no_drag) {
             if (ImGui::IsItemHovered()) {
@@ -144,12 +201,14 @@ void CustomTitleBar::Draw(GLFWwindow* window, const char* title) {
     }
 
     // Minimize / Maximize-Restore / Close, right-aligned flush to the
-    // window's right edge regardless of how wide the drag zone ended up.
-    // Zero-spacing SameLine() between them: style.ItemSpacing (nonzero,
-    // see ApplyModernTheme()) would otherwise widen the three-button
-    // cluster past buttons_width and push Close off the window's actual
-    // right edge -- caught interactively (Close was invisible/clipped).
-    ImGui::SameLine(drag_zone_end_x, 0.0f);
+    // window's true right edge regardless of how wide the drag zone ended
+    // up. Positioned with SetCursorScreenPos() rather than
+    // SameLine(offset_x) -- see buttons_start_screen_x above for why the
+    // latter silently shifted the whole cluster off the edge. Zero-spacing
+    // SameLine() *between* the buttons still matters: style.ItemSpacing
+    // (nonzero, see ApplyModernTheme()) would otherwise widen the cluster
+    // past buttons_width and push Close out again.
+    ImGui::SetCursorScreenPos(ImVec2(buttons_start_screen_x, row_origin.y));
     if (TitleBarButton("##minimize", height, IM_COL32(255, 255, 255, 25), DrawMinimizeIcon)) {
         glfwIconifyWindow(window);
     }

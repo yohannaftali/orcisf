@@ -82,6 +82,20 @@ blank editable dataset), `Open Data...` (load an existing one),
 `Save`/`Save As...`, `Save Loads (.bbn)`, `Export PDF.../Export
 Text.../Export INF Preview...`.
 
+## Display scaling
+
+The UI scales itself to whichever monitor it's on, and re-scales live if
+you drag the window to a monitor with a different DPI. To override that
+— either because you prefer a different size, or to reproduce a
+high-DPI layout issue on a 100% monitor — set `ORCISF_UI_SCALE`:
+
+```powershell
+$env:ORCISF_UI_SCALE = "2"    # bash: ORCISF_UI_SCALE=2 ./orcisf_gui
+```
+
+Any positive value works (`1.25`, `1.5`, `2`, …); unset it to go back to
+following the monitor.
+
 See [`AGENTS.md`](../AGENTS.md) at the repo root for the full
 per-subsystem architecture writeup — this file stays intentionally
 high-level; don't duplicate AGENTS.md's detail here.
