@@ -822,6 +822,44 @@ touching `gui/viewport/Camera.{h,cpp}`, `gui/viewport/Math3D.h`'s
   confirms the three plane views actually render correctly and
   click-to-place lands exactly on the locked plane.
 
+**UCS icon overlay (issue #23, part of epic #20) — read before touching
+`ViewportPanel.cpp`'s `DrawUcsIcon()`:**
+- **Hand-drawn `ImDrawList` overlay, not a 3D gizmo mesh added to
+  `SceneRenderer`** -- per the issue's own design note and this project's
+  established preference for small, dependency-free GUI code
+  (`IconToolbar.cpp`'s icons, same reasoning). Lives as a free function in
+  `ViewportPanel.cpp`'s anonymous namespace, called from `Draw()`.
+- **Projected via dot products against `Camera::Right()`/`Forward()`, not
+  a full view-matrix multiply.** `sx = Dot(axis, right)`,
+  `sy = Dot(axis, Cross(right, forward))` gives each world axis's 2D
+  screen-space direction directly -- correct in both perspective and the
+  orthographic/plane-locked views (#22) since it depends only on camera
+  orientation, not projection type, and reuses the exact up-vector
+  derivation `Camera::Pan()`/`ScreenRay()` already use internally (no new
+  math to get wrong here, unlike #22's cross-product sign bug).
+  `Camera::Right()`/`Forward()` are already public.
+- **Never creates an ImGui item** (draws straight onto
+  `ImGui::GetForegroundDrawList()`, no `InvisibleButton`/etc.), so it
+  can't intercept orbit/pan/click-to-place input -- satisfies that
+  acceptance criterion by construction, not by an explicit input-passthrough
+  check.
+- **Shares the viewport's bottom-left corner with #22's plane-offset
+  readout** -- the UCS icon reserves a fixed ~76px-wide area there
+  (`kUcsMargin`/`kUcsRadius` in `ViewportPanel.cpp`) and is drawn first,
+  unconditionally (every frame, every view mode); the plane-offset text
+  box (only shown when a plane is locked) starts past that reserved area
+  instead of overlapping it.
+- **What was verified vs. not:** the dot-product projection math was
+  hand-checked for a few reference orientations (default orbit camera:
+  X should point right-ish, Y up, Z out-of-screen-ish) and the code
+  reuses already-verified `Camera` methods rather than new vector math.
+  **No local `cmake` build toolchain was available in this environment
+  this session** -- not compiled or interactively run. CI is the first
+  real check; the icon's live rotation-with-camera behavior and its
+  non-overlap with #22's readout specifically should be re-verified
+  interactively (or via a real build + screenshot) before treating #23
+  as fully done.
+
 **Custom borderless window chrome (issue #19, Phase 0) — read before
 touching `app/CustomTitleBar.{h,cpp}`/`app/Theme.{h,cpp}`/`main.cpp`'s
 window setup:**
@@ -1232,7 +1270,7 @@ for skills that apply to the current task and follow them.
 | #20 | epic(src): joints/members list panel, 2D plane-locked drawing, UCS icon | open | 2026-08-11 |
 | #21 | feat(src): add a Joints/Members list panel (editable, delete-with-cascade-warning) | ready-for-review | 2026-08-11 |
 | #22 | feat(src): 2D plane-locked drawing (X-Y/X-Z/Y-Z orthographic views + adjustable offset) | ready-for-review | 2026-08-11 |
-| #23 | feat(src): UCS icon overlay in the viewport | open | 2026-08-11 |
+| #23 | feat(src): UCS icon overlay in the viewport | ready-for-review | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

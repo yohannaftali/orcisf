@@ -1218,3 +1218,25 @@ history only; don't duplicate current-state description here.
 - No local `cmake` toolchain was available this session -- not compiled
   or interactively run. CI is the first real build check. Issue #22
   status set to `ready-for-review`, not `done`, until confirmed.
+
+## 2026-08-11 — feat(src): implement issue #23 (UCS icon overlay)
+
+- Added `DrawUcsIcon()` (`gui/ViewportPanel.cpp`, anonymous namespace): a
+  small 3-axis (X red/Y green/Z blue, labeled) UCS indicator drawn on
+  `ImGui::GetForegroundDrawList()`, always visible bottom-left of the
+  viewport in every camera mode (free/perspective and #22's plane-locked
+  orthographic views alike). Projected via dot products against
+  `Camera::Right()`/`Forward()` (reusing the existing up-vector
+  derivation `Pan()`/`ScreenRay()` already use), not a full matrix
+  multiply or a new 3D mesh in `SceneRenderer`.
+- Never creates an ImGui item, so it can't intercept mouse input meant
+  for orbit/pan/click-to-place -- true by construction (draw-list-only).
+- Reserves a fixed area in the viewport's bottom-left corner so it
+  doesn't overlap issue #22's plane-offset readout, which now starts
+  past it.
+- This completes all three of epic #20's sub-issues (#21, #22, #23).
+  Epic #20 itself is left open pending explicit user confirmation to
+  close, per this project's usual caution around auto-closing epics.
+- No local `cmake` toolchain was available this session -- not compiled
+  or interactively run. CI is the first real build check. Issue #23
+  status set to `ready-for-review`, not `done`, until confirmed.

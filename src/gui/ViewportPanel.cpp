@@ -11,6 +11,54 @@ namespace orcisf::gui {
 
 using namespace math3d;
 
+namespace {
+
+// Issue #23: a small always-visible 3-axis UCS (User Coordinate System)
+// indicator, hand-drawn on the foreground draw list rather than a real 3D
+// gizmo mesh -- matches this project's stated preference for small,
+// dependency-free GUI code (see IconToolbar.cpp's hand-drawn icons,
+// AGENTS.md's notes on that file). Each world axis direction is projected
+// onto the screen via simple dot products against the camera's current
+// Right()/Forward()-derived screen basis (the same up-vector derivation
+// Camera::Pan()/ScreenRay() already use internally) -- correct in both
+// perspective and orthographic/plane-locked (#22) modes since it only
+// depends on camera orientation, not projection type, and needs no matrix
+// multiply. Purely a draw-list overlay: it never creates an ImGui item, so
+// it can't intercept mouse input meant for orbit/pan/click-to-place.
+void DrawUcsIcon(ImDrawList* dl, ImVec2 center, float radius, const Camera& camera) {
+    Vec3 right = camera.Right();
+    Vec3 forward = camera.Forward();
+    Vec3 up = Cross(right, forward).Normalized();
+
+    auto project = [&](const Vec3& axis) {
+        float sx = Dot(axis, right);
+        float sy = Dot(axis, up); // screen-space up; ImGui's Y grows downward, so flip below
+        return ImVec2(center.x + sx * radius, center.y - sy * radius);
+    };
+
+    struct AxisSpec {
+        Vec3 dir;
+        ImU32 color;
+        const char* label;
+    };
+    const AxisSpec axes[3] = {
+        {{1.f, 0.f, 0.f}, IM_COL32(230, 70, 70, 255), "X"},
+        {{0.f, 1.f, 0.f}, IM_COL32(80, 210, 90, 255), "Y"},
+        {{0.f, 0.f, 1.f}, IM_COL32(80, 140, 235, 255), "Z"},
+    };
+
+    dl->AddCircleFilled(center, 3.f, IM_COL32(230, 230, 230, 255));
+    for (const AxisSpec& a : axes) {
+        ImVec2 tip = project(a.dir);
+        dl->AddLine(center, tip, a.color, 2.f);
+        dl->AddCircleFilled(tip, 3.f, a.color);
+        ImVec2 label_pos(tip.x + (tip.x >= center.x ? 3.f : -12.f), tip.y - 7.f);
+        dl->AddText(label_pos, a.color, a.label);
+    }
+}
+
+} // namespace
+
 void ViewportPanel::FrameScene(const SceneModel& scene) { camera_.FrameBounds(scene.bounds_center, scene.bounds_radius); }
 
 void ViewportPanel::HandlePicking(const SceneModel& scene, Selection& selection, EditableStructure* editable,
@@ -240,13 +288,23 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
     bool hovered = ImGui::IsItemHovered();
     ImGuiIO& io = ImGui::GetIO();
 
+    // Issue #23: UCS icon, always visible (free/perspective and
+    // plane-locked views alike) in the bottom-left corner. Reserves ~76px
+    // of width there -- the plane-offset readout below (issue #22) starts
+    // past it instead of overlapping.
+    constexpr float kUcsRadius = 26.f;
+    constexpr float kUcsMargin = 40.f;
+    ImVec2 ucs_center(image_min.x + kUcsMargin, image_min.y + image_size.y - kUcsMargin);
+    DrawUcsIcon(ImGui::GetForegroundDrawList(), ucs_center, kUcsRadius, camera_);
+
     // Issue #22: read-only "which plane, at what offset" readout pinned to
-    // the bottom-left of the viewport image -- the actual plane-select/
-    // offset-edit controls live in Toolbar's View > View Plane menu (see
-    // Toolbar.cpp), this is purely the always-visible confirmation the
-    // issue asked for ("shown at the bottom ... e.g. Plane X-Y is on
-    // Z=0"). Drawn directly on the foreground draw list so it overlays the
-    // rendered scene without affecting layout/input.
+    // the bottom-left of the viewport image (past the UCS icon above) --
+    // the actual plane-select/offset-edit controls live in Toolbar's
+    // View > View Plane menu (see Toolbar.cpp), this is purely the
+    // always-visible confirmation the issue asked for ("shown at the
+    // bottom ... e.g. Plane X-Y is on Z=0"). Drawn directly on the
+    // foreground draw list so it overlays the rendered scene without
+    // affecting layout/input.
     if (options.view_plane != ViewPlane::Free) {
         const char* plane_name = "";
         float offset = 0.f;
@@ -260,7 +318,8 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
         std::snprintf(text, sizeof(text), "%s %.3f m", plane_name, offset);
         ImVec2 text_size = ImGui::CalcTextSize(text);
         ImVec2 pad(8.f, 5.f);
-        ImVec2 box_min(image_min.x + 8.f, image_min.y + image_size.y - text_size.y - pad.y * 2.f - 8.f);
+        float left = image_min.x + kUcsMargin * 2.f + 10.f;
+        ImVec2 box_min(left, image_min.y + image_size.y - text_size.y - pad.y * 2.f - 8.f);
         ImVec2 box_max(box_min.x + text_size.x + pad.x * 2.f, box_min.y + text_size.y + pad.y * 2.f);
         ImDrawList* fg = ImGui::GetForegroundDrawList();
         fg->AddRectFilled(box_min, box_max, IM_COL32(20, 20, 24, 200), 4.f);
