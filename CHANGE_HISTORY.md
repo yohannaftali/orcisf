@@ -1133,3 +1133,31 @@ history only; don't duplicate current-state description here.
   immediately by re-checking #16's actual state via the API before
   reporting completion. Reopened #13 and posted a correction comment.
   Status: #14/#15/#17/#18 closed, #16 open, #13 open pending #16.
+
+## 2026-08-11 — Epic #20: joints/members list, 2D plane-locked drawing, UCS icon
+
+- Created epic **#20** and three sub-issues, per the user's bundled
+  feature request (via `/planner`): a Joints/Members list panel with
+  delete-with-cascade-warning, AutoCAD-style 2D plane-locked drawing
+  (X-Y/X-Z/Y-Z orthographic views with an adjustable offset), and a UCS
+  icon overlay in the viewport.
+  - **#21** — feat(src): add a Joints/Members list panel (editable,
+    delete-with-cascade-warning). Reuses `LoadsPanel`'s existing
+    inline-edit/row-click-syncs-Selection pattern; new warning-before-
+    cascade-delete requirement in front of `EditableStructure::DeleteJoint()`,
+    which already cascades silently.
+  - **#22** — feat(src): 2D plane-locked drawing (X-Y/X-Z/Y-Z orthographic
+    views + adjustable offset). Extends #18's single-plane ray-intersection
+    logic in `ViewportPanel::HandlePicking()`; requires adding an
+    orthographic projection mode to `Camera` (currently perspective-orbit
+    only).
+  - **#23** — feat(src): UCS icon overlay in the viewport. Design note
+    recommends a small `ImDrawList` overlay (axis directions projected
+    through `Camera::ViewMatrix()`'s rotation), matching this project's
+    existing hand-drawn-icon style (`IconToolbar.cpp`), not a 3D gizmo mesh.
+  - **Already exists, called out in the epic body so it isn't duplicated**:
+    drag-to-move a joint (ImGuizmo gizmo, issue #6) and cascade-delete on
+    joint removal (`EditableStructure::DeleteJoint()`) both already work;
+    only the confirmation warning is new scope (#21).
+  - Epic #20's body was PATCHed after sub-issue creation to link the real
+    issue numbers, following the #1/#13 epic pattern.
