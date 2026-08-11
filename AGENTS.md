@@ -1302,6 +1302,63 @@ window setup:**
   treating Phase 0 as fully done there, per the issue's acceptance
   criteria.
 
+**DPI awareness (issue #31) — read before touching `main.cpp`'s startup
+sequence or its `EnableWindowsDpiAwareness()`/font/style-scaling code:**
+- **Root cause was a genuine, total absence of DPI handling** -- nothing
+  in `src/` declared DPI awareness or reacted to monitor content scale
+  before this fix, confirmed by code search. On a multi-monitor setup
+  with mixed DPI, Windows either bitmap-stretched the whole window
+  (blurry) or rendered it at a fixed logical size that didn't match a
+  high-DPI monitor's actual pixel density -- showing up as "fonts too
+  small on the high-resolution monitor, fine on the mid-resolution one."
+- **Runtime call, not an embedded manifest.** `EnableWindowsDpiAwareness()`
+  (Windows-only, called as the very first thing in `main()`, before even
+  `glfwInit()` -- Windows locks in the process's DPI-awareness mode the
+  first time it's queried) resolves `SetProcessDpiAwarenessContext` via
+  `GetProcAddress` rather than linking it directly or depending on
+  `<windows.h>`'s `DPI_AWARENESS_CONTEXT`/
+  `DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2` (only declared when the
+  SDK's `WINVER` target is Windows 10 1703+, which this project doesn't
+  otherwise require) -- a locally-defined opaque `void*` handle type and
+  the constant's documented fixed value (`-4`) are used instead, so this
+  compiles regardless of SDK version and is a graceful no-op on older
+  Windows 10 builds that don't export the function.
+- **Three cooperating pieces, all needed together**: (1)
+  `EnableWindowsDpiAwareness()` (Windows-only), (2)
+  `glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE)` before
+  `glfwCreateWindow()` (cross-platform, lets GLFW size the window
+  correctly on whichever monitor it's created on), (3) reading
+  `glfwGetWindowContentScale()` once right after window creation and
+  using it to both `ImGui::GetStyle().ScaleAllSizes(dpi_scale)` (**after**
+  `ApplyModernTheme()`, since it scales whatever values are currently
+  set, not ImGui's hardcoded defaults -- calling it before would scale
+  the wrong numbers) and rebuild the default font at `13.0f * dpi_scale`
+  pixels via an explicit `io.Fonts->AddFontDefault(&font_cfg)` (chosen
+  over the cheaper `io.FontGlobalScale`, which just stretches the
+  existing 13px bitmap and looks blurry at non-integer scales -- a real
+  pixel-size font rebuild stays crisp).
+- **Live monitor-drag rescaling is explicitly out of scope**, per the
+  issue's own "decide and document" acceptance criterion -- the content
+  scale is read once at startup and never re-read. Handling a window
+  being dragged between two different-DPI monitors while running would
+  need a `glfwSetWindowContentScaleCallback`, rebuilding the font atlas,
+  and un-doing/redoing the style scale (naive repeated `ScaleAllSizes()`
+  calls compound multiplicatively, not idempotently) -- real additional
+  work, left as a deliberate follow-up if ever needed, not attempted here.
+- **What was verified:** compiled cleanly (MSVC/Ninja, `windows-release`)
+  and **visually confirmed via a real screenshot** on this environment's
+  actual high-DPI (200%-scaled) monitor -- menu bar/panel text is
+  noticeably larger and legible, a stark contrast to every prior
+  screenshot taken earlier in this session (which all showed the
+  cramped, tiny pre-fix rendering on this same monitor). **Not verified**:
+  behavior on an actual mid-resolution/100%-scaled monitor (only one
+  physical monitor is available in this environment) -- the mechanism
+  (`glfwGetWindowContentScale()`-driven scaling) is monitor-agnostic and
+  would naturally return `1.0` there, keeping the original unscaled
+  13px/1x metrics, consistent with the user's report that this case
+  already worked -- but this specific claim rests on reasoning about the
+  mechanism, not a second physical monitor test.
+
 **`gui/viewport/` (issue #5) — three things worth knowing before touching it:**
 - **Member cross-section thickness/orientation is a schematic
   approximation, not the legacy local-axis convention.** `SceneRenderer`
@@ -1660,6 +1717,7 @@ for skills that apply to the current task and follow them.
 | #28 | feat(src): Alt-mnemonic menu navigation + icon before each panel title | ready-for-review | 2026-08-11 |
 | #29 | chore(src): interactively re-verify RunPanel dataset gating (#25) and 2D plane offset control (#22/#24) with a real loaded dataset | open (blocked, see notes below) | 2026-08-11 |
 | #30 | feat(src): implement real Alt-mnemonic menu navigation (Dear ImGui has no built-in "&" parsing) | open | 2026-08-11 |
+| #31 | fix(src): application is not DPI-aware -- UI too small on high-DPI monitors in multi-monitor setups | ready-for-review | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

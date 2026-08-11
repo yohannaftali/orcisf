@@ -1677,3 +1677,48 @@ history only; don't duplicate current-state description here.
   `DetailingPanel`) without clicking through every tab individually.
 - No code changes -- this was a verification-only pass. Issue #28 stays
   closed; no new issues found.
+
+## 2026-08-11 — feat(src): application not DPI-aware on multi-monitor setups
+
+- Issue #31 created on GitHub (label: `bug`).
+- Scope: `src/app/main.cpp`, possibly `src/app/orcisf.rc`
+- User-reported via `/planner`: on a two-monitor setup with mixed DPI,
+  fonts/UI render correctly on a mid-resolution monitor but too small on
+  a high-resolution one. Confirmed via code search: nothing in `src/`
+  declares DPI awareness (no manifest, no
+  `SetProcessDpiAwarenessContext()`), `glfwCreateWindow()` doesn't set
+  `GLFW_SCALE_TO_MONITOR`, and no `io.FontGlobalScale`/
+  `ImGui::GetStyle().ScaleAllSizes()` call exists anywhere -- a genuine,
+  unambiguous gap, not a regression. Scoped in the issue: Per-Monitor-v2
+  DPI awareness declaration, `GLFW_SCALE_TO_MONITOR`, startup
+  font/style scaling from the actual launch monitor's content scale, and
+  an explicit decision on whether live monitor-drag rescaling is in
+  scope or a follow-up.
+
+## 2026-08-11 — fix(src): implement issue #31 (DPI awareness)
+
+- `src/app/main.cpp`: added `EnableWindowsDpiAwareness()` (Windows-only,
+  resolves `SetProcessDpiAwarenessContext` dynamically via
+  `GetProcAddress` using a locally-defined opaque handle type, so it
+  doesn't depend on the SDK's `WINVER` target declaring
+  `DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2`), called as the very
+  first thing in `main()` before `glfwInit()`. Added
+  `glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE)` before window
+  creation. Read `glfwGetWindowContentScale()` once at startup and used
+  it to `ImGui::GetStyle().ScaleAllSizes()` (after `ApplyModernTheme()`)
+  and rebuild the default font at a scaled pixel size (crisper than
+  `io.FontGlobalScale`).
+- Live monitor-drag rescaling explicitly out of scope (documented why in
+  `AGENTS.md`) -- content scale is read once at startup only.
+- Compiled successfully (MSVC/Ninja, `windows-release`) and **visually
+  confirmed via a real screenshot** on this environment's actual
+  high-DPI (200%) monitor: menu/panel text is now noticeably larger and
+  legible, a clear contrast to every prior screenshot taken earlier in
+  this same session on the same monitor. Behavior on an actual
+  mid-resolution/100% monitor was not verified (only one physical
+  monitor available in this environment) -- reasoned to work correctly
+  since the mechanism is monitor-agnostic and would return `1.0` there,
+  but not empirically confirmed on a second display.
+- Files: `src/app/main.cpp`.
+- Issue #31 status set to `ready-for-review`, not `done`, until the
+  mid-resolution-monitor case is confirmed on real hardware.
