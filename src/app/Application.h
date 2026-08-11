@@ -7,9 +7,10 @@
 #include "engine/MemberResults.h"
 #include "gui/DetailingPanel.h"
 #include "gui/IconToolbar.h"
-#include "gui/JointsMembersPanel.h"
+#include "gui/JointsPanel.h"
 #include "gui/LoadsPanel.h"
 #include "gui/LogPanel.h"
+#include "gui/MembersPanel.h"
 #include "gui/PanelTitles.h"
 #include "gui/PropertiesPanel.h"
 #include "gui/RunPanel.h"
@@ -77,7 +78,8 @@ private:
     gui::ViewportPanel viewport_panel_;
     gui::PropertiesPanel properties_panel_;
     gui::LoadsPanel loads_panel_;
-    gui::JointsMembersPanel joints_members_panel_;
+    gui::JointsPanel joints_panel_;
+    gui::MembersPanel members_panel_;
     gui::DetailingPanel detailing_panel_;
     gui::LogPanel log_panel_;
     gui::RunPanel run_panel_;
@@ -118,7 +120,8 @@ private:
     bool viewport_open_ = true;
     bool properties_open_ = true;
     bool loads_open_ = true;
-    bool joints_members_open_ = true;
+    bool joints_open_ = true;
+    bool members_open_ = true;
     bool detailing_open_ = true;
     bool log_open_ = true;
     bool run_open_ = true;

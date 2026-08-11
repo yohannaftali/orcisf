@@ -2161,3 +2161,33 @@ automation script, not WinUI3), core objective verified, issue closed
   `src/gui/LoadsPanel.cpp`, `src/gui/JointsMembersPanel.cpp`,
   `src/gui/DetailingPanel.cpp`, `src/gui/RunPanel.cpp`, `src/gui/LogPanel.cpp`,
   `src/CMakeLists.txt`, `AGENTS.md`
+
+## [2026-08-11] — feat(src): implement issue #36 -- split Joints/Members panel
+
+- `JointsMembersPanel` (issue #21) split into two independent panels:
+  `gui/JointsPanel.{h,cpp}` (joints table + cascade-delete confirmation
+  modal, unchanged logic) and `gui/MembersPanel.{h,cpp}` (members table,
+  unchanged logic) -- each its own dockable/closeable window.
+- Reordered the shared dock group's tab order to Joints, Members, Loads
+  (previously Loads, Joints/Members). Found via screenshot that Dear
+  ImGui's displayed tab order actually follows each panel's `Draw()`/
+  `Begin()` call order within the frame, not the
+  `DockBuilderDockWindow()` call order used to set up the persistent
+  dock/node association -- an assumption in the first attempt that
+  turned out wrong, corrected after seeing the mismatch.
+- `PanelIcon` enum's `JointsMembers` value split into `Joints`/`Members`,
+  each with its own hand-drawn icon (three dots vs. a line with
+  unfilled end-caps) so the two dock tabs read as visually distinct.
+- Verified interactively with real data (not just the empty state): a
+  scratch blank structure, two joints added, connected into a member --
+  both new panels' tables correctly showed the live data, and the tab
+  order matched Joints/Members/Loads/Log exactly.
+- **Not verified this pass**: the cascade-delete confirmation modal
+  (multiple precisely-aimed synthetic clicks on the table's per-row
+  "Delete" button had no effect, root cause not found) -- this was
+  already unverified before the split (see `AGENTS.md`'s #21 section),
+  so it's not a new regression, but remains open follow-up work.
+- Files: `src/gui/JointsPanel.{h,cpp}` (new), `src/gui/MembersPanel.{h,cpp}`
+  (new), `src/gui/JointsMembersPanel.{h,cpp}` (deleted), `src/gui/PanelIcons.{h,cpp}`,
+  `src/gui/PanelTitles.{h,cpp}`, `src/app/Application.{h,cpp}`,
+  `src/app/DockTabIcons.cpp`, `src/CMakeLists.txt`, `AGENTS.md`

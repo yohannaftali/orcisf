@@ -50,7 +50,8 @@ add_executable(orcisf_gui WIN32
     gui/RunPanel.cpp
     gui/LogPanel.cpp
     gui/LoadsPanel.cpp
-    gui/JointsMembersPanel.cpp
+    gui/JointsPanel.cpp
+    gui/MembersPanel.cpp
     gui/DetailingPanel.cpp
     gui/viewport/Camera.cpp
     gui/viewport/SceneModel.cpp

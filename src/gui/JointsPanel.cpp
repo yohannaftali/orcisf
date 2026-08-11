@@ -1,4 +1,4 @@
-#include "gui/JointsMembersPanel.h"
+#include "gui/JointsPanel.h"
 
 #include <string>
 
@@ -25,11 +25,6 @@ std::vector<int> TouchingMembers(const engine::StructureData& sd, int joint_id) 
 void DrawJointsTable(const SceneModel& scene, Selection& selection, EditableStructure* editable, UndoStack* undo,
                       const std::function<void()>& on_geometry_changed, int& pending_delete_joint,
                       std::vector<int>& pending_delete_joint_members, bool& open_delete_popup) {
-    ImGui::SeparatorText("Joints");
-    if (scene.joints.empty()) {
-        ImGui::TextDisabled("None.");
-        return;
-    }
     if (!ImGui::BeginTable("joints_list", 6, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)) return;
     ImGui::TableSetupColumn("Joint", ImGuiTableColumnFlags_WidthFixed, 50.f);
     ImGui::TableSetupColumn("X (m)");
@@ -96,50 +91,6 @@ void DrawJointsTable(const SceneModel& scene, Selection& selection, EditableStru
     ImGui::EndTable();
 }
 
-void DrawMembersTable(const SceneModel& scene, Selection& selection, EditableStructure* editable, UndoStack* undo,
-                       const std::function<void()>& on_geometry_changed) {
-    ImGui::SeparatorText("Members");
-    if (scene.members.empty()) {
-        ImGui::TextDisabled("None.");
-        return;
-    }
-    if (!ImGui::BeginTable("members_list", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)) return;
-    ImGui::TableSetupColumn("Batang", ImGuiTableColumnFlags_WidthFixed, 60.f);
-    ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 70.f);
-    ImGui::TableSetupColumn("Joint A", ImGuiTableColumnFlags_WidthFixed, 70.f);
-    ImGui::TableSetupColumn("Joint B", ImGuiTableColumnFlags_WidthFixed, 70.f);
-    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 60.f);
-    ImGui::TableHeadersRow();
-
-    const engine::StructureData* sd = editable ? &editable->SdForUndo() : nullptr;
-
-    for (const MemberVisual& mv : scene.members) {
-        ImGui::PushID(mv.no_batang);
-        ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0);
-        if (ImGui::Selectable(std::to_string(mv.no_batang).c_str(), selection.kind == SelectionKind::Member &&
-                                                                          selection.id == mv.no_batang,
-                               ImGuiSelectableFlags_SpanAllColumns)) {
-            selection = {SelectionKind::Member, mv.no_batang};
-        }
-        ImGui::TableSetColumnIndex(1);
-        ImGui::TextUnformatted(mv.is_beam ? "Beam" : "Column");
-        ImGui::TableSetColumnIndex(2);
-        ImGui::Text("%d", sd ? sd->JJ[mv.no_batang] : 0);
-        ImGui::TableSetColumnIndex(3);
-        ImGui::Text("%d", sd ? sd->JK[mv.no_batang] : 0);
-        ImGui::TableSetColumnIndex(4);
-        if (editable && ImGui::SmallButton("Delete")) {
-            if (undo) undo->PushUndo(editable->SdForUndo());
-            editable->DeleteMember(mv.no_batang);
-            if (selection.kind == SelectionKind::Member && selection.id == mv.no_batang) selection.Clear();
-            if (on_geometry_changed) on_geometry_changed();
-        }
-        ImGui::PopID();
-    }
-    ImGui::EndTable();
-}
-
 // Cascade-delete confirmation modal -- shown instead of deleting a joint
 // immediately whenever EditableStructure::DeleteJoint() would also take
 // members down with it (it always cascades; this is purely the warning
@@ -183,14 +134,14 @@ void DrawPendingDeleteModal(Selection& selection, EditableStructure* editable, U
 
 } // namespace
 
-void JointsMembersPanel::Draw(bool* open, const SceneModel& scene, Selection& selection, EditableStructure* editable,
-                               UndoStack* undo, const std::function<void()>& on_geometry_changed) {
-    if (!ImGui::Begin(PanelWindowTitle(kJointsMembersId, "Joints/Members").c_str(), open)) {
+void JointsPanel::Draw(bool* open, const SceneModel& scene, Selection& selection, EditableStructure* editable,
+                        UndoStack* undo, const std::function<void()>& on_geometry_changed) {
+    if (!ImGui::Begin(PanelWindowTitle(kJointsId, "Joints").c_str(), open)) {
         ImGui::End();
         return;
     }
-    if (scene.Empty()) {
-        ImGui::TextDisabled("No dataset loaded.");
+    if (scene.joints.empty()) {
+        ImGui::TextDisabled("No dataset loaded, or no joints yet.");
         ImGui::End();
         return;
     }
@@ -198,8 +149,6 @@ void JointsMembersPanel::Draw(bool* open, const SceneModel& scene, Selection& se
     bool open_delete_popup = false;
     DrawJointsTable(scene, selection, editable, undo, on_geometry_changed, pending_delete_joint_,
                     pending_delete_joint_members_, open_delete_popup);
-    ImGui::Spacing();
-    DrawMembersTable(scene, selection, editable, undo, on_geometry_changed);
 
     if (open_delete_popup) ImGui::OpenPopup("Delete Joint##confirm");
     DrawPendingDeleteModal(selection, editable, undo, on_geometry_changed, pending_delete_joint_,

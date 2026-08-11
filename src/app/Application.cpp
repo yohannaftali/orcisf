@@ -364,8 +364,9 @@ namespace {
 
 // Issue #15's "Default" preset -- exactly the single fixed layout this app
 // always had (no regression for existing users): Viewport/Detailing
-// large+center, Properties/Run Optimization tabbed on the right, Loads/Log
-// tabbed along the bottom.
+// large+center, Properties/Run Optimization tabbed on the right,
+// Joints/Members/Loads/Log tabbed along the bottom (issue #36 split what
+// used to be a single combined Joints/Members tab into two).
 void BuildDefaultLayout(ImGuiID dock_main) {
     ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.25f, nullptr, &dock_main);
     ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.25f, nullptr, &dock_main);
@@ -374,8 +375,13 @@ void BuildDefaultLayout(ImGuiID dock_main) {
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kDetailingId).c_str(), dock_main);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kPropertiesId).c_str(), dock_right);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kRunOptimizationId).c_str(), dock_right);
+    // Issue #36: these three (plus Log) end up tabbed together in this
+    // node -- the actual left-to-right tab order comes from OnFrame()'s
+    // panel Draw() call order, not from the order they're listed here
+    // (see the comment there).
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kJointsId).c_str(), dock_bottom);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kMembersId).c_str(), dock_bottom);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLoadsId).c_str(), dock_bottom);
-    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kJointsMembersId).c_str(), dock_bottom);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLogId).c_str(), dock_bottom);
 }
 
@@ -393,8 +399,10 @@ void BuildDesignLayout(ImGuiID dock_main) {
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kViewportId).c_str(), dock_main);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kDetailingId).c_str(), dock_main);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kPropertiesId).c_str(), dock_right);
+    // Issue #36: tab order (Joints, Members, Loads) comes from OnFrame().
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kJointsId).c_str(), dock_bottom);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kMembersId).c_str(), dock_bottom);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLoadsId).c_str(), dock_bottom);
-    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kJointsMembersId).c_str(), dock_bottom);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kRunOptimizationId).c_str(), dock_bottom_right);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLogId).c_str(), dock_bottom_right);
 }
@@ -412,9 +420,12 @@ void BuildOptimizationLayout(ImGuiID dock_main) {
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLogId).c_str(), dock_main);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kViewportId).c_str(), dock_right);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kDetailingId).c_str(), dock_right);
+    // Issue #36: tab order (Properties, Joints, Members, Loads) comes
+    // from OnFrame(), not from the order these are listed below.
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kPropertiesId).c_str(), dock_right_bottom);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kJointsId).c_str(), dock_right_bottom);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kMembersId).c_str(), dock_right_bottom);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLoadsId).c_str(), dock_right_bottom);
-    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kJointsMembersId).c_str(), dock_right_bottom);
 }
 
 } // namespace
@@ -505,9 +516,16 @@ void Application::OnFrame() {
                           on_geometry_changed);
     properties_panel_.Draw(&properties_open_, scene_, selection_, editable_ptr, &undo_stack_, validation_issues_,
                             on_geometry_changed);
+    // Issue #36: a docked tab bar's *displayed* order follows the order
+    // each window's Begin() is called within the frame, not the order
+    // BuildDefaultLayout()/etc.'s DockBuilderDockWindow() calls list them
+    // in (that only sets up the persistent node/ID association; found by
+    // screenshotting a mismatch between the two, not by reading the code).
+    // Joints/Members/Loads are called in that order here specifically so
+    // the tab row reads Joints, Members, Loads left-to-right, per #36.
+    joints_panel_.Draw(&joints_open_, scene_, selection_, editable_ptr, &undo_stack_, on_geometry_changed);
+    members_panel_.Draw(&members_open_, scene_, selection_, editable_ptr, &undo_stack_, on_geometry_changed);
     loads_panel_.Draw(&loads_open_, scene_, selection_, editable_ptr, &undo_stack_, on_geometry_changed);
-    joints_members_panel_.Draw(&joints_members_open_, scene_, selection_, editable_ptr, &undo_stack_,
-                                on_geometry_changed);
     detailing_panel_.Draw(&detailing_open_, scene_, selection_);
     run_panel_.Draw(&run_open_);
     log_panel_.Draw(&log_open_);

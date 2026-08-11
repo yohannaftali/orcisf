@@ -10,19 +10,20 @@
 
 namespace orcisf::gui {
 
-// Issue #21: tabular list of every joint and member in the loaded dataset,
-// inline-editable (joint X/Y/Z, restraint toggle) and deletable, mirroring
-// LoadsPanel's existing row-click-syncs-Selection / inline-InputFloat
-// pattern rather than introducing a new one. Row-level movement reuses the
+// Issue #36 (split from JointsMembersPanel, issue #21): tabular list of
+// every joint in the loaded dataset, inline-editable (X/Y/Z, restraint
+// toggle) and deletable, mirroring LoadsPanel's existing row-click-syncs-
+// Selection / inline-InputFloat pattern. Row-level movement reuses the
 // existing ImGuizmo gizmo / Properties panel numeric fields (issue #6) --
 // this panel is not a second way to drag a joint.
 //
 // Deleting a joint that still has members attached already cascades to
 // delete those members too (EditableStructure::DeleteJoint()) -- that
-// silent behavior predates this panel. What's new here is a confirmation
-// modal shown before the delete happens whenever it would take members
-// down with it, so the user isn't surprised by a silent cascade.
-class JointsMembersPanel {
+// silent behavior predates this panel (issue #21). What's new here is a
+// confirmation modal shown before the delete happens whenever it would
+// take members down with it, so the user isn't surprised by a silent
+// cascade.
+class JointsPanel {
 public:
     void Draw(bool* open, const SceneModel& scene, Selection& selection, EditableStructure* editable, UndoStack* undo,
               const std::function<void()>& on_geometry_changed);

@@ -203,6 +203,10 @@ src/
 │   ├── LoadsPanel.{h,cpp}       # #7: load-schedule table -- one row per
 │   │                            # member/joint with a nonzero raw load,
 │   │                            # inline-editable, row click syncs Selection
+│   ├── JointsPanel.{h,cpp}      # #36 (split from JointsMembersPanel, #21):
+│   │                            # joints table, cascade-delete-with-warning
+│   ├── MembersPanel.{h,cpp}     # #36 (split from JointsMembersPanel, #21):
+│   │                            # members table
 │   ├── DetailingPanel.{h,cpp}   # #8: 2D reinforcement drawing (concrete
 │   │                            # outline, bars, stirrups, dimension labels)
 │   │                            # for whichever member is selected -- view-only,
@@ -1306,6 +1310,43 @@ callers:**
   -- CI plus a real interactive pass are still the next steps for full
   confidence.
 
+**Superseded by issue #36 (2026-08-11): `JointsMembersPanel` was split
+into `gui/JointsPanel.{h,cpp}` and `gui/MembersPanel.{h,cpp}`, two
+independent panels.** `DrawJointsTable()`/the cascade-delete modal moved
+into `JointsPanel` unchanged; `DrawMembersTable()` moved into `MembersPanel`
+unchanged (both dropped their `ImGui::SeparatorText("Joints"/"Members")`
+call, since the panel's own dock tab -- see issue #35 -- already labels
+it, same reasoning as #35's content-row-header removal). Everything
+above this note about the *logic* (the `SpanAllColumns` pattern, the
+`TouchingMembers()` + modal ID-stack scoping, `EditableStructure`'s
+cascade behavior) still applies verbatim to `JointsPanel` -- only the
+window/file split changed, not the code within either table. `#36` also
+reordered the shared dock group's tab order to Joints, Members, Loads
+(previously Loads, Joints/Members) -- see `Application.cpp`'s `OnFrame()`
+comment on *why* that reorder had to happen via `Draw()` call order, not
+via `DockBuilderDockWindow()` call order (a wrong assumption caught by
+screenshotting a mismatch, not by reading Dear ImGui's source).
+**What was verified for #36 specifically:** compiled cleanly; real
+interactive data flow confirmed via a scratch blank structure (Add Joint
+x2, Connect Joints to link them into a member) -- `JointsPanel`'s table
+correctly showed both joints' live X/Y/Z, `MembersPanel`'s table
+correctly showed the resulting member with the right Joint A/B, and the
+tab order matched Joints/Members/Loads/Log exactly as required, all via
+real screenshots. **The cascade-delete modal was NOT re-verified this
+pass** -- multiple precisely-aimed automated clicks on the Joints
+table's per-row "Delete" button (confirmed via a crosshair-annotated
+screenshot to be landing within the button's visible rect, and via
+`GetCursorPos()`/`GetWindowRect()` to rule out a coordinate-space
+mismatch) produced no hover highlight and no click effect at all,
+for a reason not root-caused in this pass. Given the modal's code is
+byte-for-byte the code #21 already shipped with the same "not yet
+interactively verified" caveat above, this isn't a new regression risk
+introduced by the split -- but it remains open work for a future
+interactive pass, ideally one that root-causes why this specific
+`SmallButton` inside a `SpanAllColumns`-selectable table row didn't
+respond to synthesized clicks that worked fine everywhere else in the
+same session (tabs, toolbar icons, viewport clicks).
+
 **2D plane-locked drawing (issue #22, part of epic #20) — read before
 touching `gui/viewport/Camera.{h,cpp}`, `gui/viewport/Math3D.h`'s
 `Orthographic()`, or `ViewportPanel`'s `add_joint_mode` branch:**
@@ -2152,7 +2193,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #31 | fix(src): application is not DPI-aware -- UI too small on high-DPI monitors in multi-monitor setups | closed | 2026-08-11 |
 | #32 | chore(src): add one-shot build scripts (build.ps1 for Windows, build.sh for macOS/Linux) | ready-for-review | 2026-08-11 |
 | #35 | fix(src): move panel icons onto the dock tab button, remove the in-content icon+title header row (#28 correction) | ready-for-review | 2026-08-11 |
-| #36 | feat(src): split Joints/Members panel into separate Joints and Members panels; order Loads tab immediately after them | open | 2026-08-11 |
+| #36 | feat(src): split Joints/Members panel into separate Joints and Members panels; order Loads tab immediately after them | ready-for-review | 2026-08-11 |
 | #37 | feat(src): View menu Menubar/Subwindows/Layout sections + fix tab close button + rename "Run Optimization" panel | open | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui

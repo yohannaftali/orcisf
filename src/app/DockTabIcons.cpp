@@ -24,17 +24,18 @@ struct Entry {
     gui::PanelIcon icon;
 };
 
-// Issue #36/#37 will edit this table (Joints/Members split into two rows,
-// "Run Optimization" renamed to "Optimization" -- a display-only change,
-// gui::kRunOptimizationId's *identity* string doesn't need to change for
-// that) -- keep it in sync with whichever gui::kXxxId constants
-// Application.cpp's panels currently pass to PanelWindowTitle().
-constexpr std::array<Entry, 7> kPanels = {{
+// Issue #37 will edit this table's display: "Run Optimization" ->
+// "Optimization" is a display-only change, gui::kRunOptimizationId's
+// *identity* string doesn't need to change for that. Keep this table in
+// sync with whichever gui::kXxxId constants Application.cpp's panels
+// currently pass to PanelWindowTitle().
+constexpr std::array<Entry, 8> kPanels = {{
     {gui::kViewportId, gui::PanelIcon::Viewport},
     {gui::kDetailingId, gui::PanelIcon::Detailing},
     {gui::kPropertiesId, gui::PanelIcon::Properties},
     {gui::kRunOptimizationId, gui::PanelIcon::Run},
-    {gui::kJointsMembersId, gui::PanelIcon::JointsMembers},
+    {gui::kJointsId, gui::PanelIcon::Joints},
+    {gui::kMembersId, gui::PanelIcon::Members},
     {gui::kLoadsId, gui::PanelIcon::Loads},
     {gui::kLogId, gui::PanelIcon::Log},
 }};

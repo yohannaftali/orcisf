@@ -42,12 +42,23 @@ void DrawPropertiesIcon(ImDrawList* dl, ImVec2 o, ImU32 c, float size) {
     dl->AddCircleFilled(P(o, 0.42f, 0.82f, size), size * 0.09f, c);
 }
 
-void DrawJointsMembersIcon(ImDrawList* dl, ImVec2 o, ImU32 c, float size) {
-    // Two joints connected by a member -- same visual language as
-    // IconToolbar.cpp's Add-Joint/Connect icons.
-    dl->AddLine(P(o, 0.2f, 0.8f, size), P(o, 0.8f, 0.2f, size), c, 1.3f);
-    dl->AddCircleFilled(P(o, 0.2f, 0.8f, size), size * 0.12f, c);
-    dl->AddCircleFilled(P(o, 0.8f, 0.2f, size), size * 0.12f, c);
+void DrawJointsIcon(ImDrawList* dl, ImVec2 o, ImU32 c, float size) {
+    // Three standalone joint dots -- issue #36 split the combined
+    // Joints/Members glyph (issue #21) into two panels; this is the
+    // joints-only subset of it.
+    dl->AddCircleFilled(P(o, 0.25f, 0.75f, size), size * 0.14f, c);
+    dl->AddCircleFilled(P(o, 0.75f, 0.75f, size), size * 0.14f, c);
+    dl->AddCircleFilled(P(o, 0.5f, 0.25f, size), size * 0.14f, c);
+}
+
+void DrawMembersIcon(ImDrawList* dl, ImVec2 o, ImU32 c, float size) {
+    // A single member (line) between two small unfilled joint end-caps --
+    // the members-only subset of the original combined glyph (issue #36),
+    // deliberately unfilled circles (vs. DrawJointsIcon's filled dots) so
+    // the two icons read as distinct at a glance.
+    dl->AddLine(P(o, 0.18f, 0.82f, size), P(o, 0.82f, 0.18f, size), c, 1.3f);
+    dl->AddCircle(P(o, 0.18f, 0.82f, size), size * 0.11f, c, 0, 1.1f);
+    dl->AddCircle(P(o, 0.82f, 0.18f, size), size * 0.11f, c, 0, 1.1f);
 }
 
 void DrawLoadsIcon(ImDrawList* dl, ImVec2 o, ImU32 c, float size) {
@@ -74,7 +85,8 @@ void DrawPanelIcon(PanelIcon icon, ImDrawList* dl, ImVec2 origin, ImU32 color, f
         case PanelIcon::Viewport: DrawViewportIcon(dl, origin, color, size); break;
         case PanelIcon::Detailing: DrawDetailingIcon(dl, origin, color, size); break;
         case PanelIcon::Properties: DrawPropertiesIcon(dl, origin, color, size); break;
-        case PanelIcon::JointsMembers: DrawJointsMembersIcon(dl, origin, color, size); break;
+        case PanelIcon::Joints: DrawJointsIcon(dl, origin, color, size); break;
+        case PanelIcon::Members: DrawMembersIcon(dl, origin, color, size); break;
         case PanelIcon::Loads: DrawLoadsIcon(dl, origin, color, size); break;
         case PanelIcon::Run: DrawRunIcon(dl, origin, color, size); break;
         case PanelIcon::Log: DrawLogIcon(dl, origin, color, size); break;

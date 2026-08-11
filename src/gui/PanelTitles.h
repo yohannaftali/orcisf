@@ -14,7 +14,8 @@ inline constexpr const char* kViewportId = "Viewport";
 inline constexpr const char* kDetailingId = "Detailing";
 inline constexpr const char* kPropertiesId = "Properties";
 inline constexpr const char* kRunOptimizationId = "RunOptimization";
-inline constexpr const char* kJointsMembersId = "JointsMembers";
+inline constexpr const char* kJointsId = "Joints";
+inline constexpr const char* kMembersId = "Members";
 inline constexpr const char* kLoadsId = "Loads";
 inline constexpr const char* kLogId = "Log";
 
