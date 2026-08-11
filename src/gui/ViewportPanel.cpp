@@ -6,6 +6,8 @@
 #include <imgui.h>
 #include <ImGuizmo.h>
 
+#include "gui/PanelIcons.h"
+
 namespace orcisf::gui {
 
 using namespace math3d;
@@ -238,6 +240,7 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
         ImGui::End();
         return;
     }
+    DrawPanelIconHeader(PanelIcon::Viewport, "Viewport");
 
     ImVec2 avail = ImGui::GetContentRegionAvail();
     int width = static_cast<int>(avail.x);

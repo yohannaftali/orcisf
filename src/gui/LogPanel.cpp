@@ -2,6 +2,8 @@
 
 #include <imgui.h>
 
+#include "gui/PanelIcons.h"
+
 namespace orcisf::gui {
 
 void LogPanel::AddLine(std::string line) {
@@ -17,6 +19,7 @@ void LogPanel::Draw(bool* open) {
         ImGui::End();
         return;
     }
+    DrawPanelIconHeader(PanelIcon::Log, "Log");
 
     if (ImGui::Button("Clear")) {
         Clear();

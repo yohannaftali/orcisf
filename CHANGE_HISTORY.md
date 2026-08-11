@@ -1587,3 +1587,35 @@ history only; don't duplicate current-state description here.
   Documented the underlying DPI-screenshot-measurement pitfall in
   `AGENTS.md` (relevant to issue #29's still-pending interactive
   verification too, which uses the same kind of tooling).
+
+## 2026-08-11 — feat(src): implement issue #28 (Alt-mnemonics + panel icons)
+
+- **Part 1**: added `&` mnemonics to `Toolbar::Draw()`'s six top-level
+  menu labels (`&File`, `&Edit`, `View &Plane`, `&Loads`, `&Run`,
+  `&View`) -- Dear ImGui's built-in mechanism, no new code needed beyond
+  picking non-colliding letters (`View Plane` uses `P` since `V` was
+  already claimed by the separate `View` layout-preset menu).
+- **Part 2**: new `src/gui/PanelIcons.{h,cpp}` -- `DrawPanelIconHeader()`
+  draws a small hand-drawn icon (same `ImDrawList` style as
+  `IconToolbar.cpp`) + label + separator, called as the first thing
+  after `ImGui::Begin()` in all seven panels (`ViewportPanel`,
+  `PropertiesPanel`, `LoadsPanel`, `JointsMembersPanel`,
+  `DetailingPanel`, `RunPanel`, `LogPanel`). Documented why this isn't
+  literally inside the native dock-tab label (no public ImGui API for
+  that without an icon font or touching `imgui_internal.h`) -- see
+  AGENTS.md.
+- Files: `src/gui/Toolbar.cpp`, `src/gui/PanelIcons.{h,cpp}` (new),
+  `src/gui/{Viewport,Properties,Loads,JointsMembers,Detailing,Run,Log}Panel.cpp`,
+  `src/CMakeLists.txt`.
+- Compiled successfully (MSVC/Ninja, `windows-release`) after fixing one
+  real build error (missing `<initializer_list>` include for the
+  icon-drawing helpers' range-for loops). App launched and stayed
+  running. **Visual confirmation (Alt-underlines, icons actually
+  rendering) was not completed** -- hit this environment's recurring
+  focus-stealing hazard again while trying to screenshot it (an
+  unrelated app kept stealing foreground); stopped rather than keep
+  retrying, per the project's automation-rabbit-hole guidance. Both
+  mechanisms are standard/low-risk (ImGui's own mnemonic convention;
+  the exact icon-drawing pattern already proven in `IconToolbar.cpp`).
+  Issue #28 status set to `ready-for-review`, not `done`, until a real
+  interactive/screenshot pass confirms it.

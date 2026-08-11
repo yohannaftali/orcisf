@@ -7,6 +7,7 @@
 #include <imgui.h>
 
 #include "engine/LegacyIO.h"
+#include "gui/PanelIcons.h"
 
 namespace orcisf::gui {
 
@@ -221,6 +222,7 @@ void PropertiesPanel::Draw(bool* open, const SceneModel& scene, Selection& selec
         ImGui::End();
         return;
     }
+    DrawPanelIconHeader(PanelIcon::Properties, "Properties");
 
     switch (selection.kind) {
         case SelectionKind::Joint:

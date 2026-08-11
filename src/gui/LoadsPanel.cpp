@@ -4,6 +4,8 @@
 
 #include <imgui.h>
 
+#include "gui/PanelIcons.h"
+
 namespace orcisf::gui {
 
 namespace {
@@ -114,6 +116,7 @@ void LoadsPanel::Draw(bool* open, const SceneModel& scene, Selection& selection,
         ImGui::End();
         return;
     }
+    DrawPanelIconHeader(PanelIcon::Loads, "Loads");
 
     if (scene.Empty()) {
         ImGui::TextDisabled("No dataset loaded.");

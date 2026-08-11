@@ -41,6 +41,7 @@ add_executable(orcisf_gui WIN32
     app/Theme.cpp
     gui/Toolbar.cpp
     gui/IconToolbar.cpp
+    gui/PanelIcons.cpp
     gui/ViewportPanel.cpp
     gui/PropertiesPanel.cpp
     gui/RunPanel.cpp

@@ -8,6 +8,7 @@
 #include <imgui.h>
 
 #include "engine/Engine.h"
+#include "gui/PanelIcons.h"
 
 namespace orcisf::gui {
 
@@ -121,6 +122,7 @@ void RunPanel::Draw(bool* open) {
         ImGui::End();
         return;
     }
+    DrawPanelIconHeader(PanelIcon::Run, "Run Optimization");
 
     bool running = IsRunning();
     if (was_running_ && !running) {

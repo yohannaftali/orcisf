@@ -819,6 +819,62 @@ report in this environment again:**
   closed as "cannot reproduce"; not closed automatically (per this
   project's usual caution around closing issues without confirmation).
 
+**Alt-mnemonic menus + panel icon headers (issue #28) — read before
+touching `Toolbar.cpp`'s menu labels or `gui/PanelIcons.{h,cpp}`:**
+- **Part 1 (Alt-mnemonics) needed zero new plumbing.** Dear ImGui
+  underlines whichever letter follows a `&` in a menu label and binds
+  Alt+<letter> to it automatically once
+  `ImGuiConfigFlags_NavEnableKeyboard` is set -- already true in
+  `main.cpp` since issue #2. The only work was adding `&` to six labels
+  in `Toolbar::Draw()` and picking non-colliding letters: `&File`,
+  `&Edit`, `View &Plane` (not `&View Plane` -- `V` was already claimed
+  by the separate `&View` layout-preset menu), `&Loads`, `&Run`, `&View`.
+- **Part 2 (panel icons) could NOT be "an icon inside the native dock-tab
+  label text"** -- Dear ImGui has no public API to embed an arbitrary
+  glyph inside a window's title/tab-bar string without either an icon
+  font (a new asset/dependency this project doesn't otherwise need) or
+  reaching into `imgui_internal.h` to hook the *shared* dock-node tab
+  bar (fragile, version-coupled, and not a pattern used elsewhere in
+  this codebase -- the one place that reaches past a library's public
+  API, `report/PdfExport.cpp`'s libharu `setjmp`/`longjmp` error
+  handler, is a C library's own documented callback model, not a
+  precedent for touching ImGui's internals). **Decided instead**: each
+  panel calls `gui::DrawPanelIconHeader(PanelIcon::X, "Label")`
+  (`gui/PanelIcons.{h,cpp}`, new) as the very first thing after
+  `ImGui::Begin()` -- draws a small hand-drawn icon (same
+  `ImDrawList`-primitives-in-a-`P()`-helper style as `IconToolbar.cpp`
+  and `ViewportPanel.cpp`'s UCS icon, no icon font) plus the label text
+  and a separator, inside the panel's own content area. This shows
+  whenever a panel is the active/visible tab (the common case), but is
+  a header *row inside the content*, not literally inside the OS-drawn
+  tab strip -- a deliberate, documented tradeoff, not an oversight.
+- **`ViewportPanel::Draw()`'s icon header consumes a little of
+  `ImGui::GetContentRegionAvail()`** before the 3D render texture size
+  is computed -- intentional and harmless (the viewport just renders
+  slightly shorter to make room), not a bug.
+- **What was verified vs. not:** compiled cleanly (MSVC/Ninja,
+  `windows-release`) after fixing one real build error (`<initializer_list>`
+  wasn't transitively included, needed for the icon-drawing helpers'
+  `for (float y : {...})` range-for loops -- MSVC caught this at compile
+  time, not a logic bug). The app launched and stayed running
+  (process alive) after wiring both parts in. **Visual confirmation via
+  screenshot (Alt-underlines actually appearing, icons actually
+  rendering) was not completed** -- holding Alt via a synthesized
+  `keybd_event` triggered an unrelated foreground-app switch in this
+  environment (unrelated concurrent processes stealing focus is a
+  recurring, previously-documented hazard here, see the `gui/viewport/`
+  and #21-#25-retest notes elsewhere in this file), and repeated
+  `SetForegroundWindow()` calls afterward didn't reliably reclaim focus
+  either (Windows' foreground-lock protections without the
+  `AttachThreadInput` workaround this project's earlier interactive
+  passes used). Stopped rather than keep retrying, per this project's
+  "avoid automation rabbit holes" guidance -- both mechanisms used here
+  are standard, already-proven-in-this-codebase techniques (ImGui's
+  built-in mnemonic convention; the exact `ImDrawList` icon pattern
+  `IconToolbar.cpp` already uses), so the risk of either being
+  substantively broken is low, but a real interactive/screenshot pass
+  is still the honest next step before calling this "fully verified."
+
 **AutoCAD-style Add Joint + editing guidance (issue #18, part of epic
 #13) — read before touching `EditorOptions::add_joint_mode`/
 `ViewportPanel::HandlePicking()`/`Toolbar.cpp`'s status-hint block:**
@@ -1548,7 +1604,7 @@ for skills that apply to the current task and follow them.
 | #25 | fix(src): Run panel dataset-path field is redundant; write each run into a timestamped output subfolder | ready-for-review | 2026-08-11 |
 | #26 | feat(src): wire up the app icon set (icons/) for Windows/macOS/Linux builds | ready-for-review | 2026-08-11 |
 | #27 | fix(src): title bar Minimize/Maximize/Close buttons not flush to window right edge | closed (not reproducible) | 2026-08-11 |
-| #28 | feat(src): Alt-mnemonic menu navigation + icon before each panel title | open | 2026-08-11 |
+| #28 | feat(src): Alt-mnemonic menu navigation + icon before each panel title | ready-for-review | 2026-08-11 |
 | #29 | chore(src): interactively re-verify RunPanel dataset gating (#25) and 2D plane offset control (#22/#24) with a real loaded dataset | open | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui

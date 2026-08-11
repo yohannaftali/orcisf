@@ -5,6 +5,7 @@
 
 #include <imgui.h>
 
+#include "gui/PanelIcons.h"
 #include "gui/detailing/DetailingLayout.h"
 
 namespace orcisf::gui {
@@ -62,6 +63,7 @@ void DetailingPanel::Draw(bool* open, const SceneModel& scene, const Selection& 
         ImGui::End();
         return;
     }
+    DrawPanelIconHeader(PanelIcon::Detailing, "Detailing");
 
     if (selection.kind != SelectionKind::Member) {
         ImGui::TextDisabled("Select a member (beam or column) in the Viewport to see its reinforcement detailing.");

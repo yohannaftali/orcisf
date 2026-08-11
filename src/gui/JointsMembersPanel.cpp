@@ -4,6 +4,8 @@
 
 #include <imgui.h>
 
+#include "gui/PanelIcons.h"
+
 namespace orcisf::gui {
 
 namespace {
@@ -187,6 +189,7 @@ void JointsMembersPanel::Draw(bool* open, const SceneModel& scene, Selection& se
         ImGui::End();
         return;
     }
+    DrawPanelIconHeader(PanelIcon::JointsMembers, "Joints/Members");
 
     if (scene.Empty()) {
         ImGui::TextDisabled("No dataset loaded.");

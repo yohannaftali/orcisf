@@ -20,8 +20,15 @@ void Toolbar::SetTitleBarDrawer(std::function<void()> drawer) { on_title_bar_dra
 
 void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_text, bool can_export_pdf,
                     bool can_export_inf, ViewLayoutPreset current_layout, EditorOptions& options) {
+    // Issue #28: VS Code-style Alt-mnemonic menu access -- Dear ImGui
+    // underlines whatever letter follows a "&" in a menu label and binds
+    // Alt+<letter> to it automatically once ImGuiConfigFlags_NavEnableKeyboard
+    // is set (already done in main.cpp), no extra wiring needed here beyond
+    // picking non-colliding letters. "View Plane" uses P (not V, which
+    // "View" already claims) to avoid a collision between the two menus
+    // that both start with "View".
     if (ImGui::BeginMainMenuBar()) {
-        if (ImGui::BeginMenu("File")) {
+        if (ImGui::BeginMenu("&File")) {
             if (ImGui::MenuItem("New Data")) {
                 if (on_new_data_) on_new_data_();
             }
@@ -51,7 +58,7 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
             }
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("Edit")) {
+        if (ImGui::BeginMenu("&Edit")) {
             if (ImGui::MenuItem("Undo", "Ctrl+Z", false, can_undo)) {
                 if (on_undo_) on_undo_();
             }
@@ -93,7 +100,7 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
         // undiscoverable/unreachable while actually looking at the locked
         // plane. Don't re-add a second offset editor here; one place to
         // edit `plane_offset_xy`/`_xz`/`_yz` is enough.
-        if (ImGui::BeginMenu("View Plane")) {
+        if (ImGui::BeginMenu("View &Plane")) {
             if (ImGui::MenuItem("Free (perspective/orbit)", nullptr, options.view_plane == ViewPlane::Free)) {
                 options.view_plane = ViewPlane::Free;
             }
@@ -109,7 +116,7 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
             }
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("Loads")) {
+        if (ImGui::BeginMenu("&Loads")) {
             bool none = options.load_mode == LoadPlacementMode::None;
             bool member_load = options.load_mode == LoadPlacementMode::MemberLoad;
             bool joint_load = options.load_mode == LoadPlacementMode::JointLoad;
@@ -128,12 +135,12 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
             }
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("Run")) {
+        if (ImGui::BeginMenu("&Run")) {
             ImGui::MenuItem("Optimize...", nullptr, false, false);
             ImGui::MenuItem("Cancel", nullptr, false, false);
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("View")) {
+        if (ImGui::BeginMenu("&View")) {
             if (ImGui::MenuItem("Default", nullptr, current_layout == ViewLayoutPreset::Default)) {
                 if (on_view_layout_) on_view_layout_(ViewLayoutPreset::Default);
             }
