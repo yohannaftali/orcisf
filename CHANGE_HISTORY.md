@@ -1722,3 +1722,31 @@ history only; don't duplicate current-state description here.
 - Files: `src/app/main.cpp`.
 - Issue #31 status set to `ready-for-review`, not `done`, until the
   mid-resolution-monitor case is confirmed on real hardware.
+
+## 2026-08-11 — feat(src): implement issue #30 (real Alt-mnemonic menu navigation)
+
+- `src/gui/Toolbar.cpp`: new `BeginMnemonicMenu(label, mnemonic_index,
+  mnemonic_key, alt_held)` -- entirely via ImGui's public API, no
+  `imgui_internal.h`. Draws an underline under the mnemonic character
+  (positioned via `CalcTextSize()`) only while Alt is held, and opens
+  the menu via `ImGui::OpenPopup(label)` (same label/ID `BeginMenu()`
+  itself uses) on `Alt+<letter>`, a documented Dear ImGui idiom for
+  programmatically opening a popup. All six top-level menus wired
+  through it: File=F, Edit=E, "View Plane"=P (index 5, not the first
+  letter -- V was already claimed by the separate "View" menu), Loads=L,
+  Run=R, View=V -- the same letter assignment #28 originally picked.
+- Compiled successfully (MSVC/Ninja, `windows-release`) via the
+  `rebuild` skill. **Interactive confirmation was not completed** --
+  repeated attempts to grab foreground for a screenshot landed on the
+  user's own actively-in-use browser window (reading this project's
+  GitHub issue #29 live), correctly identified as the user's active
+  session rather than background interference, so automation was
+  stopped and their window state restored rather than fighting for
+  control of it.
+- Files: `src/gui/Toolbar.cpp`.
+- Issue #30 status set to `ready-for-review`, not `done`, until a real
+  interactive pass (Alt held + screenshot, Alt+letter + screenshot)
+  confirms it -- #28's own lesson (an assumption about this exact
+  library turned out wrong) is reason enough not to claim this works
+  without empirical confirmation, even though the techniques used here
+  are standard/well-understood ones.

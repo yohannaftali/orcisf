@@ -4,6 +4,55 @@
 
 namespace orcisf::gui {
 
+namespace {
+
+// Issue #30: real VS Code/Win32-style Alt-mnemonic menu access -- issue
+// #28 first tried this by prefixing labels with "&", which turned out to
+// be a Win32/Qt/wxWidgets convention Dear ImGui's stock BeginMenu() does
+// NOT implement (confirmed by running a build: the literal "&" was shown,
+// unparsed -- see AGENTS.md's issue #28/#30 notes). This hand-rolls it
+// instead, entirely via ImGui's public API (no imgui_internal.h):
+//  1. Underline is drawn as a manual ImDrawList overlay under the
+//     mnemonic character, positioned via CalcTextSize() on the label's
+//     prefix/character substrings -- only while Alt is currently held
+//     (matching the Windows convention of hiding accelerators otherwise).
+//  2. Alt+<letter> opens the menu via the documented ImGui idiom for
+//     programmatically opening a popup: call ImGui::OpenPopup(label)
+//     with the *exact* same label text BeginMenu(label) uses for its own
+//     ID, in the same ID-stack scope (both are direct children of the
+//     main menu bar here), on the same frame just before BeginMenu() --
+//     ImGui recognizes it as already-open when BeginMenu() runs right
+//     after.
+bool BeginMnemonicMenu(const char* label, int mnemonic_index, ImGuiKey mnemonic_key, bool alt_held) {
+    if (alt_held && ImGui::IsKeyChordPressed(ImGuiMod_Alt | mnemonic_key)) {
+        ImGui::OpenPopup(label);
+    }
+
+    bool opened = ImGui::BeginMenu(label);
+
+    if (alt_held) {
+        ImVec2 item_min = ImGui::GetItemRectMin();
+        ImVec2 item_max = ImGui::GetItemRectMax();
+        // Main-menu-bar items are padded by FramePadding.x on each side
+        // before the label text starts (not publicly exposed as a single
+        // constant, but this matches Dear ImGui's own menu-bar item
+        // layout) -- close enough for a cosmetic underline; a 1-2px
+        // misalignment here is not a functional bug.
+        float text_x = item_min.x + ImGui::GetStyle().FramePadding.x;
+        ImVec2 pre_size = ImGui::CalcTextSize(label, label + mnemonic_index);
+        ImVec2 char_size = ImGui::CalcTextSize(label + mnemonic_index, label + mnemonic_index + 1);
+        float underline_x0 = text_x + pre_size.x;
+        float underline_x1 = underline_x0 + char_size.x;
+        float underline_y = item_max.y - ImGui::GetStyle().FramePadding.y - 1.f;
+        ImGui::GetWindowDrawList()->AddLine(ImVec2(underline_x0, underline_y), ImVec2(underline_x1, underline_y),
+                                             ImGui::GetColorU32(ImGuiCol_Text), 1.5f);
+    }
+
+    return opened;
+}
+
+} // namespace
+
 void Toolbar::SetOnNewData(std::function<void()> callback) { on_new_data_ = std::move(callback); }
 void Toolbar::SetOnSave(std::function<void()> callback) { on_save_ = std::move(callback); }
 void Toolbar::SetOnSaveAs(std::function<void()> callback) { on_save_as_ = std::move(callback); }
@@ -20,19 +69,14 @@ void Toolbar::SetTitleBarDrawer(std::function<void()> drawer) { on_title_bar_dra
 
 void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_text, bool can_export_pdf,
                     bool can_export_inf, ViewLayoutPreset current_layout, EditorOptions& options) {
-    // Issue #28/#29 correction: Dear ImGui's stock BeginMenu()/MenuItem()
-    // does NOT parse a "&"-prefixed letter into an underlined mnemonic the
-    // way Win32/Qt/wxWidgets menus do -- confirmed by actually running a
-    // build with "&"-prefixed labels: the literal "&" character was shown
-    // in the menu bar (e.g. "&File"), not stripped/underlined. Real Alt+
-    // letter mnemonics in Dear ImGui require hand-rolling it (parse the
-    // label yourself, draw the mnemonic letter underlined only while Alt
-    // is held, detect the Alt+key combo yourself to open that menu) --
-    // out of scope for this quick pass; tracked as a fresh follow-up issue
-    // instead of shipping the visibly-broken "&File" text. Plain labels
-    // restored here.
+    // Issue #30: real Alt-mnemonic menu access, see BeginMnemonicMenu()'s
+    // comment above for how (issue #28's "&"-prefix attempt didn't work --
+    // Dear ImGui doesn't parse that convention, see AGENTS.md). Letters:
+    // File=F, Edit=E, "View Plane"=P (not V -- already claimed by the
+    // separate "View" layout-preset menu), Loads=L, Run=R, View=V.
+    bool alt_held = ImGui::IsKeyDown(ImGuiMod_Alt);
     if (ImGui::BeginMainMenuBar()) {
-        if (ImGui::BeginMenu("File")) {
+        if (BeginMnemonicMenu("File", 0, ImGuiKey_F, alt_held)) {
             if (ImGui::MenuItem("New Data")) {
                 if (on_new_data_) on_new_data_();
             }
@@ -62,7 +106,7 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
             }
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("Edit")) {
+        if (BeginMnemonicMenu("Edit", 0, ImGuiKey_E, alt_held)) {
             if (ImGui::MenuItem("Undo", "Ctrl+Z", false, can_undo)) {
                 if (on_undo_) on_undo_();
             }
@@ -104,7 +148,7 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
         // undiscoverable/unreachable while actually looking at the locked
         // plane. Don't re-add a second offset editor here; one place to
         // edit `plane_offset_xy`/`_xz`/`_yz` is enough.
-        if (ImGui::BeginMenu("View Plane")) {
+        if (BeginMnemonicMenu("View Plane", 5, ImGuiKey_P, alt_held)) {
             if (ImGui::MenuItem("Free (perspective/orbit)", nullptr, options.view_plane == ViewPlane::Free)) {
                 options.view_plane = ViewPlane::Free;
             }
@@ -120,7 +164,7 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
             }
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("Loads")) {
+        if (BeginMnemonicMenu("Loads", 0, ImGuiKey_L, alt_held)) {
             bool none = options.load_mode == LoadPlacementMode::None;
             bool member_load = options.load_mode == LoadPlacementMode::MemberLoad;
             bool joint_load = options.load_mode == LoadPlacementMode::JointLoad;
@@ -139,12 +183,12 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
             }
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("Run")) {
+        if (BeginMnemonicMenu("Run", 0, ImGuiKey_R, alt_held)) {
             ImGui::MenuItem("Optimize...", nullptr, false, false);
             ImGui::MenuItem("Cancel", nullptr, false, false);
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("View")) {
+        if (BeginMnemonicMenu("View", 0, ImGuiKey_V, alt_held)) {
             if (ImGui::MenuItem("Default", nullptr, current_layout == ViewLayoutPreset::Default)) {
                 if (on_view_layout_) on_view_layout_(ViewLayoutPreset::Default);
             }

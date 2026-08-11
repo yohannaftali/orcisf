@@ -880,6 +880,56 @@ running a build, not by code review:**
   for the established pattern of correcting past claims openly rather
   than silently).
 
+**Issue #30 (real Alt-mnemonic menu navigation) — implemented; read before
+touching `Toolbar.cpp`'s `BeginMnemonicMenu()`:**
+- **Entirely public-API, no `imgui_internal.h`** -- two independent
+  pieces, both necessary:
+  1. **Underline rendering**: after `ImGui::BeginMenu(label)` draws the
+     plain-text menu bar item, `BeginMnemonicMenu()` computes the
+     mnemonic character's on-screen x-range via `ImGui::CalcTextSize()`
+     on the label's prefix substring and the single mnemonic character,
+     then draws a short line under it with
+     `ImGui::GetWindowDrawList()->AddLine()` -- but only while
+     `ImGui::IsKeyDown(ImGuiMod_Alt)` is true that frame, matching the
+     Windows convention of hiding accelerators until Alt is held. The
+     left-edge x-offset assumes `style.FramePadding.x` padding before
+     the label text (Dear ImGui's own main-menu-bar item layout) --
+     not a publicly exposed constant, so a 1-2px misalignment is
+     possible; a cosmetic risk, not a functional one.
+  2. **Opening via Alt+letter**: `ImGui::OpenPopup(label)` is called
+     (only on the exact frame `ImGui::IsKeyChordPressed(ImGuiMod_Alt |
+     mnemonic_key)` fires) with the *identical* label string
+     `BeginMenu(label)` uses for its own ID, in the same ID-stack scope
+     (both direct children of the main menu bar) -- this is a documented
+     Dear ImGui idiom for programmatically opening a specific popup/menu
+     without a click, and `BeginMenu()` recognizes it as open the same
+     frame since `OpenPopup()` runs first.
+- **Mnemonic index is the character's index within the label, not
+  necessarily 0** -- `"View Plane"`'s mnemonic is `P` at index 5 (`V`0
+  `i`1 `e`2 `w`3 ` `4 `P`5), not the first letter, since `V` was already
+  claimed by the separate `"View"` layout-preset menu. Letters: File=F,
+  Edit=E, View Plane=P, Loads=L, Run=R, View=V (same assignment #28
+  originally picked, before the "&" attempt was found broken).
+- **What was verified vs. not:** compiled cleanly (MSVC/Ninja,
+  `windows-release`) via the `rebuild` skill. **Interactive
+  confirmation (Alt held -> underlines actually appear in the right
+  place; Alt+letter -> the right menu actually opens) was not
+  completed** -- attempting to grab foreground for screenshotting
+  repeatedly landed on the user's own actively-in-use browser window
+  (reading this project's GitHub issue #29 in real time), not an
+  unrelated background process. Correctly identified as the user's live
+  session rather than background interference, so automation was
+  stopped and their window state was restored rather than continuing to
+  fight for control of their active session. The underline-position math
+  and the `OpenPopup`-before-`BeginMenu` idiom are both standard,
+  well-understood Dear ImGui techniques (not the kind of "assumed but
+  wrong" mistake #28's `&`-prefix attempt was, which assumed a
+  *library* feature that plain research/testing would have caught
+  immediately) -- but given #28's own lesson that assumptions about this
+  exact library should be verified empirically before trusting them,
+  don't treat this as fully confirmed until a real interactive pass
+  (Alt held + screenshot, Alt+letter + screenshot) succeeds.
+
 **Issue #29 (interactive retest of RunPanel dataset gating + plane-offset
 overlay) — still blocked, not resolved this pass; read before attempting
 this again:**
@@ -1716,7 +1766,7 @@ for skills that apply to the current task and follow them.
 | #27 | fix(src): title bar Minimize/Maximize/Close buttons not flush to window right edge | closed (not reproducible) | 2026-08-11 |
 | #28 | feat(src): Alt-mnemonic menu navigation + icon before each panel title | ready-for-review | 2026-08-11 |
 | #29 | chore(src): interactively re-verify RunPanel dataset gating (#25) and 2D plane offset control (#22/#24) with a real loaded dataset | open (blocked, see notes below) | 2026-08-11 |
-| #30 | feat(src): implement real Alt-mnemonic menu navigation (Dear ImGui has no built-in "&" parsing) | open | 2026-08-11 |
+| #30 | feat(src): implement real Alt-mnemonic menu navigation (Dear ImGui has no built-in "&" parsing) | ready-for-review | 2026-08-11 |
 | #31 | fix(src): application is not DPI-aware -- UI too small on high-DPI monitors in multi-monitor setups | ready-for-review | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
