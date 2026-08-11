@@ -2067,3 +2067,68 @@ automation script, not WinUI3), core objective verified, issue closed
   `src/gui/IconToolbar.h`, `src/gui/IconToolbar.cpp`,
   `src/gui/PanelIcons.cpp`, `src/gui/ViewportPanel.cpp`,
   `src/CMakeLists.txt`, `src/README.md`, `AGENTS.md`
+
+## [2026-08-11] — chore(src): tester pass on #31, issue closed
+
+- `tester` skill ran against issue #31's 5 acceptance criteria using a
+  fresh `windows-release` build of commit `96c343a` (the DPI-awareness
+  fix above).
+- **PASS (with measured evidence)**: hand-drawn chrome scaling (icon
+  toolbar/UCS icon/panel icon headers), title-bar button visibility and
+  alignment (Close-button glyph-vs-cell centering measured at -0.5px/
+  0px/0px across 100%/150%/200%), no panel clipping under the toolbar/
+  menu bar at any tested scale.
+- **PASS (mechanism)**: live rescale with no compounding. Verified
+  through the real `ApplyUiScale()`/per-frame-poll code path via a
+  temporary F9 test hook in `main.cpp`, exercised across two full
+  100%<->200% round trips, then reverted with `git checkout` (confirmed
+  empty diff) and rebuilt before finishing -- the tree was clean at the
+  same commit before and after.
+- **UNVERIFIED**: the fifth criterion (verified on the actual
+  dual-monitor Windows dev environment, live drag between two
+  different-DPI monitors) -- this environment has one physical monitor
+  (confirmed via `Screen.AllScreens`), so that specific hardware test
+  could not be run here.
+- Reported all 5 findings individually (not averaged into one verdict)
+  and recommended leaving #31 open pending a real dual-monitor check;
+  the user reviewed the breakdown and explicitly chose to close the
+  issue anyway.
+- Files: `AGENTS.md`, `CHANGE_HISTORY.md` (this entry); no source changes
+  (the temporary test hook was reverted, not committed).
+
+## [2026-08-11] — fix(src): move panel icons onto the dock tab button (#28 correction)
+
+- Issue #35 created on GitHub, correcting a misimplementation from issue
+  #28 Part 2: the panel icon was drawn as a new header row inside each
+  panel's content (duplicating the title already shown on the tab
+  button), not on the tab button itself as originally requested. The
+  user looked for the original request under #13 and couldn't find it --
+  it was never there; the actual implementation is under #28.
+- Scope: `src/gui/PanelIcons.{h,cpp}` + the 7 panels that call
+  `DrawPanelIconHeader()` (Viewport, Properties, Loads, Joints/Members,
+  Detailing, Run Optimization, Log).
+- Labels: bug, gui
+- Note: two throwaway issues (#33, #34) were accidentally created while
+  debugging a curl/JSON payload path issue during this creation -- both
+  closed immediately as not-planned with an explanatory comment.
+
+## [2026-08-11] — feat(src): split Joints/Members panel, order Loads after it
+
+- Issue #36 created on GitHub -- prerequisite for #37: split the combined
+  "Joints/Members" panel (issue #21) into two independent panels, and
+  make Loads' tab default to immediately after Members in tab order.
+- Scope: `src/gui/JointsMembersPanel.{h,cpp}`, `src/app/Application.{h,cpp}`
+- Labels: enhancement, gui
+
+## [2026-08-11] — feat(src): View menu restructure + close-button fix + rename
+
+- Issue #37 created on GitHub, depends on #36: (1) fix a reported bug
+  where a docked panel's tab close button doesn't actually close the
+  panel, (2) restructure the View menu into Menubar (per-icon-toolbar-
+  button visibility) / Subwindows (per-panel show/hide) / Layout
+  (existing Default/Design/Optimization presets) sections, (3) rename
+  the "Run Optimization" panel to "Optimization" everywhere the literal
+  string appears.
+- Scope: `src/gui/Toolbar.{h,cpp}`, `src/gui/RunPanel.cpp`,
+  `src/app/Application.{h,cpp}`, `src/gui/IconToolbar.{h,cpp}`
+- Labels: bug, enhancement, gui

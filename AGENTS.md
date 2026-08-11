@@ -1590,6 +1590,26 @@ sequence or its `EnableWindowsDpiAwareness()`/font/style-scaling code:**
   mechanism is the same `glfwGetWindowContentScale()` poll either way,
   but the specific drag gesture is still the user's own office-machine
   test.
+- **`tester` pass (2026-08-11) confirmed 4 of 5 acceptance criteria with
+  direct evidence and closed the issue on the user's explicit call.**
+  Criteria 1-3 (chrome scaling, title-bar button visibility/alignment,
+  no panel clipping) were re-verified with fresh screenshots at 100%/
+  150%/200% via `ORCISF_UI_SCALE`, plus a pixel-level measurement of the
+  Close button's glyph-vs-cell centering (offset -0.5px/0px/0px across
+  the three scales -- sub-pixel). Criterion 4 (live rescale, no
+  compounding) was re-exercised through the real `ApplyUiScale()`/
+  per-frame-poll path via a temporary F9 test hook (reverted with `git
+  checkout` and rebuilt before finishing -- confirmed empty diff), two
+  full 100%<->200% round trips, screenshotted: the final 100% frame is
+  visually identical to a fresh 100% launch. **Criterion 5 (verified on
+  the actual dual-monitor Windows dev environment, live drag between two
+  different-DPI monitors) was explicitly reported UNVERIFIED** -- this
+  environment has one physical monitor (confirmed via
+  `Screen.AllScreens`), so the specific hardware test could not run
+  here. The user closed the issue anyway, on the strength of criteria
+  1-4 plus the shared mechanism; if a real dual-monitor drag is ever
+  found to misbehave, treat it as a new report rather than assuming #31
+  covers it.
 
 **`gui/viewport/` (issue #5) — three things worth knowing before touching it:**
 - **Member cross-section thickness/orientation is a schematic
@@ -2027,8 +2047,11 @@ later, different one (e.g. closing an issue or cutting a release).
 | #28 | feat(src): Alt-mnemonic menu navigation + icon before each panel title | ready-for-review | 2026-08-11 |
 | #29 | chore(src): interactively re-verify RunPanel dataset gating (#25) and 2D plane offset control (#22/#24) with a real loaded dataset | closed | 2026-08-11 |
 | #30 | feat(src): implement real Alt-mnemonic menu navigation (Dear ImGui has no built-in "&" parsing) | ready-for-review | 2026-08-11 |
-| #31 | fix(src): application is not DPI-aware -- UI too small on high-DPI monitors in multi-monitor setups | ready-for-review | 2026-08-11 |
+| #31 | fix(src): application is not DPI-aware -- UI too small on high-DPI monitors in multi-monitor setups | closed | 2026-08-11 |
 | #32 | chore(src): add one-shot build scripts (build.ps1 for Windows, build.sh for macOS/Linux) | ready-for-review | 2026-08-11 |
+| #35 | fix(src): move panel icons onto the dock tab button, remove the in-content icon+title header row (#28 correction) | open | 2026-08-11 |
+| #36 | feat(src): split Joints/Members panel into separate Joints and Members panels; order Loads tab immediately after them | open | 2026-08-11 |
+| #37 | feat(src): View menu Menubar/Subwindows/Layout sections + fix tab close button + rename "Run Optimization" panel | open | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
