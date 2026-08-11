@@ -819,61 +819,101 @@ report in this environment again:**
   closed as "cannot reproduce"; not closed automatically (per this
   project's usual caution around closing issues without confirmation).
 
-**Alt-mnemonic menus + panel icon headers (issue #28) — read before
-touching `Toolbar.cpp`'s menu labels or `gui/PanelIcons.{h,cpp}`:**
-- **Part 1 (Alt-mnemonics) needed zero new plumbing.** Dear ImGui
-  underlines whichever letter follows a `&` in a menu label and binds
-  Alt+<letter> to it automatically once
-  `ImGuiConfigFlags_NavEnableKeyboard` is set -- already true in
-  `main.cpp` since issue #2. The only work was adding `&` to six labels
-  in `Toolbar::Draw()` and picking non-colliding letters: `&File`,
-  `&Edit`, `View &Plane` (not `&View Plane` -- `V` was already claimed
-  by the separate `&View` layout-preset menu), `&Loads`, `&Run`, `&View`.
-- **Part 2 (panel icons) could NOT be "an icon inside the native dock-tab
-  label text"** -- Dear ImGui has no public API to embed an arbitrary
-  glyph inside a window's title/tab-bar string without either an icon
-  font (a new asset/dependency this project doesn't otherwise need) or
-  reaching into `imgui_internal.h` to hook the *shared* dock-node tab
-  bar (fragile, version-coupled, and not a pattern used elsewhere in
-  this codebase -- the one place that reaches past a library's public
-  API, `report/PdfExport.cpp`'s libharu `setjmp`/`longjmp` error
-  handler, is a C library's own documented callback model, not a
-  precedent for touching ImGui's internals). **Decided instead**: each
-  panel calls `gui::DrawPanelIconHeader(PanelIcon::X, "Label")`
+**Panel icon headers (issue #28 Part 2) — read before touching
+`gui/PanelIcons.{h,cpp}`; Alt-mnemonics (Part 1) were reverted, see below
+and issue #30:**
+- **Panel icons could NOT be "an icon inside the native dock-tab label
+  text"** -- Dear ImGui has no public API to embed an arbitrary glyph
+  inside a window's title/tab-bar string without either an icon font (a
+  new asset/dependency this project doesn't otherwise need) or reaching
+  into `imgui_internal.h` to hook the *shared* dock-node tab bar
+  (fragile, version-coupled, and not a pattern used elsewhere in this
+  codebase). **Decided instead**: each panel calls
+  `gui::DrawPanelIconHeader(PanelIcon::X, "Label")`
   (`gui/PanelIcons.{h,cpp}`, new) as the very first thing after
   `ImGui::Begin()` -- draws a small hand-drawn icon (same
   `ImDrawList`-primitives-in-a-`P()`-helper style as `IconToolbar.cpp`
   and `ViewportPanel.cpp`'s UCS icon, no icon font) plus the label text
-  and a separator, inside the panel's own content area. This shows
-  whenever a panel is the active/visible tab (the common case), but is
-  a header *row inside the content*, not literally inside the OS-drawn
-  tab strip -- a deliberate, documented tradeoff, not an oversight.
+  and a separator, inside the panel's own content area -- a header *row
+  inside the content*, not literally inside the OS-drawn tab strip, a
+  deliberate documented tradeoff.
 - **`ViewportPanel::Draw()`'s icon header consumes a little of
   `ImGui::GetContentRegionAvail()`** before the 3D render texture size
-  is computed -- intentional and harmless (the viewport just renders
-  slightly shorter to make room), not a bug.
-- **What was verified vs. not:** compiled cleanly (MSVC/Ninja,
-  `windows-release`) after fixing one real build error (`<initializer_list>`
-  wasn't transitively included, needed for the icon-drawing helpers'
-  `for (float y : {...})` range-for loops -- MSVC caught this at compile
-  time, not a logic bug). The app launched and stayed running
-  (process alive) after wiring both parts in. **Visual confirmation via
-  screenshot (Alt-underlines actually appearing, icons actually
-  rendering) was not completed** -- holding Alt via a synthesized
-  `keybd_event` triggered an unrelated foreground-app switch in this
-  environment (unrelated concurrent processes stealing focus is a
-  recurring, previously-documented hazard here, see the `gui/viewport/`
-  and #21-#25-retest notes elsewhere in this file), and repeated
-  `SetForegroundWindow()` calls afterward didn't reliably reclaim focus
-  either (Windows' foreground-lock protections without the
-  `AttachThreadInput` workaround this project's earlier interactive
-  passes used). Stopped rather than keep retrying, per this project's
-  "avoid automation rabbit holes" guidance -- both mechanisms used here
-  are standard, already-proven-in-this-codebase techniques (ImGui's
-  built-in mnemonic convention; the exact `ImDrawList` icon pattern
-  `IconToolbar.cpp` already uses), so the risk of either being
-  substantively broken is low, but a real interactive/screenshot pass
-  is still the honest next step before calling this "fully verified."
+  is computed -- intentional and harmless, not a bug.
+- **Confirmed genuinely working via a real screenshot** (issue #29's
+  retest pass): the small hand-drawn icon renders correctly before
+  "Viewport"'s title text in the panel's content area, exactly as
+  designed. This is the one part of #28 that's actually verified, not
+  just compiled-and-launched.
+
+**Part 1 (Alt-mnemonics) was reverted -- Dear ImGui does NOT parse
+`&`-prefixed labels; this was a wrong assumption, caught by actually
+running a build, not by code review:**
+- The original #28 implementation added `&File`/`&Edit`/etc. to
+  `Toolbar::Draw()`'s menu labels, assuming Dear ImGui would strip the
+  `&` and underline the following letter (the Win32/Qt/wxWidgets
+  convention) once `ImGuiConfigFlags_NavEnableKeyboard` was set. **It
+  does not** -- confirmed via a real screenshot during issue #29's
+  retest pass: the literal `&` character was displayed in the menu bar
+  ("&File", "&Edit", ...), completely unparsed. Dear ImGui has no
+  built-in equivalent to this mnemonic system for regular menu labels.
+- **Reverted to plain labels** (`File`, `Edit`, `View Plane`, `Loads`,
+  `Run`, `View`) rather than ship the visibly-broken `&`-prefixed text.
+  Rebuilt and re-screenshotted to confirm the revert actually fixed it.
+- **Real Alt+letter mnemonic support needs to be hand-rolled** if wanted
+  (parse a mnemonic marker yourself, draw an underline only while Alt is
+  held, detect Alt+letter yourself and open the menu) -- scoped as a
+  fresh issue, **#30**, rather than attempted again under time pressure
+  within the same pass that just found the bug. Don't re-add bare `&`
+  prefixes to these labels without implementing that machinery first.
+- **This was found while working issue #29** (the "retest #21-#25"
+  follow-up), not #28 itself -- #28 was already closed by the time this
+  was discovered; a comment was posted there cross-referencing this
+  correction and #30, per this project's transparency conventions
+  (see the #13/epic-13 closure-correction precedent earlier in this file
+  for the established pattern of correcting past claims openly rather
+  than silently).
+
+**Issue #29 (interactive retest of RunPanel dataset gating + plane-offset
+overlay) — still blocked, not resolved this pass; read before attempting
+this again:**
+- **What this pass DID accomplish**: fixed and confirmed the #28
+  mnemonic regression above (a real, concrete finding), and confirmed
+  #28's panel-icon-header Part 2 genuinely works via screenshot -- both
+  via a corrected, DPI-aware screenshot technique (explicit physical-pixel
+  bitmap size, not `.NET`'s `Screen.Bounds`, per issue #27's finding)
+  combined with an `AttachThreadInput`-based foreground-grab (see #11's
+  original interactive-verification notes) that *did* reliably work this
+  time for getting the app's main window foregrounded and its menu bar
+  clickable.
+- **What still did NOT work: driving the native "Open Data..."
+  folder-picker dialog to actually load a dataset.** Coordinate-based
+  clicking inside the dialog repeatedly mis-hit targets (clicked "New
+  Data" instead of "Open Data..." once; a "Cancel" click coordinate
+  computed from a *previous* screenshot's displayed/scaled pixel
+  position without re-multiplying by the DPI scale factor missed
+  entirely). **A new hazard was also hit**: an unrelated app (Proton
+  Drive, this user's own cloud-sync client) spontaneously opened its own
+  window mid-sequence, stealing focus -- not triggered by anything this
+  session did, just an environment where background apps can grab
+  foreground focus unpredictably at any time, independent of the
+  already-documented "another Claude/browser session steals focus"
+  hazard. Left untouched (did not force-close another app's window).
+- **Lesson for next attempt**: always recompute click coordinates from
+  the *most recent* screenshot taken *after* any UI state change, in the
+  same physical-pixel coordinate space that screenshot was captured in
+  -- never reuse a coordinate read from an earlier screenshot's displayed
+  (scaled-for-viewing) dimensions without re-deriving it fresh. Consider
+  keyboard-only navigation (arrow keys + Enter within the folder picker,
+  or typing a path directly into the address bar and confirming with a
+  single unambiguous key) over mouse coordinates for native dialogs,
+  since a single missed click can silently land on the wrong control
+  with no error.
+- **Issue #29's core objective (confirm RunPanel enables Run and the
+  plane-offset overlay appears once a real dataset is loaded) remains
+  unverified.** Code review (from the previous pass, still valid) found
+  no defect in either code path. Don't close #29 until a real load
+  succeeds and both behaviors are actually observed.
 
 **AutoCAD-style Add Joint + editing guidance (issue #18, part of epic
 #13) — read before touching `EditorOptions::add_joint_mode`/
@@ -1552,6 +1592,13 @@ for skills that apply to the current task and follow them.
   implements the fix following this file's conventions. Use for "fix an
   issue", "work on a ticket", "implement issue #X". Shares remote-repo/token
   resolution with `planner` via [`.claude/skills/_shared/references/`](.claude/skills/_shared/references/).
+- **`rebuild`** ([`.claude/skills/rebuild/SKILL.md`](.claude/skills/rebuild/SKILL.md)) —
+  rebuilds `src/`'s `orcisf_gui`/`orcisf_cli` for whichever OS the agent is
+  currently on, after a fix/issue/review lands. Use whenever about to verify a
+  `src/` change and a fresh binary is needed. Encodes how to find the
+  toolchain (CMake/MSVC/vcpkg) even when it isn't on the default `PATH` --
+  see this file's Validation section for where it was found in this
+  environment.
 
 ---
 
@@ -1605,7 +1652,8 @@ for skills that apply to the current task and follow them.
 | #26 | feat(src): wire up the app icon set (icons/) for Windows/macOS/Linux builds | ready-for-review | 2026-08-11 |
 | #27 | fix(src): title bar Minimize/Maximize/Close buttons not flush to window right edge | closed (not reproducible) | 2026-08-11 |
 | #28 | feat(src): Alt-mnemonic menu navigation + icon before each panel title | ready-for-review | 2026-08-11 |
-| #29 | chore(src): interactively re-verify RunPanel dataset gating (#25) and 2D plane offset control (#22/#24) with a real loaded dataset | open | 2026-08-11 |
+| #29 | chore(src): interactively re-verify RunPanel dataset gating (#25) and 2D plane offset control (#22/#24) with a real loaded dataset | open (blocked, see notes below) | 2026-08-11 |
+| #30 | feat(src): implement real Alt-mnemonic menu navigation (Dear ImGui has no built-in "&" parsing) | open | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

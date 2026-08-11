@@ -1619,3 +1619,45 @@ history only; don't duplicate current-state description here.
   the exact icon-drawing pattern already proven in `IconToolbar.cpp`).
   Issue #28 status set to `ready-for-review`, not `done`, until a real
   interactive/screenshot pass confirms it.
+
+## 2026-08-11 — Added `rebuild` skill; picked up #29, found and fixed a real #28 regression
+
+- Added `.claude/skills/rebuild/SKILL.md`: rebuilds `src/`'s
+  `orcisf_gui`/`orcisf_cli` for whichever OS the agent is on, encoding
+  how to locate the toolchain (CMake/MSVC/vcpkg) even when it isn't on
+  the default `PATH` -- this session had to rediscover that location
+  multiple times; now it's a reusable, documented skill. Registered in
+  `AGENTS.md`'s Agent Skills section.
+- Picked up issue #29 (interactively re-verify #21-#25's claims). Used
+  the new `rebuild` skill to confirm the build was current, then
+  attempted the interactive verification with a corrected, DPI-aware
+  screenshot technique (explicit physical-pixel bitmap, per #27's
+  finding) plus an `AttachThreadInput`-based foreground grab that
+  reliably worked this time.
+- **Found and fixed a real regression along the way**: opening the File
+  menu revealed issue #28's "&"-prefixed menu labels ("&File", "&Edit",
+  ...) were displaying the literal `&` character, not being parsed into
+  an underlined mnemonic -- Dear ImGui's stock `BeginMenu()`/`MenuItem()`
+  has no built-in equivalent to Win32's `&`-mnemonic convention, a wrong
+  assumption in #28's original implementation. Reverted `Toolbar.cpp`'s
+  labels to plain text, rebuilt, and re-screenshotted to confirm the fix.
+  Filed a proper follow-up, **#30**, to implement real Alt-mnemonic
+  support (hand-rolled: parse a marker, draw underline only while Alt is
+  held, detect Alt+letter yourself) rather than re-attempt it hastily.
+  Posted a correction comment on the already-closed #28.
+- **Also confirmed via the same screenshot**: issue #28's Part 2 (panel
+  icon headers) genuinely works -- the hand-drawn icon renders correctly
+  before "Viewport"'s title text.
+- **Issue #29's core objective (load a real dataset, confirm RunPanel
+  and the plane-offset overlay) was NOT completed.** Repeated attempts
+  to drive the native "Open Data..." folder-picker via coordinate-based
+  clicks failed (wrong menu item clicked once; a stale coordinate reused
+  from a differently-scaled screenshot missed a Cancel button), and an
+  unrelated app (Proton Drive) spontaneously opened mid-sequence,
+  stealing focus -- a new hazard, independent of the already-documented
+  "another Claude/browser session steals focus" one. Stopped rather than
+  keep retrying, per this project's automation-rabbit-hole guidance.
+  Issue #29 remains open with its core objective unmet; `AGENTS.md` has
+  the full account plus a lesson for the next attempt (always recompute
+  click coordinates fresh from the most recent screenshot's own physical
+  pixel space, consider keyboard-only navigation for native dialogs).
