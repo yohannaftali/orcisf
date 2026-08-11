@@ -953,7 +953,7 @@ for skills that apply to the current task and follow them.
 | #12 | fix(src): orcisf_gui.exe opens an extra console window on Windows | closed | 2026-08-11 |
 | #13 | epic(src): more user-friendly GUI (icon toolbar, view presets, re-optimize, editing guidance) | open | 2026-08-11 |
 | #14 | feat(src): add a configurable icon toolbar below the menu bar | closed | 2026-08-11 |
-| #15 | feat(src): add Default/Design/Optimization view-layout presets | ready-for-review | 2026-08-11 |
+| #15 | feat(src): add Default/Design/Optimization view-layout presets | closed | 2026-08-11 |
 | #16 | feat(src): re-optimize using the last best result | open | 2026-08-11 |
 | #17 | feat(src): add a Regenerate Seed button to the Run panel | open | 2026-08-11 |
 | #18 | feat(src): AutoCAD-style in-progress guidance while adding joints/members | open | 2026-08-11 |
