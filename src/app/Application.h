@@ -97,6 +97,12 @@ private:
     bool log_open_ = true;
     bool run_open_ = true;
     bool dockspace_initialized_ = false;
+
+    // Issue #15: which View menu preset is active. BuildDockspace() rebuilds
+    // the layout whenever this differs from built_layout_preset_ (the
+    // preset the current dock arrangement was last built for).
+    gui::ViewLayoutPreset current_layout_ = gui::ViewLayoutPreset::Default;
+    gui::ViewLayoutPreset built_layout_preset_ = gui::ViewLayoutPreset::Default;
 };
 
 } // namespace orcisf::app

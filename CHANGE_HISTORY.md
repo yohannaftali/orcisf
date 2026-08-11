@@ -902,3 +902,37 @@ history only; don't duplicate current-state description here.
 - Files: `src/gui/IconToolbar.h` (new), `src/gui/IconToolbar.cpp` (new),
   `src/gui/RunPanel.h`, `src/gui/RunPanel.cpp`, `src/app/Application.h`,
   `src/app/Application.cpp`, `src/CMakeLists.txt`
+
+## 2026-08-11 — feat(src): #15 implemented (view-layout presets)
+
+- `Toolbar`'s View menu (previously disabled placeholder items) now has
+  working `Default`/`Design`/`Optimization` entries, checkmarking the
+  active one and firing a new `SetOnViewLayout(ViewLayoutPreset)`
+  callback.
+- `Application::BuildDockspace()` now rebuilds the dock layout whenever
+  the active preset changes (previously ran once at startup only, via
+  `dockspace_initialized_` alone). Each preset is its own
+  `BuildDefaultLayout()`/`BuildDesignLayout()`/`BuildOptimizationLayout()`
+  free function:
+  - Default: unchanged from the original single fixed layout (Viewport/
+    Detailing center, Properties+Run Optimization tabbed right,
+    Loads+Log tabbed bottom) -- no regression, per the issue's explicit
+    requirement.
+  - Design: Viewport/Detailing stay large; Properties gets its own
+    dedicated column (no longer sharing with Run Optimization); Loads
+    gets a wider bottom strip; Run Optimization+Log move to a smaller
+    tabbed corner (still reachable, not hidden).
+  - Optimization: Run Optimization+Log get the large primary area;
+    Viewport/Detailing and Properties/Loads move to tabbed pairs in a
+    secondary column.
+- No panel is ever fully hidden by any preset -- all six panels are
+  docked somewhere in every layout, just resized/re-tabbed.
+- **Verified interactively** in this environment: all three presets
+  render with the exact arrangement described above; the View menu's
+  checkmark correctly tracks the active preset; switching Design ->
+  Optimization -> back to Default restores the original layout exactly.
+  Also confirmed switching presets doesn't touch loaded dataset/
+  selection/undo state (added a joint, cycled through all three
+  presets, joint/selection/undo history all persisted).
+- Files: `src/gui/Toolbar.h`, `src/gui/Toolbar.cpp`,
+  `src/app/Application.h`, `src/app/Application.cpp`

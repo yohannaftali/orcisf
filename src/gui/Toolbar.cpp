@@ -15,9 +15,10 @@ void Toolbar::SetOnSaveLoads(std::function<void()> callback) { on_save_loads_ = 
 void Toolbar::SetOnExportText(std::function<void()> callback) { on_export_text_ = std::move(callback); }
 void Toolbar::SetOnExportPdf(std::function<void()> callback) { on_export_pdf_ = std::move(callback); }
 void Toolbar::SetOnExportInf(std::function<void()> callback) { on_export_inf_ = std::move(callback); }
+void Toolbar::SetOnViewLayout(std::function<void(ViewLayoutPreset)> callback) { on_view_layout_ = std::move(callback); }
 
 void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_text, bool can_export_pdf,
-                    bool can_export_inf, EditorOptions& options) {
+                    bool can_export_inf, ViewLayoutPreset current_layout, EditorOptions& options) {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
             if (ImGui::MenuItem("New Data")) {
@@ -96,9 +97,15 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("View")) {
-            ImGui::MenuItem("Viewport", nullptr, false, false);
-            ImGui::MenuItem("Properties", nullptr, false, false);
-            ImGui::MenuItem("Log", nullptr, false, false);
+            if (ImGui::MenuItem("Default", nullptr, current_layout == ViewLayoutPreset::Default)) {
+                if (on_view_layout_) on_view_layout_(ViewLayoutPreset::Default);
+            }
+            if (ImGui::MenuItem("Design", nullptr, current_layout == ViewLayoutPreset::Design)) {
+                if (on_view_layout_) on_view_layout_(ViewLayoutPreset::Design);
+            }
+            if (ImGui::MenuItem("Optimization", nullptr, current_layout == ViewLayoutPreset::Optimization)) {
+                if (on_view_layout_) on_view_layout_(ViewLayoutPreset::Optimization);
+            }
             ImGui::EndMenu();
         }
         if (options.connect_mode) {

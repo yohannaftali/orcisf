@@ -6,15 +6,23 @@
 
 namespace orcisf::gui {
 
+// Issue #15: switchable docking-layout presets, selected from the View
+// menu. Default matches the layout this app has always had; Design and
+// Optimization re-weight which panels get the large/primary area for
+// their respective workflow stage -- no panel is ever fully hidden by a
+// preset, just resized/re-tabbed, so nothing becomes unreachable.
+enum class ViewLayoutPreset { Default, Design, Optimization };
+
 // Top toolbar. "File > Open Folder..." (#5), the "Edit" menu (#6:
 // Undo/Redo, Add Joint, Connect Mode, Snap to Grid), the "Loads" menu +
-// "File > Save Loads (.bbn)" (#7), and "File > Export PDF.../Export
-// Text..." (#9) are wired; Run/View menu items are still placeholders
-// (Run is covered by the separate RunPanel).
+// "File > Save Loads (.bbn)" (#7), "File > Export PDF.../Export
+// Text..." (#9), and the "View" menu's layout presets (#15) are wired;
+// Run menu is still a placeholder (Run is covered by the separate
+// RunPanel/IconToolbar's Run button, #14).
 class Toolbar {
 public:
     void Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_text, bool can_export_pdf,
-              bool can_export_inf, EditorOptions& options);
+              bool can_export_inf, ViewLayoutPreset current_layout, EditorOptions& options);
 
     // Issue #11: starts a brand-new, empty dataset in the editor.
     void SetOnNewData(std::function<void()> callback);
@@ -40,6 +48,8 @@ public:
     // Issue #11: .inf preview generated directly from the in-GUI dataset,
     // independent of a completed optimization run.
     void SetOnExportInf(std::function<void()> callback);
+    // Issue #15: fires when the user picks a View menu layout preset.
+    void SetOnViewLayout(std::function<void(ViewLayoutPreset)> callback);
 
 private:
     std::function<void()> on_new_data_;
@@ -53,6 +63,7 @@ private:
     std::function<void()> on_export_text_;
     std::function<void()> on_export_pdf_;
     std::function<void()> on_export_inf_;
+    std::function<void(ViewLayoutPreset)> on_view_layout_;
 };
 
 } // namespace orcisf::gui

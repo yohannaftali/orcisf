@@ -586,6 +586,44 @@ touching:**
   joint (Properties panel updated, Save/Undo icons became enabled
   immediately after, Redo/Run correctly stayed disabled).
 
+**View layout presets (issue #15, part of epic #13) — read before
+touching `Application::BuildDockspace()`/`Toolbar`'s View menu:**
+- **`ViewLayoutPreset` (`Default`/`Design`/`Optimization`) lives in
+  `Toolbar.h`**, not a new file -- it's a View-menu-owned concept the
+  menu itself needs to check-mark the active preset, so it's colocated
+  there rather than in `gui/editor/Selection.h`'s other shared enums
+  (`SelectionKind`, `LoadPlacementMode`), which are viewport/editor-owned.
+- **`BuildDockspace()` rebuilds the dock layout whenever
+  `current_layout_ != built_layout_preset_`**, not just once at startup
+  the way it did pre-#15 (`dockspace_initialized_` alone used to gate
+  it). Each preset has its own `BuildXLayout(ImGuiID dock_main)` free
+  function in `Application.cpp`'s anonymous namespace -- add a new
+  preset by adding one more such function and a `switch` arm, not by
+  branching inline in `BuildDockspace()` itself.
+- **No panel is ever hidden by a preset, only resized/re-tabbed.** All
+  six panels (`Viewport`/`Detailing`/`Properties`/`Loads`/`Run
+  Optimization`/`Log`) are docked somewhere in every preset -- Design
+  tabs `Run Optimization`+`Log` together in a smaller corner (still one
+  click away), Optimization does the same to
+  `Viewport`+`Detailing`/`Properties`+`Loads`. Don't "improve" a preset
+  by dropping a `DockBuilderDockWindow` call for a panel you think is
+  irrelevant to that workflow stage -- that would make it fully
+  unreachable except via re-switching presets, which the acceptance
+  criteria didn't ask for and would be a regression for anyone who
+  docked something custom there.
+- **Switching presets is purely a layout change** -- `current_layout_`
+  is the only new state, and `BuildDockspace()`'s rebuild only calls
+  `ImGuiDockBuilder*` functions, never touches `loaded_sd_`/`editable_`/
+  selection/undo state. Verified interactively: added a joint, switched
+  through all three presets and back to Default, the joint/selection/
+  undo history were all still there throughout.
+- **What was verified:** interactively, in this environment (same
+  synthesized-input technique as #11/#14's passes) -- all three presets
+  render with the exact panel arrangement described above, the View
+  menu's checkmark correctly tracks the active preset, and switching
+  Design -> Optimization -> Default round-trips back to the original
+  layout exactly (pixel-for-pixel arrangement, not just "close enough").
+
 **`gui/viewport/` (issue #5) — three things worth knowing before touching it:**
 - **Member cross-section thickness/orientation is a schematic
   approximation, not the legacy local-axis convention.** `SceneRenderer`
@@ -915,7 +953,7 @@ for skills that apply to the current task and follow them.
 | #12 | fix(src): orcisf_gui.exe opens an extra console window on Windows | closed | 2026-08-11 |
 | #13 | epic(src): more user-friendly GUI (icon toolbar, view presets, re-optimize, editing guidance) | open | 2026-08-11 |
 | #14 | feat(src): add a configurable icon toolbar below the menu bar | closed | 2026-08-11 |
-| #15 | feat(src): add Default/Design/Optimization view-layout presets | open | 2026-08-11 |
+| #15 | feat(src): add Default/Design/Optimization view-layout presets | ready-for-review | 2026-08-11 |
 | #16 | feat(src): re-optimize using the last best result | open | 2026-08-11 |
 | #17 | feat(src): add a Regenerate Seed button to the Run panel | open | 2026-08-11 |
 | #18 | feat(src): AutoCAD-style in-progress guidance while adding joints/members | open | 2026-08-11 |

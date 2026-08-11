@@ -86,6 +86,7 @@ Application::Application() {
     toolbar_.SetOnExportText([this]() { OnExportTextRequested(); });
     toolbar_.SetOnExportPdf([this]() { OnExportPdfRequested(); });
     toolbar_.SetOnExportInf([this]() { OnExportInfRequested(); });
+    toolbar_.SetOnViewLayout([this](gui::ViewLayoutPreset preset) { current_layout_ = preset; });
 
     icon_toolbar_.SetOnNewData([this]() { OnNewDataRequested(); });
     icon_toolbar_.SetOnOpenFolder([this]() { OnOpenFolderRequested(); });
@@ -355,25 +356,15 @@ void Application::OnExportInfRequested() {
     }
 }
 
-void Application::BuildDockspace() {
-    ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
-    ImGui::DockSpaceOverViewport(dockspace_id, ImGui::GetMainViewport(),
-                                  ImGuiDockNodeFlags_PassthruCentralNode);
+namespace {
 
-    if (dockspace_initialized_) {
-        return;
-    }
-    dockspace_initialized_ = true;
-
-    ImGui::DockBuilderRemoveNode(dockspace_id);
-    ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
-    ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->Size);
-
-    ImGuiID dock_main = dockspace_id;
-    ImGuiID dock_right =
-        ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.25f, nullptr, &dock_main);
-    ImGuiID dock_bottom =
-        ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.25f, nullptr, &dock_main);
+// Issue #15's "Default" preset -- exactly the single fixed layout this app
+// always had (no regression for existing users): Viewport/Detailing
+// large+center, Properties/Run Optimization tabbed on the right, Loads/Log
+// tabbed along the bottom.
+void BuildDefaultLayout(ImGuiID dock_main) {
+    ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.25f, nullptr, &dock_main);
+    ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.25f, nullptr, &dock_main);
 
     ImGui::DockBuilderDockWindow("Viewport", dock_main);
     ImGui::DockBuilderDockWindow("Detailing", dock_main);
@@ -381,6 +372,73 @@ void Application::BuildDockspace() {
     ImGui::DockBuilderDockWindow("Run Optimization", dock_right);
     ImGui::DockBuilderDockWindow("Loads", dock_bottom);
     ImGui::DockBuilderDockWindow("Log", dock_bottom);
+}
+
+// "Design" preset: focuses on geometry/load input -- Viewport+Detailing
+// stay large, Properties gets its own dedicated (not shared/tabbed) column,
+// Loads gets a bigger bottom strip. Run Optimization/Log are still present,
+// just tabbed in less prominent corners rather than hidden -- nothing a
+// Design-focused user needs is ever unreachable.
+void BuildDesignLayout(ImGuiID dock_main) {
+    ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.22f, nullptr, &dock_main);
+    ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.32f, nullptr, &dock_main);
+    ImGuiID dock_bottom_right =
+        ImGui::DockBuilderSplitNode(dock_bottom, ImGuiDir_Right, 0.3f, nullptr, &dock_bottom);
+
+    ImGui::DockBuilderDockWindow("Viewport", dock_main);
+    ImGui::DockBuilderDockWindow("Detailing", dock_main);
+    ImGui::DockBuilderDockWindow("Properties", dock_right);
+    ImGui::DockBuilderDockWindow("Loads", dock_bottom);
+    ImGui::DockBuilderDockWindow("Run Optimization", dock_bottom_right);
+    ImGui::DockBuilderDockWindow("Log", dock_bottom_right);
+}
+
+// "Optimization" preset: focuses on running -- Run Optimization + Log get
+// the large primary area, everything else (Viewport/Detailing/Properties/
+// Loads) moves to a secondary column, tabbed in pairs so all four stay one
+// click away instead of disappearing.
+void BuildOptimizationLayout(ImGuiID dock_main) {
+    ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.35f, nullptr, &dock_main);
+    ImGuiID dock_right_bottom =
+        ImGui::DockBuilderSplitNode(dock_right, ImGuiDir_Down, 0.5f, nullptr, &dock_right);
+
+    ImGui::DockBuilderDockWindow("Run Optimization", dock_main);
+    ImGui::DockBuilderDockWindow("Log", dock_main);
+    ImGui::DockBuilderDockWindow("Viewport", dock_right);
+    ImGui::DockBuilderDockWindow("Detailing", dock_right);
+    ImGui::DockBuilderDockWindow("Properties", dock_right_bottom);
+    ImGui::DockBuilderDockWindow("Loads", dock_right_bottom);
+}
+
+} // namespace
+
+void Application::BuildDockspace() {
+    ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
+    ImGui::DockSpaceOverViewport(dockspace_id, ImGui::GetMainViewport(),
+                                  ImGuiDockNodeFlags_PassthruCentralNode);
+
+    if (dockspace_initialized_ && built_layout_preset_ == current_layout_) {
+        return;
+    }
+    dockspace_initialized_ = true;
+    built_layout_preset_ = current_layout_;
+
+    ImGui::DockBuilderRemoveNode(dockspace_id);
+    ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+    ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->Size);
+
+    switch (current_layout_) {
+        case gui::ViewLayoutPreset::Design:
+            BuildDesignLayout(dockspace_id);
+            break;
+        case gui::ViewLayoutPreset::Optimization:
+            BuildOptimizationLayout(dockspace_id);
+            break;
+        case gui::ViewLayoutPreset::Default:
+        default:
+            BuildDefaultLayout(dockspace_id);
+            break;
+    }
 
     ImGui::DockBuilderFinish(dockspace_id);
 }
@@ -391,7 +449,7 @@ void Application::OnFrame() {
     bool can_export_pdf = has_run_results_;
     bool can_export_inf = editable_.has_value();
     toolbar_.Draw(undo_stack_.CanUndo(), undo_stack_.CanRedo(), can_save, can_export_text, can_export_pdf,
-                  can_export_inf, editor_options_);
+                  can_export_inf, current_layout_, editor_options_);
 
     // Ctrl+S was only ever a display hint on the File > Save menu item
     // (ImGui::MenuItem's shortcut text is cosmetic, it doesn't bind the
