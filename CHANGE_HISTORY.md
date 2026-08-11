@@ -851,3 +851,24 @@ history only; don't duplicate current-state description here.
   than computing from perceived proportions).
 - Files: `src/app/Application.cpp` (Ctrl+S fix only -- the verification
   itself touched no code)
+
+## 2026-08-11 — Epic #13: more user-friendly GUI
+
+- Issue #13 (epic) created on GitHub, split into 5 sub-issues per this
+  repo's existing epic #1 pattern:
+  - #14 configurable icon toolbar below the menu bar (Office/Adobe/
+    AutoCAD-style)
+  - #15 Default/Design/Optimization view-layout presets (extends
+    `Application::BuildDockspace()`, currently one fixed layout)
+  - #16 re-optimize using the last best result -- flagged explicitly as
+    *not* a pure GUI change: the ported `optimasi()` driver always
+    randomizes its full initial population, so this needs an
+    engine-level way to seed a population slot from a previous best
+    design, not just new RunPanel UI
+  - #17 "Regenerate Seed" button next to `RunPanel`'s existing
+    "RNG seed (0 = random)" field
+  - #18 AutoCAD-style step-by-step guidance while adding joints/members/
+    loads (extends the existing single-line `TextColored` hints in
+    `Toolbar::Draw()` for connect-mode/load-placement-mode)
+- Scope: `src/gui/`, `src/app/Application.cpp`, `src/engine/` (#16 only)
+- Labels: enhancement

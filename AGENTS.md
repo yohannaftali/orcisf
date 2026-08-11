@@ -870,6 +870,12 @@ for skills that apply to the current task and follow them.
 | #10 | fix(src): CI build-src.yml failing on Linux and Windows targets | closed | 2026-08-10 |
 | #11 | feat(src): add File > New Data action, rename Open Folder... to Open Data... | closed | 2026-08-11 |
 | #12 | fix(src): orcisf_gui.exe opens an extra console window on Windows | closed | 2026-08-11 |
+| #13 | epic(src): more user-friendly GUI (icon toolbar, view presets, re-optimize, editing guidance) | open | 2026-08-11 |
+| #14 | feat(src): add a configurable icon toolbar below the menu bar | open | 2026-08-11 |
+| #15 | feat(src): add Default/Design/Optimization view-layout presets | open | 2026-08-11 |
+| #16 | feat(src): re-optimize using the last best result | open | 2026-08-11 |
+| #17 | feat(src): add a Regenerate Seed button to the Run panel | open | 2026-08-11 |
+| #18 | feat(src): AutoCAD-style in-progress guidance while adding joints/members | open | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
