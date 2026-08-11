@@ -1561,3 +1561,29 @@ history only; don't duplicate current-state description here.
   #26. Bumped from `v0.0.2-alpha` per `AGENTS.md`'s alpha versioning
   scheme. Release notes summarize #26 (fixed) and #27-#29 (filed, not
   yet fixed) from this session's retest pass.
+
+## 2026-08-11 — Investigated #27: could not reproduce, was a screenshot-tooling artifact
+
+- Picked up issue #27 (title bar buttons not flush to window right
+  edge) via `/coder`. Before writing any fix, re-measured with a
+  properly maximized window and a corrected, physical-pixel-accurate
+  screenshot -- found the original "confirmed via screenshot" evidence
+  was itself wrong: it mixed a DPI-aware `GetWindowRect()` call with
+  .NET's `Screen.Bounds`/`CopyFromScreen()` (which returned a *logical*,
+  scaled-down size in this environment despite `SetProcessDPIAware()`),
+  so the screenshot only captured roughly the top-left quarter of the
+  true physical screen -- the button cluster was actually rendering
+  correctly at the true (uncaptured) physical right edge.
+- Re-verified with a corrected capture (explicit physical-pixel bitmap
+  size, not `Screen.Bounds`): the Minimize/Maximize/Close buttons are
+  flush to the window's right edge with even, consistent spacing -- no
+  gap, no bug. `CustomTitleBar.cpp`'s right-alignment math was reviewed
+  and found correct as written (operates in ImGui's own logical
+  coordinate system, unaffected by the OS-level DPI API inconsistency
+  that caused the false positive).
+- **No code change made.** Posted a comment on issue #27 explaining the
+  finding and recommending it be closed as "cannot reproduce" -- not
+  closed automatically, per this project's usual confirmation caution.
+  Documented the underlying DPI-screenshot-measurement pitfall in
+  `AGENTS.md` (relevant to issue #29's still-pending interactive
+  verification too, which uses the same kind of tooling).

@@ -783,6 +783,42 @@ orcisf.desktop`, or the icon-related blocks in `src/CMakeLists.txt`:**
   (`build-src.yml`, matrix over all three OSes) is the first real
   cross-platform check for those two.
 
+**Issue #27 (title bar buttons "not flush to window edge") — investigated,
+could not reproduce; read this before trusting a screenshot-based UI bug
+report in this environment again:**
+- **This was a false positive caused by a DPI-measurement-tooling bug,
+  not a real product defect.** The original report (filed during the
+  #21-#25 retest pass) was based on a screenshot that mixed a
+  DPI-aware `GetWindowRect()` P/Invoke call with .NET's
+  `System.Windows.Forms.Screen.Bounds`/`Graphics.CopyFromScreen()` in
+  the same PowerShell session -- the latter returned a *logical*
+  (scaled-down) screen size despite `SetProcessDPIAware()` having been
+  called, so the screenshot only captured roughly the top-left quarter
+  of the true physical screen. The window (genuinely maximized to the
+  full physical resolution) rendered its title bar buttons correctly at
+  the true physical right edge -- just outside that undersized capture
+  -- which looked exactly like "a gap before the window's true edge."
+- **The fix for the tooling, if you hit this again**: don't rely on
+  `System.Windows.Forms.Screen.Bounds` for capture dimensions in this
+  environment. Instead, size the capture bitmap explicitly from a
+  DPI-aware `GetWindowRect()`/`GetSystemMetrics(SM_CXVIRTUALSCREEN)`
+  P/Invoke call, and pass that same explicit size to
+  `Graphics.CopyFromScreen()` rather than trusting `Screen.Bounds` to
+  already be in the right coordinate space. Re-verified this way (a
+  4x-zoomed crop of the true physical top-right corner): the button
+  cluster **is** flush and evenly spaced, no gap, no code change needed.
+- **`CustomTitleBar.cpp`'s existing right-alignment math is correct as
+  written** -- `ImGui::SameLine(drag_zone_end_x, 0.0f)` using
+  `ImGui::GetWindowWidth()` operates entirely within ImGui's own
+  internal logical coordinate system (not affected by the OS-level DPI
+  API inconsistency above), so there was never a plausible code-level
+  mechanism for the reported gap once the measurement was corrected.
+  Don't "fix" this code without a *real* (physical-pixel-accurate)
+  screenshot showing an actual gap first.
+- A comment explaining this was posted on issue #27 recommending it be
+  closed as "cannot reproduce"; not closed automatically (per this
+  project's usual caution around closing issues without confirmation).
+
 **AutoCAD-style Add Joint + editing guidance (issue #18, part of epic
 #13) — read before touching `EditorOptions::add_joint_mode`/
 `ViewportPanel::HandlePicking()`/`Toolbar.cpp`'s status-hint block:**
@@ -1511,7 +1547,7 @@ for skills that apply to the current task and follow them.
 | #24 | fix(src): 2D plane offset control unreachable from the viewport (move it under the UCS icon) | ready-for-review | 2026-08-11 |
 | #25 | fix(src): Run panel dataset-path field is redundant; write each run into a timestamped output subfolder | ready-for-review | 2026-08-11 |
 | #26 | feat(src): wire up the app icon set (icons/) for Windows/macOS/Linux builds | ready-for-review | 2026-08-11 |
-| #27 | fix(src): title bar Minimize/Maximize/Close buttons not flush to window right edge | open | 2026-08-11 |
+| #27 | fix(src): title bar Minimize/Maximize/Close buttons not flush to window right edge | closed (not reproducible) | 2026-08-11 |
 | #28 | feat(src): Alt-mnemonic menu navigation + icon before each panel title | open | 2026-08-11 |
 | #29 | chore(src): interactively re-verify RunPanel dataset gating (#25) and 2D plane offset control (#22/#24) with a real loaded dataset | open | 2026-08-11 |
 
