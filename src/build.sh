@@ -83,9 +83,22 @@ if [ -z "${VCPKG_ROOT:-}" ]; then
     fi
 fi
 if [ -z "${VCPKG_ROOT:-}" ]; then
-    echo "error: VCPKG_ROOT is not set and no vcpkg/ checkout was found at the repo root." >&2
-    echo "Clone vcpkg, run ./vcpkg/bootstrap-vcpkg.sh, and export VCPKG_ROOT, then retry (see src/README.md)." >&2
-    exit 1
+    # No existing checkout and no VCPKG_ROOT override -- bootstrap one at
+    # <repo root>/vcpkg automatically, matching src/README.md's one-time
+    # setup steps, instead of just telling the user to run them by hand.
+    if ! command -v git >/dev/null 2>&1; then
+        echo "error: VCPKG_ROOT is not set, no vcpkg/ checkout was found at the repo root, and git is not on PATH to clone one automatically." >&2
+        echo "Install git, or clone vcpkg and export VCPKG_ROOT yourself (see src/README.md), then retry." >&2
+        exit 1
+    fi
+
+    echo "== VCPKG_ROOT not set and no vcpkg/ checkout found -- cloning one to $repo_root/vcpkg =="
+    git clone https://github.com/microsoft/vcpkg "$repo_root/vcpkg"
+
+    echo "== bootstrapping vcpkg =="
+    "$repo_root/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+
+    export VCPKG_ROOT="$repo_root/vcpkg"
 fi
 echo "  VCPKG_ROOT: $VCPKG_ROOT"
 

@@ -21,18 +21,12 @@ untouched — this is an independent rewrite, not an in-place port.
 
 Requires: CMake ≥ 3.21, Ninja, a C++20 compiler, and vcpkg.
 
-```sh
-# one-time: get vcpkg and point VCPKG_ROOT at it
-git clone https://github.com/microsoft/vcpkg
-./vcpkg/bootstrap-vcpkg.sh   # or bootstrap-vcpkg.bat on Windows
-export VCPKG_ROOT=$(pwd)/vcpkg   # PowerShell: $env:VCPKG_ROOT = "$PWD/vcpkg"
-```
-
 **Quickest path**: run the one-shot build script in this directory — it
-detects the OS, locates CMake/MSVC/vcpkg (even if not on `PATH`; a
-`vcpkg/` checkout is expected at the repo root, one level up from here,
-matching the one-time bootstrap step above), configures the matching
-preset if needed, and builds `orcisf_gui`/`orcisf_cli`:
+detects the OS, locates CMake/MSVC/vcpkg (even if not on `PATH`), clones
+and bootstraps vcpkg automatically to `<repo root>/vcpkg` if no checkout
+is found and `VCPKG_ROOT` isn't already set, configures the matching
+preset if needed, and builds `orcisf_gui`/`orcisf_cli` — no manual setup
+required:
 
 ```powershell
 # Windows (PowerShell), from src/
@@ -44,7 +38,14 @@ preset if needed, and builds `orcisf_gui`/`orcisf_cli`:
 ./build.sh
 ```
 
-**Manual control**, if you'd rather drive CMake yourself:
+**Manual control**, if you'd rather drive CMake (and vcpkg) yourself:
+
+```sh
+# one-time: get vcpkg and point VCPKG_ROOT at it
+git clone https://github.com/microsoft/vcpkg
+./vcpkg/bootstrap-vcpkg.sh   # or bootstrap-vcpkg.bat on Windows
+export VCPKG_ROOT=$(pwd)/vcpkg   # PowerShell: $env:VCPKG_ROOT = "$PWD/vcpkg"
+```
 
 ```sh
 cd src

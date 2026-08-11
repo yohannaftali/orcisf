@@ -2062,6 +2062,17 @@ icon overlay — see each issue's own "read before touching" section above.
     `build.sh` mirrors the same logic but could not be executed locally
     (no macOS/Linux toolchain in this environment) -- CI is relied on
     to confirm it.
+  - **Both scripts self-bootstrap vcpkg if it's missing** (clone to
+    `<repo root>/vcpkg` + run `bootstrap-vcpkg.bat`/`.sh -disableMetrics`,
+    then set `VCPKG_ROOT` for the rest of that run), rather than just
+    erroring and telling the user to do it by hand -- added after a real
+    user hit exactly that error on first run from a fresh clone. Only
+    triggers when neither `VCPKG_ROOT` nor an existing `<repo root>/
+    vcpkg/vcpkg(.exe)` is found; requires `git` on `PATH` (fails with a
+    clear message if it's missing, same as every other missing-tool
+    case). Interactively verified end-to-end on Windows: with no
+    `VCPKG_ROOT` set and no prior checkout, `build.ps1` cloned + bootstrapped
+    vcpkg at `<repo root>/vcpkg` and then proceeded to build successfully.
 
 ---
 

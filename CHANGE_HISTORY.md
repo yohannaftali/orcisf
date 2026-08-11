@@ -1996,3 +1996,28 @@ automation script, not WinUI3), core objective verified, issue closed
 - Files: `src/build.ps1` (moved from `build.ps1`), `src/build.sh` (moved
   from `build.sh`), `src/README.md`, `AGENTS.md`,
   `.claude/skills/builder/SKILL.md`
+
+## 2026-08-11 — feat(src): build.ps1/build.sh auto-bootstrap vcpkg
+
+- User hit the "VCPKG_ROOT is not set" error on a real first run from a
+  fresh clone and asked the script to just get vcpkg itself instead of
+  erroring, matching `src/README.md`'s existing one-time bootstrap steps
+  (`git clone` + `bootstrap-vcpkg.{bat,sh}` + set `VCPKG_ROOT`).
+- Both scripts now clone vcpkg to `<repo root>/vcpkg` and run its
+  bootstrap script automatically when neither `VCPKG_ROOT` nor an
+  existing checkout is found, rather than stopping with instructions to
+  do it by hand. Requires `git` on `PATH` -- fails with a clear message
+  if missing, same as every other missing-tool case these scripts
+  already handle.
+- **Interactively verified end-to-end**: cleared `VCPKG_ROOT`, confirmed
+  no `vcpkg/` checkout existed at the repo root, ran `build.ps1` fresh --
+  it cloned vcpkg, bootstrapped it (`vcpkg.exe` produced), then
+  configured (skipped, already configured from a prior checkout) and
+  built successfully, all in one invocation with zero manual steps.
+  Re-ran once more with `VCPKG_ROOT` still unset to confirm the
+  now-existing checkout is auto-detected on a second run without
+  re-cloning.
+- Updated `src/README.md` to lead with "no manual setup required" and
+  moved the manual vcpkg bootstrap steps into the "manual control"
+  section as an alternative, not a prerequisite.
+- Files: `src/build.ps1`, `src/build.sh`, `src/README.md`, `AGENTS.md`

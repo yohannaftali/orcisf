@@ -73,8 +73,31 @@ if (-not $env:VCPKG_ROOT) {
     }
 }
 if (-not $env:VCPKG_ROOT) {
-    Write-Error "VCPKG_ROOT is not set and no vcpkg/ checkout was found at the repo root. Clone vcpkg, run bootstrap-vcpkg.bat, and set `$env:VCPKG_ROOT`, then retry (see src/README.md)."
-    exit 1
+    # No existing checkout and no VCPKG_ROOT override -- bootstrap one at
+    # <repo root>/vcpkg automatically, matching src/README.md's one-time
+    # setup steps, instead of just telling the user to run them by hand.
+    $Git = Get-Command git -ErrorAction SilentlyContinue
+    if (-not $Git) {
+        Write-Error "VCPKG_ROOT is not set, no vcpkg/ checkout was found at the repo root, and git is not on PATH to clone one automatically. Install git, or clone vcpkg and set `$env:VCPKG_ROOT` yourself (see src/README.md), then retry."
+        exit 1
+    }
+
+    $candidate = Join-Path $RepoRoot "vcpkg"
+    Write-Host "== VCPKG_ROOT not set and no vcpkg/ checkout found -- cloning one to $candidate ==" -ForegroundColor Cyan
+    git clone https://github.com/microsoft/vcpkg $candidate
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "git clone of vcpkg failed (exit $LASTEXITCODE)."
+        exit 1
+    }
+
+    Write-Host "== bootstrapping vcpkg ==" -ForegroundColor Cyan
+    & (Join-Path $candidate "bootstrap-vcpkg.bat") -disableMetrics
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "vcpkg bootstrap failed (exit $LASTEXITCODE)."
+        exit 1
+    }
+
+    $env:VCPKG_ROOT = $candidate
 }
 Write-Host "  VCPKG_ROOT: $env:VCPKG_ROOT"
 
