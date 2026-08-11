@@ -1848,9 +1848,9 @@ skill can skip because its task seems self-contained.
   rebuilds `src/`'s `orcisf_gui`/`orcisf_cli` for whichever OS the agent is
   currently on, after a fix/issue/review lands. Use whenever about to verify a
   `src/` change and a fresh binary is needed. Runs the repo's own
-  `build.ps1`/`build.sh` (issue #32) rather than re-deriving toolchain paths
-  inline -- see this file's Validation section for the toolchain locations
-  those scripts already know about in this environment.
+  `src/build.ps1`/`src/build.sh` (issue #32) rather than re-deriving
+  toolchain paths inline -- see this file's Validation section for the
+  toolchain locations those scripts already know about in this environment.
 - **`tester`** ([`.claude/skills/tester/SKILL.md`](.claude/skills/tester/SKILL.md)) —
   tests a freshly built binary against a specific GitHub issue's own
   Acceptance Criteria checklist, criterion by criterion (PASS/FAIL/
@@ -2041,8 +2041,13 @@ icon overlay — see each issue's own "read before touching" section above.
     this repo incorrectly reported "no cmake toolchain available" without
     checking beyond the default `PATH` — check for these before assuming
     a build genuinely can't happen locally.
-  - **`build.ps1`/`build.sh`** (issue #32, repo root) wrap all of the
-    above into one command for a human contributor (or CI). The
+  - **`src/build.ps1`/`src/build.sh`** (issue #32) wrap all of the
+    above into one command for a human contributor (or CI) — deliberately
+    placed in `src/`, alongside `vcpkg.json`/`CMakeLists.txt`/
+    `CMakePresets.json`, not the repo root, since they only ever build
+    this one component; a `vcpkg/` checkout is still expected one level
+    up at the repo root (matching `src/README.md`'s bootstrap step), so
+    each script derives the repo root as its own parent directory. The
     `builder` agent skill (renamed from `rebuild`) just *calls* these
     scripts rather than re-deriving toolchain paths inline itself --
     they're the single source of truth for this logic now, so update

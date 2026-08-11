@@ -7,7 +7,7 @@ description: >
   you're about to verify/test a change to src/ and need a fresh binary --
   "rebuild", "build it", "does this compile", "verify the fix", "run it and
   check" — not just when the user says "build" literally. Runs the repo's
-  own build.ps1/build.sh (issue #32) rather than re-deriving toolchain
+  own src/build.ps1/src/build.sh (issue #32) rather than re-deriving toolchain
   paths by hand, and reports pass/fail plus the built binary's path. Do not
   use for the legacy Optimasi Beton/Source/ program (no modern toolchain
   can build it, see AGENTS.md) or for anything outside src/.
@@ -28,26 +28,28 @@ can change how you interpret a build failure. Don't skip this because
 the task feels self-contained.
 
 **Run the repo's own build script rather than re-deriving toolchain
-paths yourself** — `build.ps1` (Windows) / `build.sh` (macOS/Linux) at
-the repo root already encode the OS-detection, toolchain-location
-(CMake/MSVC/vcpkg, including fallback paths when not on `PATH`),
-configure-if-needed, and build steps this skill used to spell out
-step-by-step. Calling the script directly does the same job in far
-fewer tokens than re-discovering those paths inline every invocation.
+paths yourself** — `src/build.ps1` (Windows) / `src/build.sh` (macOS/
+Linux) already encode the OS-detection, toolchain-location (CMake/MSVC/
+vcpkg, including fallback paths when not on `PATH`), configure-if-needed,
+and build steps this skill used to spell out step-by-step. They live in
+`src/` (alongside `vcpkg.json`/`CMakeLists.txt`/`CMakePresets.json`), not
+the repo root, since they only ever build this one component. Calling
+the script directly does the same job in far fewer tokens than
+re-discovering those paths inline every invocation.
 
 ---
 
 ## Step 1 — Run the script
 
-Detect the OS and invoke the matching script from the repo root:
+Detect the OS and invoke the matching script from `src/`:
 
 ```powershell
-# Windows
+# Windows, from src/
 .\build.ps1
 ```
 
 ```sh
-# macOS / Linux
+# macOS / Linux, from src/
 ./build.sh
 ```
 

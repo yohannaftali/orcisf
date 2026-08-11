@@ -1970,3 +1970,29 @@ automation script, not WinUI3), core objective verified, issue closed
   without that confirmation either way).
 - Files: `.claude/skills/reviewer/SKILL.md` (new),
   `.claude/skills/builder/SKILL.md`, `AGENTS.md`
+
+## 2026-08-11 — fix: move build.ps1/build.sh from repo root into src/
+
+- User feedback after actually running `.\build.ps1` from a fresh
+  PowerShell session: the scripts only ever build `src/`, so they belong
+  next to `vcpkg.json`/`CMakeLists.txt`/`CMakePresets.json` in `src/`,
+  not the repo root. Moved both (`git mv`), updated each script's
+  internal path derivation (script's own directory is now `src/`; repo
+  root -- where the `vcpkg/` checkout is expected, per `src/README.md`'s
+  bootstrap step -- is derived as its parent), and updated every
+  reference in `src/README.md`, `AGENTS.md`, and the `builder` skill.
+- The `VCPKG_ROOT` error the user hit was separately confirmed to be
+  correct, expected behavior, not a bug: no `vcpkg/` checkout exists yet
+  at their repo root and `VCPKG_ROOT` isn't set in their shell -- this
+  session's own earlier successful runs only worked because a leftover
+  vcpkg checkout happened to exist in this sandbox's temp directory from
+  a prior session, which doesn't generalize to a fresh environment.
+  Pointed the user at `src/README.md`'s existing one-time bootstrap
+  steps rather than changing the script to paper over a missing
+  dependency.
+- Re-verified `src/build.ps1` end-to-end after the move (same toolchain
+  paths located, both binaries built and confirmed present at their
+  reported paths).
+- Files: `src/build.ps1` (moved from `build.ps1`), `src/build.sh` (moved
+  from `build.sh`), `src/README.md`, `AGENTS.md`,
+  `.claude/skills/builder/SKILL.md`

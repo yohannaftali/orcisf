@@ -4,12 +4,16 @@
 # Locates cmake/a C++20 compiler/ninja/vcpkg even when not on PATH,
 # configures the matching preset (macos-release/linux-release) if it
 # hasn't been configured yet, and builds. Run from anywhere -- paths are
-# resolved relative to this script's own location, not the caller's cwd.
+# resolved relative to this script's own location -- src/ -- not the
+# caller's cwd.
+#
+# Lives in src/ (alongside vcpkg.json/CMakeLists.txt/CMakePresets.json)
+# rather than the repo root, since it only ever builds this one component.
 
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-src_dir="$repo_root/src"
+src_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(dirname "$src_dir")"
 
 os="$(uname -s)"
 case "$os" in

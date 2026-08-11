@@ -28,18 +28,19 @@ git clone https://github.com/microsoft/vcpkg
 export VCPKG_ROOT=$(pwd)/vcpkg   # PowerShell: $env:VCPKG_ROOT = "$PWD/vcpkg"
 ```
 
-**Quickest path**: run the one-shot build script at the repo root — it
-detects the OS, locates CMake/MSVC/vcpkg (even if not on `PATH`),
-configures the matching preset if needed, and builds `orcisf_gui`/
-`orcisf_cli`:
+**Quickest path**: run the one-shot build script in this directory — it
+detects the OS, locates CMake/MSVC/vcpkg (even if not on `PATH`; a
+`vcpkg/` checkout is expected at the repo root, one level up from here,
+matching the one-time bootstrap step above), configures the matching
+preset if needed, and builds `orcisf_gui`/`orcisf_cli`:
 
 ```powershell
-# Windows (PowerShell)
+# Windows (PowerShell), from src/
 .\build.ps1
 ```
 
 ```sh
-# macOS / Linux
+# macOS / Linux, from src/
 ./build.sh
 ```
 

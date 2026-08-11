@@ -1,15 +1,18 @@
 # build.ps1 -- one-shot Windows build of src/ (orcisf_gui, orcisf_cli).
 #
-# Locates CMake/MSVC/vcpkg even when not on PATH (see .claude/skills/rebuild/
+# Locates CMake/MSVC/vcpkg even when not on PATH (see .claude/skills/builder/
 # SKILL.md, which documents the same fallback locations for an AI agent),
 # configures the windows-release preset if it hasn't been configured yet,
-# and builds. Run from anywhere in the repo (paths are resolved relative to
-# this script's own location, not the caller's current directory).
+# and builds. Run from anywhere (paths are resolved relative to this
+# script's own location -- src/ -- not the caller's current directory).
+#
+# Lives in src/ (alongside vcpkg.json/CMakeLists.txt/CMakePresets.json)
+# rather than the repo root, since it only ever builds this one component.
 
 $ErrorActionPreference = "Stop"
 
-$RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$SrcDir = Join-Path $RepoRoot "src"
+$SrcDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$RepoRoot = Split-Path -Parent $SrcDir
 $Preset = "windows-release"
 $BuildDir = Join-Path $SrcDir "build\$Preset"
 
