@@ -151,7 +151,7 @@ void IconToolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_run
     }
 
     ImGui::SameLine(0.f, kPadding * 2.f);
-    if (IconButton("##run", can_run ? "Run Optimization" : "Run Optimization (set a dataset path first)", can_run,
+    if (IconButton("##run", can_run ? "Run Optimization" : "Run Optimization (load or create a dataset first)", can_run,
                     DrawRunIcon) &&
         on_run_) {
         on_run_();

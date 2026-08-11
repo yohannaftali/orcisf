@@ -33,17 +33,27 @@ public:
     // Called (from the UI thread, inside Draw()) once, right after a run
     // finishes successfully (not cancelled, no error) -- with a *copy* of
     // the finished StructureData (so RunPanel's own result_sd_ stays valid
-    // for the next run) and the dataset path that produced it. Wired by
-    // Application to refresh the 3D viewport with the new results (#5).
-    void SetOnResult(std::function<void(engine::StructureData, std::string)> callback);
+    // for the next run), the input dataset path that produced it, and the
+    // generic *output* path (issue #25) the run's .opt/.str/.kdl/.inf/.his/
+    // .log.txt actually landed in (a fresh timestamped subfolder, see
+    // engine::RunFullOptimization's comment -- never the same as the input
+    // path). Wired by Application to refresh the 3D viewport (#5) and to
+    // know where to find those files for later export (#9).
+    void SetOnResult(std::function<void(engine::StructureData, std::string dataset_path, std::string output_path)>
+                          callback);
+
+    // Issue #25: which dataset this panel will run against -- always
+    // whatever Application currently has loaded (File > Open Data/New
+    // Data/Save As), not a separately user-typed path. Call once per
+    // frame, before Draw()/CanRun() (Application::OnFrame() does this
+    // right at the top, ahead of the icon toolbar's CanRun() check).
+    void SetDatasetPath(std::string path);
 
     void Draw(bool* open);
 
     // Issue #14 (icon toolbar): lets an external "Run" button trigger the
     // exact same start path the panel's own button uses, gated the same
-    // way (not already running, dataset_path_ set via this panel's own
-    // "Dataset generic path" field -- there's no dataset-path parameter
-    // here, this only starts a run the user has already configured).
+    // way (not already running, a dataset loaded via SetDatasetPath()).
     bool CanRun() const;
     void TriggerRun();
 
@@ -53,10 +63,13 @@ private:
     bool IsRunning() const;
 
     std::function<void(std::string)> log_sink_;
-    std::function<void(engine::StructureData, std::string)> on_result_;
+    std::function<void(engine::StructureData, std::string, std::string)> on_result_;
 
     // ---- Run configuration (edited on the UI thread only) ----
-    char dataset_path_[512] = "";
+    // Issue #25: no longer a separately user-typed field (was `char
+    // dataset_path_[512]`, editable via its own InputText) -- always kept
+    // in sync with Application's loaded dataset via SetDatasetPath().
+    std::string dataset_path_;
     float harga_beton_ = 250000.f;
     float harga_besi_ = 5000.f;
     float selimut_kolom_ = 50.f;
@@ -91,6 +104,7 @@ private:
     // result_sd_ itself gets overwritten by the new run in progress).
     bool has_result_ = false;
     std::string result_dataset_path_; // dataset_path_ at the time result_sd_ was captured
+    std::string result_output_path_;  // issue #25: the generic output path that run actually wrote to
     bool reoptimize_from_last_ = false;
 };
 

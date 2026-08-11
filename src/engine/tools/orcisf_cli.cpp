@@ -112,8 +112,9 @@ int CmdOptimize(const std::string& dataset, float harga_beton, float harga_besi,
         return true;
     };
 
-    RunFullOptimization(sd, dataset, opt, cb);
+    std::string output_path = RunFullOptimization(sd, dataset, opt, cb);
 
+    std::cout << "Output written to: " << output_path << "\n";
     std::cout << "Done. JVD=" << sd.JVD << " JSTD=" << sd.JSTD << " worker_threads=" << worker_threads
               << " rng_seed=" << rng_seed << "\n";
     std::cout << "Best fitness=" << sd.fitstr[sd.JSTD - 1] << " harga=" << sd.hargastr[sd.JSTD - 1]

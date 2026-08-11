@@ -72,8 +72,8 @@ Application::Application() {
                         "are wired to the engine.");
 
     run_panel_.SetLogSink([this](std::string line) { log_panel_.AddLine(std::move(line)); });
-    run_panel_.SetOnResult([this](engine::StructureData sd, std::string dataset_path) {
-        OnRunResult(std::move(sd), std::move(dataset_path));
+    run_panel_.SetOnResult([this](engine::StructureData sd, std::string dataset_path, std::string output_path) {
+        OnRunResult(std::move(sd), std::move(dataset_path), std::move(output_path));
     });
     toolbar_.SetOnNewData([this]() { OnNewDataRequested(); });
     toolbar_.SetOnSave([this]() { OnSaveRequested(); });
@@ -127,7 +127,7 @@ void Application::OnSaveRequested() {
         return;
     }
     std::string err =
-        report::WriteTextExport(loaded_sd_, loaded_dataset_path_, has_run_results_, loaded_dataset_path_);
+        report::WriteTextExport(loaded_sd_, loaded_dataset_path_, has_run_results_, last_run_output_path_);
     if (err.empty()) {
         log_panel_.AddLine("Saved: " + loaded_dataset_path_);
     } else {
@@ -144,7 +144,7 @@ void Application::OnSaveAsRequested() {
     std::optional<std::string> generic = PromptForGenericPath(default_name.c_str());
     if (!generic) return;
 
-    std::string source = loaded_dataset_path_;
+    std::string source = last_run_output_path_;
     std::string err = report::WriteTextExport(loaded_sd_, *generic, has_run_results_, source);
     if (err.empty()) {
         loaded_dataset_path_ = *generic;
@@ -212,7 +212,7 @@ void Application::OnOpenFolderRequested() {
     }
 }
 
-void Application::OnRunResult(engine::StructureData sd, std::string dataset_path) {
+void Application::OnRunResult(engine::StructureData sd, std::string dataset_path, std::string output_path) {
     std::vector<engine::MemberResult> results = engine::ComputeMemberResults(sd);
 
     // RunFullOptimization's sd came through engine::ReadLoads(), which
@@ -233,7 +233,8 @@ void Application::OnRunResult(engine::StructureData sd, std::string dataset_path
     for (int i = 1; i <= 6 * sd.NJ; ++i) sd.AJ[i] = 0.f;
 
     LoadStructure(std::move(sd), &results, dataset_path);
-    log_panel_.AddLine("Viewport updated with results from: " + dataset_path);
+    last_run_output_path_ = output_path; // issue #25: LoadStructure() doesn't touch this, set it after
+    log_panel_.AddLine("Viewport updated with results from: " + dataset_path + " (output: " + output_path + ")");
 }
 
 void Application::OnAddJointRequested() {
@@ -300,7 +301,7 @@ void Application::OnExportTextRequested() {
     }
     std::string dest_generic = (std::filesystem::path(folder) / basename).string();
 
-    std::string err = report::WriteTextExport(loaded_sd_, dest_generic, has_run_results_, loaded_dataset_path_);
+    std::string err = report::WriteTextExport(loaded_sd_, dest_generic, has_run_results_, last_run_output_path_);
     if (err.empty()) {
         log_panel_.AddLine("Exported legacy text file set to: " + folder);
     } else {
@@ -449,6 +450,12 @@ void Application::BuildDockspace() {
 }
 
 void Application::OnFrame() {
+    // Issue #25: keep RunPanel's notion of "which dataset to run" in sync
+    // with whatever's actually loaded, every frame, before anything below
+    // reads RunPanel::CanRun() (the icon toolbar's Run button) or draws
+    // the panel itself -- see RunPanel::SetDatasetPath()'s comment.
+    run_panel_.SetDatasetPath(loaded_dataset_path_);
+
     bool can_save = editable_.has_value() && !loaded_dataset_path_.empty();
     bool can_export_text = editable_.has_value();
     bool can_export_pdf = has_run_results_;

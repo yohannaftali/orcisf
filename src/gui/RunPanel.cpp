@@ -1,7 +1,6 @@
 #include "gui/RunPanel.h"
 
 #include <algorithm>
-#include <cstring>
 #include <exception>
 #include <limits>
 #include <random>
@@ -26,9 +25,12 @@ RunPanel::~RunPanel() {
 
 void RunPanel::SetLogSink(std::function<void(std::string)> sink) { log_sink_ = std::move(sink); }
 
-void RunPanel::SetOnResult(std::function<void(engine::StructureData, std::string)> callback) {
+void RunPanel::SetOnResult(
+    std::function<void(engine::StructureData, std::string, std::string)> callback) {
     on_result_ = std::move(callback);
 }
+
+void RunPanel::SetDatasetPath(std::string path) { dataset_path_ = std::move(path); }
 
 bool RunPanel::IsRunning() const { return running_.load(); }
 
@@ -97,7 +99,7 @@ void RunPanel::StartRun() {
         };
 
         try {
-            engine::RunFullOptimization(result_sd_, dataset_path, options, on_progress, &cancel_);
+            result_output_path_ = engine::RunFullOptimization(result_sd_, dataset_path, options, on_progress, &cancel_);
         } catch (const std::exception& e) {
             last_error_ = e.what();
             has_error_ = true;
@@ -109,7 +111,7 @@ void RunPanel::StartRun() {
 
 void RunPanel::RequestCancel() { cancel_.store(true); }
 
-bool RunPanel::CanRun() const { return !IsRunning() && dataset_path_[0] != '\0'; }
+bool RunPanel::CanRun() const { return !IsRunning() && !dataset_path_.empty(); }
 void RunPanel::TriggerRun() {
     if (CanRun()) StartRun();
 }
@@ -127,25 +129,26 @@ void RunPanel::Draw(bool* open) {
         } else if (cancel_.load()) {
             if (log_sink_) log_sink_("Optimization run cancelled.");
         } else {
-            if (log_sink_) log_sink_("Optimization run finished.");
+            if (log_sink_) log_sink_("Optimization run finished. Output: " + result_output_path_);
             has_result_ = true;
             result_dataset_path_ = dataset_path_;
-            if (on_result_) on_result_(result_sd_, std::string(dataset_path_));
+            if (on_result_) on_result_(result_sd_, dataset_path_, result_output_path_);
         }
     }
     was_running_ = running;
 
-    ImGui::BeginDisabled(running);
-    ImGui::InputText("Dataset path", dataset_path_, sizeof(dataset_path_));
-    ImGui::SameLine();
-    ImGui::TextDisabled("(?)");
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip(
-            "Generic dataset path, no extension -- e.g.\n"
-            "Optimasi Beton/Example/Apl1-1/aplikasi\n"
-            "(matches the legacy .inp/.isd/.idl/.ijl/.ids/.ijs/.bbn set).");
+    // Issue #25: no longer an editable field -- always whatever dataset
+    // Application currently has loaded (SetDatasetPath(), called once per
+    // frame from Application::OnFrame()), so it can't drift out of sync
+    // with what File > Open Data/New Data/Save As already point at.
+    ImGui::SeparatorText("Dataset");
+    if (dataset_path_.empty()) {
+        ImGui::TextDisabled("No dataset loaded -- use File > Open Data... or New Data.");
+    } else {
+        ImGui::TextWrapped("%s", dataset_path_.c_str());
     }
 
+    ImGui::BeginDisabled(running);
     ImGui::SeparatorText("Cost / design parameters");
     ImGui::InputFloat("Harga beton (Rp/m^3)", &harga_beton_);
     ImGui::InputFloat("Harga besi (Rp/kg)", &harga_besi_);
@@ -217,7 +220,7 @@ void RunPanel::Draw(bool* open) {
     }
 
     ImGui::Spacing();
-    bool can_run = !running && dataset_path_[0] != '\0';
+    bool can_run = !running && !dataset_path_.empty();
     ImGui::BeginDisabled(!can_run);
     if (ImGui::Button("Run")) {
         StartRun();
@@ -263,8 +266,8 @@ void RunPanel::Draw(bool* open) {
         ImGui::TextColored(ImVec4(0.9f, 0.4f, 0.4f, 1.f), "%s", last_error_.c_str());
     }
 
-    if (!running && !dataset_path_[0]) {
-        ImGui::TextDisabled("Enter a dataset path to enable Run.");
+    if (!running && dataset_path_.empty()) {
+        ImGui::TextDisabled("Load or create a dataset (File > Open Data.../New Data) to enable Run.");
     }
 
     ImGui::End();

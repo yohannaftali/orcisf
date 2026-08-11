@@ -47,7 +47,7 @@ private:
     void OnSaveRequested();
     void OnSaveAsRequested();
     void OnOpenFolderRequested();
-    void OnRunResult(engine::StructureData sd, std::string dataset_path);
+    void OnRunResult(engine::StructureData sd, std::string dataset_path, std::string output_path);
     void OnAddJointRequested();
     void OnUndo();
     void OnRedo();
@@ -100,6 +100,19 @@ private:
     // it (which would also mutate loaded_sd_'s scratch fields again).
     bool has_run_results_ = false;
     std::vector<engine::MemberResult> current_results_;
+
+    // Issue #25: the generic path the *most recent completed run* actually
+    // wrote its .opt/.str/.kdl/.inf/.his/.log.txt to (a fresh timestamped
+    // subfolder per run, see engine::RunFullOptimization) -- no longer the
+    // same as loaded_dataset_path_ (which stays the *input* dataset's
+    // path, used for Save/Save As). report::WriteTextExport()'s
+    // source_generic_path argument must use this, not
+    // loaded_dataset_path_, whenever has_run_results_ is true, or it would
+    // look for .his/.log.txt in the wrong place. Cleared implicitly by
+    // has_run_results_ going false (RebuildSceneAfterEdit()); left stale
+    // otherwise, which is harmless since it's never read while
+    // has_run_results_ is false.
+    std::string last_run_output_path_;
 
     bool viewport_open_ = true;
     bool properties_open_ = true;

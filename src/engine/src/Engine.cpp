@@ -1,9 +1,33 @@
 #include "engine/Engine.h"
 
+#include <chrono>
+#include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 
 namespace orcisf::engine {
+
+namespace {
+
+// "YYYY-MM-DD.HH.MM" for the current local time -- issue #25's per-run
+// output subfolder name. localtime_s/localtime_r (not localtime()) since
+// this runs from a background worker thread (RunPanel's StartRun()) and
+// bare std::localtime() isn't thread-safe (shared static buffer).
+std::string MakeRunTimestamp() {
+    std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::tm tm_local{};
+#if defined(_WIN32)
+    localtime_s(&tm_local, &now);
+#else
+    localtime_r(&now, &tm_local);
+#endif
+    char buf[32];
+    std::strftime(buf, sizeof(buf), "%Y-%m-%d.%H.%M", &tm_local);
+    return std::string(buf);
+}
+
+} // namespace
 
 void LoadDatasetForViewing(StructureData& sd, const std::string& generic_dataset_path) {
     DatasetPaths paths = MakeDatasetPaths(generic_dataset_path);
@@ -11,14 +35,23 @@ void LoadDatasetForViewing(StructureData& sd, const std::string& generic_dataset
     ReadLoads(sd, paths.bbn);
 }
 
-void RunFullOptimization(StructureData& sd, const std::string& generic_dataset_path,
-                          const OptimizationOptions& options, const ProgressCallback& on_progress,
-                          const std::atomic<bool>* cancel) {
-    DatasetPaths paths = MakeDatasetPaths(generic_dataset_path);
-    ReadDataset(sd, paths);
-    ReadLoads(sd, paths.bbn);
+std::string RunFullOptimization(StructureData& sd, const std::string& generic_dataset_path,
+                                 const OptimizationOptions& options, const ProgressCallback& on_progress,
+                                 const std::atomic<bool>* cancel) {
+    DatasetPaths input_paths = MakeDatasetPaths(generic_dataset_path);
+    ReadDataset(sd, input_paths);
+    ReadLoads(sd, input_paths.bbn);
 
     PrepareOptimization(sd, options);
+
+    // Issue #25: output goes into "<dataset folder>/<timestamp>/<basename>"
+    // -- a fresh subfolder per run -- while input above was still read
+    // from generic_dataset_path itself, unaffected.
+    std::filesystem::path generic_fs(generic_dataset_path);
+    std::filesystem::path run_dir = generic_fs.parent_path() / MakeRunTimestamp();
+    std::filesystem::create_directories(run_dir);
+    std::string output_generic = (run_dir / generic_fs.filename()).string();
+    DatasetPaths paths = MakeDatasetPaths(output_generic);
 
     auto his = std::make_shared<std::ofstream>(paths.his);
     auto log_detail = std::make_shared<std::ofstream>(paths.log_detail);
@@ -72,6 +105,8 @@ void RunFullOptimization(StructureData& sd, const std::string& generic_dataset_p
     log_detail->close();
 
     WriteFinalResults(sd, paths);
+
+    return output_generic;
 }
 
 } // namespace orcisf::engine

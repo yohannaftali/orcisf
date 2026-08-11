@@ -1385,3 +1385,54 @@ history only; don't duplicate current-state description here.
   own acceptance criteria and still need a real interactive pass. Issue
   #24 status set to `ready-for-review`, not `done`, until that's
   confirmed.
+
+## 2026-08-11 — feat(src): Run panel dataset-path field + per-run output subfolder
+
+- Issue #25 created on GitHub (label: `enhancement`).
+- Scope: `src/gui/RunPanel.{h,cpp}`, `src/app/Application.{h,cpp}`,
+  `src/engine/include/engine/Engine.h`/`Engine.cpp`
+- User-reported via `/planner`: `RunPanel`'s own "Dataset path" text
+  field is a confusing second source of truth once a dataset is already
+  loaded via File > Open Data/New Data. Bundled with a second request:
+  each optimization run (including re-optimize-from-last-best, #16)
+  should write its `.opt/.str/.kdl/.inf/.his/.log.txt` output into a
+  timestamped subfolder (`YYYY-MM-DD.HH.MM`, e.g. `2026-08-11.13.40`)
+  instead of overwriting the same files in place every run. Flagged in
+  the issue body as an engine-level change (`RunFullOptimization()`
+  currently derives both input and output paths from one shared generic
+  path), not just GUI wiring.
+
+## 2026-08-11 — fix(src): implement issue #25 (Run panel path + per-run output subfolder)
+
+- **Part 1**: `RunPanel` no longer has its own editable "Dataset path"
+  field. `dataset_path_` is now a plain `std::string`, synced every frame
+  from `Application`'s actually-loaded dataset via a new
+  `RunPanel::SetDatasetPath()` (called at the top of
+  `Application::OnFrame()`, before anything reads `CanRun()`). The panel
+  shows the path read-only; `Run`/`CanRun()`/the icon toolbar's Run
+  button all key off it automatically.
+- **Part 2**: `engine::RunFullOptimization()` now returns the generic
+  *output* path (was `void`) -- each run creates a
+  `<dataset folder>/<YYYY-MM-DD.HH.MM>/` subfolder and writes
+  `.opt/.str/.kdl/.inf/.his/.log.txt` there instead of overwriting the
+  dataset's own files in place; input files are still read from the
+  original path, unaffected. Threaded the new return value through
+  `orcisf_cli`, `RunPanel` (`result_output_path_`, `SetOnResult`'s now
+  3-arg callback), and `Application` (`last_run_output_path_`) --
+  `report::WriteTextExport()`'s `source_generic_path` argument now uses
+  `last_run_output_path_` instead of the input dataset path in all three
+  call sites (`OnSaveRequested`/`OnSaveAsRequested`/
+  `OnExportTextRequested`), or text export would silently stop finding
+  `.his`/`.log.txt`.
+- Files: `src/gui/RunPanel.{h,cpp}`, `src/gui/IconToolbar.cpp`,
+  `src/app/Application.{h,cpp}`, `src/engine/include/engine/Engine.h`,
+  `src/engine/src/Engine.cpp`, `src/engine/tools/orcisf_cli.cpp`.
+- **Compiled successfully** (MSVC/Ninja, `windows-release` preset, all
+  three targets) and **empirically verified** with `orcisf_cli optimize`
+  against a scratch copy of `Example/Data01`: confirmed a real
+  `<timestamp>/` subfolder was created with the run's six output files,
+  and (via checksum) that the dataset's own top-level `.opt` was
+  byte-identical before/after -- genuinely untouched. The built GUI
+  launched and ran without crashing after the `RunPanel` changes, but the
+  UI itself wasn't click-tested interactively. Issue #25 status set to
+  `ready-for-review`, not `done`, until that's confirmed.

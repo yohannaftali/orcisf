@@ -650,6 +650,67 @@ app and reading the field's displayed value, not just by code review --
 verified interactively in this environment (two separate clicks produced
 two different valid positive seeds).
 
+**Run panel dataset-path field removed; per-run timestamped output
+subfolder (issue #25) — read before touching `RunPanel`'s dataset-path
+handling or `engine::RunFullOptimization()`'s output paths:**
+- **`RunPanel` no longer owns an independently-typed dataset path.** The
+  old `char dataset_path_[512]` field, edited via its own `InputText`,
+  was a second source of truth that could (and did, per the user report
+  this fixes) drift out of sync with whatever `Application` actually had
+  loaded via File > Open Data/New Data/Save As. `dataset_path_` is now a
+  plain `std::string`, kept in sync via a new `RunPanel::SetDatasetPath()`
+  that `Application::OnFrame()` calls once per frame, **before** anything
+  that reads `RunPanel::CanRun()` (the icon toolbar's Run button) or
+  calls `Draw()` -- ordering matters here, since `CanRun()` reflects
+  whatever `dataset_path_` held as of the *previous* `SetDatasetPath()`
+  call otherwise. The panel now just displays the loaded path read-only.
+- **`engine::RunFullOptimization()`'s signature changed from `void` to
+  returning `std::string`** -- the generic *output* path a run's
+  `.opt/.str/.kdl/.inf/.his/.log.txt` actually landed in. Every run now
+  creates a fresh subfolder next to the dataset (`YYYY-MM-DD.HH.MM`, e.g.
+  `2026-08-11.13.40`) and writes there instead of overwriting the
+  dataset's own files in place -- **input** (`.inp/.isd/.idl/.ijl/.ids/
+  .ijs/.bbn`) is still read from `generic_dataset_path` itself,
+  unaffected; only output moved. This needed two independent
+  `LegacyIO::DatasetPaths` inside `RunFullOptimization()` (`input_paths`
+  for reading, a second `paths` built from the timestamped generic path
+  for everything written) -- don't collapse them back into one, that was
+  exactly the bug this issue reports for the old in-place-overwrite
+  behavior (specifically: no isolation between separate runs/re-runs,
+  including issue #16's re-optimize-from-last-best).
+- **Every caller of `RunFullOptimization()` needed updating for the new
+  return value**, not just `RunPanel`: `orcisf_cli.cpp`'s `optimize`
+  command now prints `Output written to: <path>`; `RunPanel::StartRun()`
+  captures it into a new `result_output_path_` member, threaded through
+  `SetOnResult`'s callback (now 3 args: `StructureData`, input dataset
+  path, output path) to `Application::OnRunResult()`, which stores it in
+  a new `last_run_output_path_` member.
+- **`report::WriteTextExport()`'s `source_generic_path` argument (the
+  path it copies `.his`/`.log_detail` from when `has_run_results_` is
+  true) must be `last_run_output_path_`, not `loaded_dataset_path_`,
+  everywhere it's called** (`OnSaveRequested`/`OnSaveAsRequested`/
+  `OnExportTextRequested`) -- `loaded_dataset_path_` is the *input*
+  dataset's path (used for Save/Save As, unaffected by this issue);
+  after this change it no longer points at where a run's `.his`/
+  `.log.txt` actually live. Get this wrong and text export silently
+  stops copying those two files (the `!source.empty()` guard in
+  `TextExport.cpp` fails open, not loud, on a stale/wrong path).
+- **Two runs started within the same minute against the same dataset
+  reuse the same output subfolder** (last one wins) -- an accepted minor
+  edge case per the issue's own acceptance criteria, not otherwise
+  handled.
+- **What was verified:** compiled cleanly (MSVC/Ninja, `windows-release`
+  preset, all three targets: `orcisf_engine`, `orcisf_cli`, `orcisf_gui`)
+  and empirically exercised via `orcisf_cli optimize` against a scratch
+  copy of `Example/Data01`: confirmed a real `<folder>/<timestamp>/`
+  subfolder was created containing the run's six output files, and (via
+  checksum, not just mtime) that the dataset's own top-level `.opt` file
+  was byte-identical before and after -- genuinely untouched. The built
+  GUI was launched and confirmed running without crashing after the
+  `RunPanel` UI changes, but the dataset-path-sync/Run-panel-display
+  itself was not click-tested interactively; that's still a good next
+  step for full confidence.
+
 **AutoCAD-style Add Joint + editing guidance (issue #18, part of epic
 #13) — read before touching `EditorOptions::add_joint_mode`/
 `ViewportPanel::HandlePicking()`/`Toolbar.cpp`'s status-hint block:**
@@ -1376,6 +1437,7 @@ for skills that apply to the current task and follow them.
 | #22 | feat(src): 2D plane-locked drawing (X-Y/X-Z/Y-Z orthographic views + adjustable offset) | closed | 2026-08-11 |
 | #23 | feat(src): UCS icon overlay in the viewport | closed | 2026-08-11 |
 | #24 | fix(src): 2D plane offset control unreachable from the viewport (move it under the UCS icon) | ready-for-review | 2026-08-11 |
+| #25 | fix(src): Run panel dataset-path field is redundant; write each run into a timestamped output subfolder | ready-for-review | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
