@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cstring>
 #include <exception>
+#include <limits>
+#include <random>
 
 #include <imgui.h>
 
@@ -144,8 +146,27 @@ void RunPanel::Draw(bool* open) {
             std::thread::hardware_concurrency());
     }
     int rng_seed_i = static_cast<int>(rng_seed_);
+    ImGui::SetNextItemWidth(ImGui::CalcItemWidth() * 0.6f);
     if (ImGui::InputInt("RNG seed (0 = random)", &rng_seed_i)) {
         rng_seed_ = static_cast<unsigned int>(std::max(0, rng_seed_i));
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Regenerate Seed")) {
+        // std::random_device rather than time-seeding: two regenerates in
+        // the same frame/millisecond must still produce different values.
+        // Only affects the *next* run started (StartRun() copies rng_seed_
+        // into its own local options at call time) -- a run already in
+        // progress is unaffected either way, but the button is disabled
+        // along with the rest of this section while one is running anyway.
+        // Bounded to [1, INT_MAX]: rng_seed_ round-trips through this
+        // field as a plain `int` (ImGui::InputInt), so a raw
+        // std::random_device value with the sign bit set would display as
+        // a negative number and, worse, get silently clamped back to 0
+        // (the "random" sentinel) the next time this field's edit path
+        // runs its `std::max(0, rng_seed_i)`.
+        std::random_device rd;
+        std::uniform_int_distribution<int> dist(1, std::numeric_limits<int>::max());
+        rng_seed_ = static_cast<unsigned int>(dist(rd));
     }
     ImGui::EndDisabled();
 

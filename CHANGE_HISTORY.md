@@ -936,3 +936,66 @@ history only; don't duplicate current-state description here.
   presets, joint/selection/undo history all persisted).
 - Files: `src/gui/Toolbar.h`, `src/gui/Toolbar.cpp`,
   `src/app/Application.h`, `src/app/Application.cpp`
+
+## 2026-08-11 — feat(src): #17 implemented (Regenerate Seed button)
+
+- Added a "Regenerate Seed" button next to `RunPanel`'s existing "RNG
+  seed (0 = random)" field, generating a new value via
+  `std::random_device`.
+- **Bug found and fixed during interactive verification:** the field
+  round-trips `rng_seed_` (`unsigned int`) through `ImGui::InputInt`
+  (signed `int`). A raw `std::random_device` draw can exceed `INT_MAX`,
+  which displayed as a negative number -- and the field's own commit
+  path (`std::max(0, rng_seed_i)`) would have silently clamped that
+  negative display back to `0` (the "always random" sentinel) on the
+  next edit. Fixed by generating with
+  `std::uniform_int_distribution<int>(1, INT_MAX)` instead, so the
+  value is always positive and displays correctly.
+- **Verified interactively** in this environment: clicked the button
+  twice in the running app, confirmed two different valid positive
+  seed values appeared in the field each time (the first attempt, before
+  the fix, showed `-1306594150` -- caught by actually reading the
+  field, not just by code review).
+- Files: `src/gui/RunPanel.cpp`
+
+## 2026-08-11 — Custom borderless window chrome + modern theme
+
+- Issue #19 created on GitHub: "feat(src): custom borderless window
+  chrome + modern ImGui theme (cross-platform)".
+- Scope: `src/app/main.cpp`, new `CustomTitleBar`/`Theme` files
+- Labels: enhancement
+- User request (via /planner) was an elaborate, code-generation-style
+  spec for removing OS title bars on Windows/macOS/Linux and replacing
+  them with a custom ImGui title bar + drag/resize + a premium dark
+  theme. Filed as a tracked issue rather than generating code directly,
+  per this project's convention. Flagged prominently in the issue body:
+  this app uses **GLFW**, which doesn't expose native window-proc/
+  delegate hooks by default -- correctly implementing native drag/
+  resize/snap on each platform requires pulling raw native handles
+  (`glfwGetWin32Window()`/`glfwGetCocoaWindow()`/`glfwGetX11Window()`)
+  and subclassing/hooking outside GLFW's own supported API, which GLFW's
+  own docs caution against doing carelessly. Wayland support on Linux is
+  explicitly called out as needing a feasibility spike first (Wayland
+  compositors don't allow client-side window positioning the way X11/
+  Win32/Cocoa do) -- may need to scope down to "X11 only" for Linux.
+- **#19 revised (same day) to a platform-agnostic-first rollout:** split
+  into Phase 0 (ships identically on all three platforms using only
+  GLFW's own cross-platform API -- `GLFW_DECORATED=false`, the ImGui
+  title bar, `ApplyModernTheme()`, and a basic `glfwSetWindowPos`-based
+  drag that works everywhere but isn't OS-native) and Phase 1+ (each
+  platform's native drag/resize/snap integration, Windows first, shipped
+  as independent non-blocking follow-up work; Wayland stays on Phase 0's
+  fallback indefinitely if the feasibility spike finds it infeasible).
+  Rationale: get the modern *look* live on every platform immediately
+  instead of blocking the whole issue on native per-platform systems
+  work landing everywhere first.
+- **#19 corrected (same day): Phase 0 is not equally functional on all
+  three platforms, only equally visual.** Phase 0's drag mechanism
+  (`glfwSetWindowPos` per-frame) is a no-op on Wayland -- Wayland
+  compositors don't allow client-side window positioning at all, unlike
+  X11/Win32/Cocoa. Added a requirement to detect the Wayland backend at
+  runtime (`glfwGetPlatform() == GLFW_PLATFORM_WAYLAND`) and surface the
+  limitation instead of shipping a window that silently can't be moved,
+  and tightened the "verified" acceptance criteria to require actually
+  confirming drag works (or is a documented no-op on Wayland) rather
+  than just confirming the code compiles/runs per platform.

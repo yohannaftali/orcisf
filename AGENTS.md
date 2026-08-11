@@ -624,6 +624,22 @@ touching `Application::BuildDockspace()`/`Toolbar`'s View menu:**
   Design -> Optimization -> Default round-trips back to the original
   layout exactly (pixel-for-pixel arrangement, not just "close enough").
 
+**`RunPanel`'s "Regenerate Seed" button (issue #17) — a real bug was
+found and fixed here, worth knowing if you touch `rng_seed_` again:**
+`rng_seed_` is `unsigned int`, but the field round-trips through
+`ImGui::InputInt` (a signed `int`) via `rng_seed_i`. A raw
+`std::random_device` value can exceed `INT_MAX`, which displayed as a
+*negative* number in the field -- and worse, the field's own edit path
+(`rng_seed_ = static_cast<unsigned int>(std::max(0, rng_seed_i))`) would
+have silently clamped that negative display back to `0` (the "always
+random" sentinel) on the next edit. Fixed by generating with
+`std::uniform_int_distribution<int>(1, INT_MAX)` instead of a raw
+`std::random_device` draw, so the value is always positive and
+int-representable. Caught by actually clicking the button in the running
+app and reading the field's displayed value, not just by code review --
+verified interactively in this environment (two separate clicks produced
+two different valid positive seeds).
+
 **`gui/viewport/` (issue #5) — three things worth knowing before touching it:**
 - **Member cross-section thickness/orientation is a schematic
   approximation, not the legacy local-axis convention.** `SceneRenderer`
@@ -955,8 +971,9 @@ for skills that apply to the current task and follow them.
 | #14 | feat(src): add a configurable icon toolbar below the menu bar | closed | 2026-08-11 |
 | #15 | feat(src): add Default/Design/Optimization view-layout presets | closed | 2026-08-11 |
 | #16 | feat(src): re-optimize using the last best result | open | 2026-08-11 |
-| #17 | feat(src): add a Regenerate Seed button to the Run panel | open | 2026-08-11 |
+| #17 | feat(src): add a Regenerate Seed button to the Run panel | ready-for-review | 2026-08-11 |
 | #18 | feat(src): AutoCAD-style in-progress guidance while adding joints/members | open | 2026-08-11 |
+| #19 | feat(src): custom borderless window chrome + modern ImGui theme (cross-platform) | open | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
