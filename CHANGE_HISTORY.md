@@ -1333,3 +1333,9 @@ history only; don't duplicate current-state description here.
   not on default `PATH`, an earlier session incorrectly reported none
   available) in the Validation section, and added a "Releases" note to
   the GitHub Workflow section (alpha versioning scheme: `v0.0.x-alpha`).
+- **Published the first GitHub Release**: tag `v0.0.1-alpha`, marked as a
+  pre-release, with a prebuilt Windows x64 binary
+  (`orcisf_gui-v0.0.1-alpha-windows-x64.zip`, built via the same
+  `windows-release` MSVC/Ninja build used to verify #16 above) attached
+  as a release asset. Release notes summarize what's included (epics #1,
+  #13, #20 complete) and link to the README's new GUI tutorial.
