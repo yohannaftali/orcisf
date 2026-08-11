@@ -1861,3 +1861,112 @@ automation script, not WinUI3), core objective verified, issue closed
   cross-referencing the change. Updated `AGENTS.md`'s Tracked Issues row
   and its #31 "read before touching" section with a pointer to this
   reopening and the expanded scope.
+
+## 2026-08-11 — chore(src): one-shot build scripts (#32 created)
+
+- Issue #32 created on GitHub (no duplicate found via search).
+- Scope: `src/` build tooling -- `build.ps1` (Windows) and `build.sh`
+  (macOS/Linux), wrapping the same OS-detection/toolchain-location/
+  configure/build logic the `rebuild` agent skill already documents, but
+  as standalone scripts usable without an AI agent in the loop.
+- Labels: chore, enhancement
+
+## 2026-08-11 — chore(src): implement issue #32 (build.ps1 / build.sh)
+
+- Added `build.ps1` (Windows) and `build.sh` (macOS/Linux) at the repo
+  root, mirroring the `rebuild` agent skill's toolchain-detection logic
+  (CMake/MSVC/vcpkg located beyond `PATH`, matching preset picked by OS,
+  configure-if-needed, then build `orcisf_gui`/`orcisf_cli`) as
+  standalone scripts a human or CI can run without an AI agent.
+- Updated `src/README.md`'s Building section to lead with the new
+  scripts, keeping the manual `cmake --preset`/`cmake --build --preset`
+  instructions as a documented alternative.
+- **Interactively verified `build.ps1`** in this environment: found
+  `C:\Qt\Tools\CMake_64\bin\cmake.exe` and the BuildTools `vcvars64.bat`
+  exactly as the `rebuild` skill documents, located a real vcpkg
+  checkout via `VCPKG_ROOT`, and successfully built both binaries. Found
+  and fixed a real bug during this pass: the script's initial reported
+  path for `orcisf_cli.exe` was wrong (assumed it landed directly in the
+  build dir like `orcisf_gui.exe`; it actually lands in a nested
+  `engine/` subdirectory, since it's defined in
+  `src/engine/CMakeLists.txt` rather than the top-level `CMakeLists.txt`)
+  -- caught by checking the reported path against the filesystem, not by
+  code review alone. Fixed and re-verified: both `orcisf_gui.exe` and
+  `engine/orcisf_cli.exe` confirmed present at the paths the script
+  prints.
+- **`build.sh` was not executed** (no macOS/Linux toolchain available in
+  this environment) -- written against the identical logic and reviewed,
+  but relies on CI (`.github/workflows/build-src.yml`) for its first
+  real cross-platform confirmation.
+- Files: `build.ps1` (new), `build.sh` (new), `src/README.md`,
+  `AGENTS.md` (Validation section + Tracked Issues row)
+
+## 2026-08-11 — chore: rename `rebuild` agent skill to `builder`; delegate to build.ps1/build.sh
+
+- Renamed `.claude/skills/rebuild/` to `.claude/skills/builder/` at the
+  user's request. Rewrote `SKILL.md` to call the repo's own
+  `build.ps1`/`build.sh` (issue #32, added earlier the same day) rather
+  than re-deriving toolchain-detection steps inline on every invocation
+  -- the scripts are now the single source of truth for that logic, and
+  the skill just invokes them and reports the result, using far fewer
+  tokens per run.
+- Updated every `AGENTS.md` reference from `rebuild` to `builder`
+  (Agent Skills section, the Validation section's build.ps1/build.sh
+  note, and one inline mention in the #30 Alt-mnemonics entry). Checked
+  the other skills (`coder`, `planner`, `_shared`) for stray references
+  -- none found.
+- Files: `.claude/skills/rebuild/SKILL.md` -> `.claude/skills/builder/
+  SKILL.md` (renamed + rewritten), `AGENTS.md`
+
+## 2026-08-11 — chore: add `tester` agent skill
+
+- New `.claude/skills/tester/SKILL.md` at the user's request: tests a
+  freshly built binary against a specific issue's own Acceptance
+  Criteria checklist (`/tester pick #X`), reporting PASS/FAIL/UNVERIFIED
+  per criterion rather than a single aggregate verdict -- UNVERIFIED is
+  a deliberate third state for criteria this environment genuinely can't
+  mechanically check (e.g. a second physical monitor), so the skill
+  isn't forced to guess a pass/fail either way.
+- Delegates to `builder` for the binary (doesn't re-derive build steps)
+  and to the same repo/token resolution `planner`/`coder` already use
+  (doesn't re-derive that either). Bakes in this session's own hard-won
+  automation lessons for the GUI-testable case (DPI-aware coordinates,
+  foreground-window checks, stale-coordinate avoidance, focus-stealing
+  hazards) by reference to `AGENTS.md`'s accumulated notes, rather than
+  repeating them inline.
+- Never auto-closes the remote issue or writes to `AGENTS.md`/
+  `CHANGE_HISTORY.md` without explicit user confirmation, matching
+  `planner`/`coder`'s existing caution around remote writes.
+- Registered in `AGENTS.md`'s Agent Skills section.
+- Files: `.claude/skills/tester/SKILL.md` (new), `AGENTS.md`
+
+## 2026-08-11 — chore: add `reviewer` agent skill; document the full skill workflow
+
+- New `.claude/skills/reviewer/SKILL.md` at the user's request: the
+  final quality-assurance gate. Audits architecture/design fit, hunts
+  for bugs and security gaps, confirms an issue's criteria pass
+  end-to-end (distinct from `tester`'s per-criterion mechanical check),
+  then acts on the verdict -- reopen with a comment if something's
+  wrong (routing back to `coder`), or comment + propose closing if
+  genuinely done, and propose a release if the change included an
+  actual `src/` code change (never for docs/tooling-only changes).
+  Every remote write (reopen/comment/close/release) requires explicit
+  user confirmation, same caution as every other skill.
+- Formalized the project's full five-stage workflow in `AGENTS.md`'s
+  new "Agent Skill Workflow" subsection: `planner` (create issue) ->
+  `coder` (implement) -> `builder` (compile) -> `tester` (per-criterion
+  pass/fail) -> `reviewer` (end-to-end QA + close/reopen/release
+  decision).
+- Added an explicit rule at the top of the Agent Skills section: every
+  skill reads `AGENTS.md` first, in full, before doing anything else --
+  already true in practice for `planner`/`coder`/`tester`/`reviewer`
+  (each already had this as their own Step 1), but `builder` didn't
+  say so explicitly since it mostly delegates to `build.ps1`/`build.sh`
+  -- added the same instruction there too, since a build failure can
+  still need this file's context to interpret correctly.
+- Updated the GitHub Workflow section's Releases bullet: releases still
+  require explicit user confirmation, but now acknowledge `reviewer` as
+  a legitimate source of a release *proposal* (never a release created
+  without that confirmation either way).
+- Files: `.claude/skills/reviewer/SKILL.md` (new),
+  `.claude/skills/builder/SKILL.md`, `AGENTS.md`

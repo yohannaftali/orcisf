@@ -911,7 +911,7 @@ touching `Toolbar.cpp`'s `BeginMnemonicMenu()`:**
   Edit=E, View Plane=P, Loads=L, Run=R, View=V (same assignment #28
   originally picked, before the "&" attempt was found broken).
 - **What was verified vs. not:** compiled cleanly (MSVC/Ninja,
-  `windows-release`) via the `rebuild` skill. **Interactive
+  `windows-release`) via the `builder` skill. **Interactive
   confirmation (Alt held -> underlines actually appear in the right
   place; Alt+letter -> the right menu actually opens) was not
   completed** -- attempting to grab foreground for screenshotting
@@ -1825,6 +1825,15 @@ calls, etc.) — treat it as new work under `src/`, not an in-place edit of
 AI agents working in this repo should check [`.claude/skills/`](.claude/skills/)
 for skills that apply to the current task and follow them.
 
+**Every skill in this project reads this file (`AGENTS.md`) first**, in
+full, before doing anything else — not just the section that looks
+relevant to its own job. This is a small, densely cross-referenced
+project where a change in one area (the engine's 1-based arrays, a
+DPI-scaling gotcha, a documented "deliberate deviation") routinely
+matters to work that looks unrelated at first glance. Each skill's own
+`SKILL.md` restates this, but it's the rule, not a suggestion any one
+skill can skip because its task seems self-contained.
+
 - **`planner`** ([`.claude/skills/planner/SKILL.md`](.claude/skills/planner/SKILL.md)) —
   context-aware issue tracker for GitHub. Use this instead of raw API
   calls/`curl` whenever creating, updating, or checking issues/tickets, even if
@@ -1835,13 +1844,78 @@ for skills that apply to the current task and follow them.
   implements the fix following this file's conventions. Use for "fix an
   issue", "work on a ticket", "implement issue #X". Shares remote-repo/token
   resolution with `planner` via [`.claude/skills/_shared/references/`](.claude/skills/_shared/references/).
-- **`rebuild`** ([`.claude/skills/rebuild/SKILL.md`](.claude/skills/rebuild/SKILL.md)) —
+- **`builder`** ([`.claude/skills/builder/SKILL.md`](.claude/skills/builder/SKILL.md)) —
   rebuilds `src/`'s `orcisf_gui`/`orcisf_cli` for whichever OS the agent is
   currently on, after a fix/issue/review lands. Use whenever about to verify a
-  `src/` change and a fresh binary is needed. Encodes how to find the
-  toolchain (CMake/MSVC/vcpkg) even when it isn't on the default `PATH` --
-  see this file's Validation section for where it was found in this
-  environment.
+  `src/` change and a fresh binary is needed. Runs the repo's own
+  `build.ps1`/`build.sh` (issue #32) rather than re-deriving toolchain paths
+  inline -- see this file's Validation section for the toolchain locations
+  those scripts already know about in this environment.
+- **`tester`** ([`.claude/skills/tester/SKILL.md`](.claude/skills/tester/SKILL.md)) —
+  tests a freshly built binary against a specific GitHub issue's own
+  Acceptance Criteria checklist, criterion by criterion (PASS/FAIL/
+  UNVERIFIED, not a single aggregate verdict). Use for "test issue #X",
+  "/tester pick #X". Calls `builder` for the binary rather than building
+  inline, and reuses `planner`/`coder`'s repo/token resolution -- doesn't
+  duplicate either. Never auto-closes the remote issue or writes to
+  `AGENTS.md`/`CHANGE_HISTORY.md` without explicit confirmation, same as
+  `planner`/`coder`.
+- **`reviewer`** ([`.claude/skills/reviewer/SKILL.md`](.claude/skills/reviewer/SKILL.md)) —
+  the final quality-assurance gate: audits code architecture/design,
+  hunts for bugs and security gaps, and confirms an issue's Acceptance
+  Criteria genuinely pass end-to-end (not per-criterion like `tester` --
+  this is the human-facing sign-off). Reopens the issue with a comment if
+  something's wrong, or comments + proposes closing it if it's genuinely
+  done, and proposes a release if the change warrants one. Use for
+  "review issue #X", "/reviewer pick #X", "is #X really done". Never
+  takes a remote write action (reopen/comment/close/release) without
+  explicit confirmation of that specific action.
+
+### Agent Skill Workflow
+
+This project's steady-state workflow for any change is a five-stage
+pipeline, each stage owned by one skill:
+
+```
+planner  -->  coder  -->  builder  -->  tester  -->  reviewer
+(create      (implement   (compile     (per-        (end-to-end QA,
+ issue)       the fix)     a binary)    criterion     architecture/
+                                        pass/fail)    security audit,
+                                                       close/reopen,
+                                                       propose release)
+```
+
+- **`planner`** turns a report/request into a well-formed GitHub issue
+  with testable Acceptance Criteria (the contract every later stage
+  checks against).
+- **`coder`** implements against that issue's criteria, following this
+  file's conventions.
+- **`builder`** produces a fresh, verifiably current binary — no stage
+  after this one should test or review a stale build.
+- **`tester`** mechanically checks each Acceptance Criterion against
+  that binary and reports PASS/FAIL/UNVERIFIED per item — narrow and
+  literal, not a judgment call.
+- **`reviewer`** is the judgment call: architecture/design fit, bug and
+  security audit, confirming the feature genuinely works end-to-end (not
+  just criterion-by-criterion), and then acting on the verdict — reopen
+  the issue with a comment if something's wrong (routing back to
+  `coder`), or comment and propose closing it if it's genuinely done. If
+  the change included an actual `src/` code change (not just docs/
+  tooling), `reviewer` also proposes whether a new release is warranted.
+
+Not every change needs all five stages run as separate invocations in
+one sitting — a trivial fix might reasonably combine `coder`+`builder`
+verification inline — but for anything closing out a tracked issue,
+running `tester` then `reviewer` before considering it truly done is
+this project's expected practice, and skipping straight from `coder` to
+closing an issue without either is a process gap worth flagging to the
+user, not silently doing anyway.
+
+Every stage that touches the remote issue tracker or creates a release
+follows the same rule the rest of this file establishes: propose the
+action, get explicit confirmation, then act — a prior confirmation for
+one action (e.g. "commit and push") never implies permission for a
+later, different one (e.g. closing an issue or cutting a release).
 
 ---
 
@@ -1861,8 +1935,12 @@ for skills that apply to the current task and follow them.
   is currently in **alpha** — tags/releases use a `v0.0.x-alpha` scheme
   (first one: `v0.0.1-alpha`). Bump the patch number for each subsequent
   alpha; move to a `v0.x.0` (beta) or `v1.0.0` scheme only once the user
-  explicitly decides the project has left alpha. Only create a release
-  when the user asks — it's a user-visible, hard-to-quietly-undo action.
+  explicitly decides the project has left alpha. **Only create a release
+  after explicit user confirmation** — either the user asks directly, or
+  the `reviewer` skill proposes one (per its Step 8: only when the change
+  includes an actual `src/` code change, never for docs/tooling-only
+  changes) and the user confirms. A release is a user-visible,
+  hard-to-quietly-undo action either way.
 
 ## Tracked Issues
 | ID | Title | Status | Last Checked |
@@ -1898,6 +1976,7 @@ for skills that apply to the current task and follow them.
 | #29 | chore(src): interactively re-verify RunPanel dataset gating (#25) and 2D plane offset control (#22/#24) with a real loaded dataset | closed | 2026-08-11 |
 | #30 | feat(src): implement real Alt-mnemonic menu navigation (Dear ImGui has no built-in "&" parsing) | ready-for-review | 2026-08-11 |
 | #31 | fix(src): application is not DPI-aware -- UI too small on high-DPI monitors in multi-monitor setups | reopened (see below) | 2026-08-11 |
+| #32 | chore(src): add one-shot build scripts (build.ps1 for Windows, build.sh for macOS/Linux) | ready-for-review | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
@@ -1962,6 +2041,22 @@ icon overlay — see each issue's own "read before touching" section above.
     this repo incorrectly reported "no cmake toolchain available" without
     checking beyond the default `PATH` — check for these before assuming
     a build genuinely can't happen locally.
+  - **`build.ps1`/`build.sh`** (issue #32, repo root) wrap all of the
+    above into one command for a human contributor (or CI). The
+    `builder` agent skill (renamed from `rebuild`) just *calls* these
+    scripts rather than re-deriving toolchain paths inline itself --
+    they're the single source of truth for this logic now, so update
+    only `build.ps1`/`build.sh` if a new fallback toolchain location is
+    ever discovered (the skill needs no matching edit; it delegates).
+    `build.ps1` was interactively verified in this
+    environment (locates `C:\Qt\Tools\CMake_64\bin\cmake.exe` and the
+    BuildTools `vcvars64.bat` exactly as documented above, builds both
+    `orcisf_gui.exe` and `engine/orcisf_cli.exe` -- note `orcisf_cli`
+    lands in a nested `engine/` subdirectory of the build dir, since
+    it's defined in `src/engine/CMakeLists.txt`, not the top-level one).
+    `build.sh` mirrors the same logic but could not be executed locally
+    (no macOS/Linux toolchain in this environment) -- CI is relied on
+    to confirm it.
 
 ---
 

@@ -26,7 +26,26 @@ Requires: CMake ≥ 3.21, Ninja, a C++20 compiler, and vcpkg.
 git clone https://github.com/microsoft/vcpkg
 ./vcpkg/bootstrap-vcpkg.sh   # or bootstrap-vcpkg.bat on Windows
 export VCPKG_ROOT=$(pwd)/vcpkg   # PowerShell: $env:VCPKG_ROOT = "$PWD/vcpkg"
+```
 
+**Quickest path**: run the one-shot build script at the repo root — it
+detects the OS, locates CMake/MSVC/vcpkg (even if not on `PATH`),
+configures the matching preset if needed, and builds `orcisf_gui`/
+`orcisf_cli`:
+
+```powershell
+# Windows (PowerShell)
+.\build.ps1
+```
+
+```sh
+# macOS / Linux
+./build.sh
+```
+
+**Manual control**, if you'd rather drive CMake yourself:
+
+```sh
 cd src
 cmake --preset windows-release   # or macos-release / linux-release
 cmake --build --preset windows-release
