@@ -1832,3 +1832,32 @@ automation script, not WinUI3), core objective verified, issue closed
 - Cleaned up all scratch screenshots and the `C:\Users\IT\Desktop\
   OrcisfTest` scratch folder. **Issue #29 closed** -- both criteria the
   user explicitly asked to have re-verified are now confirmed.
+
+## 2026-08-11 — #31 reopened: DPI-awareness fix was incomplete
+
+- User reported (via `/planner`, real dual-monitor use with two
+  different-DPI monitors side by side) that the app is still not
+  DPI-aware in practice: toolbar icons look too small, the title bar
+  Close button is clipped on the right edge, sub-window panel content is
+  clipped at the top, and moving the window to a different-DPI monitor
+  live does nothing.
+- Checked #31's status first (closed) and searched for other open
+  DPI-related issues (none found) before deciding how to track this.
+  Asked the user whether to reopen #31 or file a new issue, since #31's
+  own acceptance criteria had explicitly scoped live monitor-drag
+  rescaling as a "decide and document" follow-up rather than a hard
+  requirement -- user chose to reopen #31 and fold this in, since it's
+  the same root feature (DPI awareness) just incompletely covered by the
+  original fix, not a different feature.
+- Reopened #31 on GitHub, rewrote its body to document why the original
+  fix (still correct as far as it went -- font/style scaling at startup)
+  didn't cover: (1) `IconToolbar.cpp`'s hand-drawn `ImDrawList` icons
+  (fixed pixel constants, never multiplied by `dpi_scale`), (2)
+  `CustomTitleBar.cpp`'s Close-button right-alignment math (tuned before
+  DPI scaling existed), (3) `Application.cpp`'s dockspace work-area
+  constants (unscaled, causing top-clipping), (4) no
+  `glfwSetWindowContentScaleCallback`-driven live rescale when the
+  window moves between monitors. Posted an explanatory comment
+  cross-referencing the change. Updated `AGENTS.md`'s Tracked Issues row
+  and its #31 "read before touching" section with a pointer to this
+  reopening and the expanded scope.

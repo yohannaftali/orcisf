@@ -1519,6 +1519,25 @@ sequence or its `EnableWindowsDpiAwareness()`/font/style-scaling code:**
   13px/1x metrics, consistent with the user's report that this case
   already worked -- but this specific claim rests on reasoning about the
   mechanism, not a second physical monitor test.
+- **Reopened 2026-08-11: this fix is incomplete, not wrong.** It only
+  ever scaled ImGui's own font + `ImGui::GetStyle()` metrics, both read
+  once at startup. A follow-up report (real dual-monitor use, two
+  different-DPI monitors side by side) found four more gaps that were
+  never in scope here: (1) `IconToolbar.cpp`'s hand-drawn `ImDrawList`
+  icon glyphs are fixed pixel constants, never multiplied by
+  `dpi_scale`, so they read as too-small at higher scales even though
+  the font around them is now correctly sized; (2)
+  `CustomTitleBar.cpp`'s Close-button-flush-right math (see issue #19's
+  own notes on this exact code) was tuned pre-DPI-scaling and can clip
+  at non-1.0 scale; (3) docked panel content clips at the top because
+  `Application.cpp`'s dockspace work-area math (`IconToolbar::kHeight`,
+  menu bar height) uses unscaled constants; (4) the "live monitor-drag
+  rescaling is out of scope" limitation documented above is exactly what
+  the user is now asking be handled, since they run two different-DPI
+  monitors in parallel and move the window between them live. See
+  `CHANGE_HISTORY.md`'s 2026-08-11 "#31 reopened" entry and the issue's
+  own updated acceptance criteria on GitHub for the full expanded scope
+  before starting this work.
 
 **`gui/viewport/` (issue #5) — three things worth knowing before touching it:**
 - **Member cross-section thickness/orientation is a schematic
@@ -1878,7 +1897,7 @@ for skills that apply to the current task and follow them.
 | #28 | feat(src): Alt-mnemonic menu navigation + icon before each panel title | ready-for-review | 2026-08-11 |
 | #29 | chore(src): interactively re-verify RunPanel dataset gating (#25) and 2D plane offset control (#22/#24) with a real loaded dataset | closed | 2026-08-11 |
 | #30 | feat(src): implement real Alt-mnemonic menu navigation (Dear ImGui has no built-in "&" parsing) | ready-for-review | 2026-08-11 |
-| #31 | fix(src): application is not DPI-aware -- UI too small on high-DPI monitors in multi-monitor setups | ready-for-review | 2026-08-11 |
+| #31 | fix(src): application is not DPI-aware -- UI too small on high-DPI monitors in multi-monitor setups | reopened (see below) | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
