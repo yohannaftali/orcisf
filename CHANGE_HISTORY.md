@@ -1750,3 +1750,33 @@ history only; don't duplicate current-state description here.
   library turned out wrong) is reason enough not to claim this works
   without empirical confirmation, even though the techniques used here
   are standard/well-understood ones.
+
+## 2026-08-11 — Second #29 attempt: root cause of the blocker precisely diagnosed
+
+- Picked #29 back up via `/coder`. Checked `GetForegroundWindow()` first
+  (not the user's own active session this time) before grabbing focus.
+  Confirmed the app's own File menu is fully keyboard-navigable
+  (Down/Down/Enter moved nav focus from "New Data" to "Open Data..." and
+  activated it, screenshot-verified at each step) and that the native
+  "Select Folder" dialog opens correctly.
+- **Precisely diagnosed why loading a dataset keeps failing**: the
+  dialog is Windows 11's newer WinUI3/XAML file picker (not the classic
+  Win32 common-item dialog). Its "Folder:" text field does not accept
+  synthetic `SetCursorPos`/`mouse_event` clicks or `SendKeys` typed text
+  in this environment -- confirmed empty across five distinct attempts
+  (direct click+type, `Ctrl+A`-then-type, `Ctrl+L` address-bar focus,
+  double-click), each re-screenshotted immediately before/after to rule
+  out stale coordinates. One attempt visibly navigated the sidebar tree
+  instead, showing keyboard focus was landing elsewhere in the dialog
+  entirely. This is a known category of issue (WinUI3/XAML controls
+  needing real UI Automation, not raw `SendInput`, for reliable external
+  automation) -- not a repeat of the previous coordinate-math mistakes.
+- Cancelled cleanly via `{ESC}` each time (dialog-level accelerators do
+  reach it, just not the text field specifically); no orphaned dialogs,
+  no corrupted app state, process stopped cleanly at the end.
+- **Still did not achieve #29's core objective** (load a dataset,
+  confirm RunPanel/plane-offset behavior). Documented concrete next
+  steps in `AGENTS.md` for whoever attempts this next: use a real UI
+  Automation API instead of raw input synthesis for this dialog, or
+  navigate the folder tree/file list by mouse instead of the text field,
+  or hand off to the user for a manual load. Issue #29 left open.

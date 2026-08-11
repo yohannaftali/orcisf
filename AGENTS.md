@@ -971,6 +971,57 @@ this again:**
   no defect in either code path. Don't close #29 until a real load
   succeeds and both behaviors are actually observed.
 
+**Second attempt at #29 -- root cause of the automation failure
+precisely diagnosed this time (a specific dialog control resists
+synthetic input, not a coordinate-math mistake); still not resolved:**
+- **Progress made**: this pass confirmed the app's own File menu is
+  fully keyboard-navigable (Down/Down/Enter reliably moved nav focus
+  from "New Data" to "Open Data..." and activated it, confirmed via
+  screenshots showing the nav-focus highlight box moving correctly) and
+  that the native "Select Folder" dialog does open correctly in
+  response. Foreground-grabbing via `AttachThreadInput` also worked
+  reliably again once confirmed the *actual* current foreground window
+  wasn't the user's own active session (checked `GetForegroundWindow()`
+  first, out of caution, before grabbing anything).
+- **Precisely diagnosed blocker**: the "Select Folder" dialog on this
+  Windows install is the **newer WinUI3/XAML-based Windows 11 file
+  picker** (visible from its "Home"/"Gallery" sidebar entries and rounded
+  scrollbar styling, not the classic Win32 common-item-dialog look).
+  Its "Folder:" text-entry field **does not accept synthetic input** in
+  this environment -- neither `SetCursorPos`+`mouse_event` clicks
+  (single or double-click, at coordinates re-verified correct via a
+  screenshot taken immediately before each attempt) nor
+  `SendKeys::SendWait()` typed text ever populated the field; it stayed
+  visibly empty across five distinct attempts (direct click+type,
+  `Ctrl+A`-then-type, `Ctrl+L`-then-`Ctrl+A`-then-type, double-click,
+  each re-screenshotted to confirm). One `Ctrl+A` attempt visibly
+  expanded/navigated the left sidebar's tree view instead, indicating
+  keyboard focus was landing somewhere else in the dialog entirely, not
+  the text field, regardless of where the mouse had just clicked.
+- **Why this is a plausible, not just a "kept failing" explanation**:
+  WinUI3/XAML controls are known to require real UI Automation (e.g. the
+  Windows UI Automation COM API, or a wrapper like FlaUI) to reliably
+  receive focus and input from external automation -- raw `SendInput`
+  mouse/keyboard events that work fine against classic Win32 controls
+  (confirmed working against this *app's own* ImGui-rendered menu, and
+  against the *older-style* "Save As" dialog seen in an earlier #29
+  attempt, which behaved differently) are known to be unreliable against
+  this specific newer dialog family. This is a testable, falsifiable
+  claim -- not a shrug.
+- **What this means for the next attempt**: don't repeat plain
+  `SetCursorPos`/`SendKeys` against this dialog's text field expecting a
+  different result. Either (a) use a real UI Automation library/API
+  instead of raw input synthesis for this specific dialog, (b) drive
+  the dialog via mouse-only navigation through the folder tree/file list
+  (which *did* visually respond to clicks, e.g. the sidebar tree
+  expanded) rather than the text field, clicking down into the target
+  folder and then clicking "Select Folder", or (c) ask the user to load
+  the dataset manually and hand off from there. Cancelled cleanly via
+  `{ESC}` (which *did* reach the dialog -- window-level accelerators
+  seem to work even when the text field doesn't) each time, leaving no
+  orphaned dialogs or corrupted app state.
+- **Issue #29's core objective is still unverified.** Not closed.
+
 **AutoCAD-style Add Joint + editing guidance (issue #18, part of epic
 #13) — read before touching `EditorOptions::add_joint_mode`/
 `ViewportPanel::HandlePicking()`/`Toolbar.cpp`'s status-hint block:**
