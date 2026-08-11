@@ -19,6 +19,36 @@ void ViewportPanel::HandlePicking(const SceneModel& scene, Selection& selection,
     Vec3 origin, dir;
     camera_.ScreenRay(ndc_x, ndc_y, aspect, origin, dir);
 
+    if (options.add_joint_mode && editable) {
+        // Places at the click ray's intersection with the horizontal plane
+        // through the camera's current orbit target (matches "the depth
+        // you're already looking at" rather than a fixed world height,
+        // since target starts at the loaded structure's bounds center --
+        // see Camera::FrameBounds -- or the origin for an empty scene).
+        // Ray parallel to that plane (dir.y ~ 0, e.g. a perfectly
+        // horizontal/top-down-adjacent view) or behind the camera (t <= 0)
+        // is a no-op, same graceful-skip pattern PickJoint/PickMember use
+        // for a miss.
+        constexpr float kMinRayPlaneAngle = 1e-4f;
+        if (std::fabs(dir.y) > kMinRayPlaneAngle) {
+            float t = (camera_.target.y - origin.y) / dir.y;
+            if (t > 0.f) {
+                Vec3 pos = origin + dir * t;
+                if (options.snap_to_grid && options.grid_size_m > 1e-6f) {
+                    auto snap = [&](float v) { return std::round(v / options.grid_size_m) * options.grid_size_m; };
+                    pos = {snap(pos.x), snap(pos.y), snap(pos.z)};
+                }
+                if (undo) undo->PushUndo(editable->SdForUndo());
+                int joint_id = editable->AddJoint(pos);
+                if (joint_id > 0) {
+                    selection = {SelectionKind::Joint, joint_id};
+                    if (on_geometry_changed) on_geometry_changed();
+                }
+            }
+        }
+        return;
+    }
+
     if (options.load_mode == LoadPlacementMode::MemberLoad && editable) {
         int hit_member = PickMember(scene, origin, dir);
         if (hit_member < 0) return;
@@ -129,7 +159,19 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
     int width = static_cast<int>(avail.x);
     int height = static_cast<int>(avail.y);
 
-    if (width < 4 || height < 4 || scene.Empty()) {
+    if (width < 4 || height < 4) {
+        ImGui::End();
+        return;
+    }
+
+    // Issue #18: only bail out to the static placeholder when there's no
+    // editable dataset at all -- a blank-but-editable structure (0 joints,
+    // right after File > New Data or the Add Joint bootstrap) must still
+    // render the interactive (empty) 3D view below, or clicking to place
+    // the very first joint (add_joint_mode) would have nothing to click
+    // on. `editable` is only non-null once *something* (even a blank
+    // in-memory structure) has been loaded, see Application::LoadStructure.
+    if (!editable && scene.Empty()) {
         ImGui::TextDisabled(
             "No dataset loaded.\n"
             "Use File > Open Folder... to load an Optimasi Beton/Example/* dataset,\n"

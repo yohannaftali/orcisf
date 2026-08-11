@@ -118,13 +118,30 @@ void IconToolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_run
     if (IconButton("##redo", "Redo", can_redo, DrawRedoIcon) && on_redo_) on_redo_();
 
     ImGui::SameLine(0.f, kPadding * 2.f);
-    if (IconButton("##add_joint", "Add Joint", true, DrawAddJointIcon) && on_add_joint_) on_add_joint_();
+    bool add_joint_active = options.add_joint_mode;
+    const char* add_joint_tooltip =
+        add_joint_active ? "Add Joint (active -- click in viewport to place, click here to stop)" : "Add Joint";
+    if (IconButton("##add_joint", add_joint_tooltip, true, DrawAddJointIcon)) {
+        options.add_joint_mode = !options.add_joint_mode;
+        if (options.add_joint_mode) {
+            options.connect_mode = false;
+            options.connect_first_joint = -1;
+            options.load_mode = LoadPlacementMode::None;
+            if (on_add_joint_) on_add_joint_();
+        }
+    }
+    if (add_joint_active) {
+        ImVec2 min = ImGui::GetItemRectMin();
+        ImVec2 max = ImGui::GetItemRectMax();
+        ImGui::GetWindowDrawList()->AddRect(min, max, IM_COL32(90, 230, 110, 255), 3.f, 0, 2.f);
+    }
     ImGui::SameLine(0.f, kPadding);
     bool connect_active = options.connect_mode;
     const char* connect_tooltip = connect_active ? "Connect Joints (active -- click to stop)" : "Connect Joints";
     if (IconButton("##connect", connect_tooltip, true, DrawConnectIcon)) {
         options.connect_mode = !options.connect_mode;
         options.connect_first_joint = -1;
+        options.add_joint_mode = false;
         options.load_mode = LoadPlacementMode::None;
     }
     if (connect_active) {

@@ -59,12 +59,19 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
                 if (on_redo_) on_redo_();
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Add Joint")) {
-                if (on_add_joint_) on_add_joint_();
+            if (ImGui::MenuItem("Add Joint (click in viewport to place)", nullptr, options.add_joint_mode)) {
+                options.add_joint_mode = !options.add_joint_mode;
+                if (options.add_joint_mode) {
+                    options.connect_mode = false;
+                    options.connect_first_joint = -1;
+                    options.load_mode = LoadPlacementMode::None;
+                    if (on_add_joint_) on_add_joint_();
+                }
             }
             if (ImGui::MenuItem("Connect Joints (add member)", nullptr, options.connect_mode)) {
                 options.connect_mode = !options.connect_mode;
                 options.connect_first_joint = -1;
+                options.add_joint_mode = false;
                 options.load_mode = LoadPlacementMode::None;
             }
             ImGui::Separator();
@@ -85,10 +92,12 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
             if (ImGui::MenuItem("Add Member Load (distributed)", nullptr, member_load)) {
                 options.load_mode = LoadPlacementMode::MemberLoad;
                 options.connect_mode = false;
+                options.add_joint_mode = false;
             }
             if (ImGui::MenuItem("Add Joint Load (point / moment / wind)", nullptr, joint_load)) {
                 options.load_mode = LoadPlacementMode::JointLoad;
                 options.connect_mode = false;
+                options.add_joint_mode = false;
             }
             ImGui::EndMenu();
         }
@@ -109,15 +118,35 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
             }
             ImGui::EndMenu();
         }
-        if (options.connect_mode) {
+        // Issue #18: AutoCAD-command-line-style step-by-step guidance while
+        // a click-to-place mode is active. Each of these modes already
+        // stays active after a successful placement (ViewportPanel keeps
+        // options.add_joint_mode/connect_mode/load_mode set, only clearing
+        // per-placement scratch state like connect_first_joint) so the
+        // hint text's job is just to say what the *next* click does --
+        // the "place another without reopening a menu" behavior itself
+        // already exists.
+        if (options.add_joint_mode) {
             ImGui::Separator();
-            ImGui::TextColored(ImVec4(1.f, 0.82f, 0.15f, 1.f), "Connect mode: click two joints to add a member");
+            ImGui::TextColored(ImVec4(0.45f, 0.9f, 0.5f, 1.f),
+                                "Add Joint: click in the viewport to place a joint (stays active -- "
+                                "click the button again or pick another mode to stop)");
+        } else if (options.connect_mode) {
+            ImGui::Separator();
+            if (options.connect_first_joint < 0) {
+                ImGui::TextColored(ImVec4(1.f, 0.82f, 0.15f, 1.f), "Connect Joints: click the first joint");
+            } else {
+                ImGui::TextColored(ImVec4(1.f, 0.82f, 0.15f, 1.f),
+                                    "Connect Joints: now click the second joint to create the member");
+            }
         } else if (options.load_mode == LoadPlacementMode::MemberLoad) {
             ImGui::Separator();
-            ImGui::TextColored(ImVec4(0.35f, 0.75f, 0.95f, 1.f), "Click a member to add a distributed load");
+            ImGui::TextColored(ImVec4(0.35f, 0.75f, 0.95f, 1.f),
+                                "Add Member Load: click a member to apply a distributed load (stays active)");
         } else if (options.load_mode == LoadPlacementMode::JointLoad) {
             ImGui::Separator();
-            ImGui::TextColored(ImVec4(0.35f, 0.75f, 0.95f, 1.f), "Click a joint to add a point load");
+            ImGui::TextColored(ImVec4(0.35f, 0.75f, 0.95f, 1.f),
+                                "Add Joint Load: click a joint to apply a point load (stays active)");
         }
         if (on_title_bar_drawer_) on_title_bar_drawer_();
         ImGui::EndMainMenuBar();

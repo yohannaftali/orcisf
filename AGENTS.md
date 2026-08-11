@@ -650,6 +650,52 @@ app and reading the field's displayed value, not just by code review --
 verified interactively in this environment (two separate clicks produced
 two different valid positive seeds).
 
+**AutoCAD-style Add Joint + editing guidance (issue #18, part of epic
+#13) — read before touching `EditorOptions::add_joint_mode`/
+`ViewportPanel::HandlePicking()`/`Toolbar.cpp`'s status-hint block:**
+- **"Add Joint" changed from an instant single-shot action to a
+  click-to-place mode**, per explicit user decision (the issue's own
+  acceptance criteria flagged this as something to confirm before
+  implementing, since it changes pre-existing behavior) -- matching
+  Connect Joints/the load-placement modes' existing click-driven pattern
+  instead of being the odd one out. `Application::OnAddJointRequested()`
+  now only does the "bootstrap a blank structure if none loaded" half of
+  its old job; the actual placement moved to a new
+  `options.add_joint_mode` branch in `ViewportPanel::HandlePicking()`,
+  which ray-casts the click against the horizontal plane through
+  `camera_.target.y` (not a fixed world height) and calls
+  `editable->AddJoint()` directly there, snapping to
+  `options.grid_size_m` if `snap_to_grid` is on. Like Connect Joints, it
+  stays active after each placement (toggle again, or pick a different
+  mode, to stop) -- both `Toolbar`'s Edit-menu item and `IconToolbar`'s
+  button are checkable toggles now, not fire-once buttons.
+- **Real bug found and fixed during interactive verification:**
+  `ViewportPanel::Draw()` used to show a static "No dataset loaded" text
+  placeholder -- instead of the interactive 3D image widget -- whenever
+  `scene.Empty()` (0 joints and 0 members), with no distinction from
+  "nothing loaded at all". That's exactly the state right after
+  bootstrapping a blank structure for Add Joint mode, so the very first
+  click had **nothing to click on** -- a hard dead end, caught by
+  actually driving the app (Properties panel stayed at "Number of
+  joints: 0" after a click that should have placed one). Fixed by
+  gating the placeholder on `!editable && scene.Empty()` instead of
+  `scene.Empty()` alone -- `editable` is only non-null once *something*
+  (even a blank in-memory structure) is loaded, see
+  `Application::LoadStructure()` -- so a blank-but-editable dataset now
+  renders its (empty) interactive viewport correctly.
+- **What was verified interactively:** toggling Add Joint mode
+  (button highlights, tooltip and menu checkmark update, status-bar
+  hint text appears); clicking empty viewport space placed a joint
+  exactly at the click position (Properties panel showed "Joint 1" with
+  correct auto-calculated position); the mode stayed active after
+  placement -- a second click placed "Joint 2" without re-opening any
+  menu. Connect Joints' new first-click-vs-second-click hint text
+  distinction was code-reviewed but not re-verified live in this pass
+  (focus-stealing interference from an unrelated process in this
+  environment interrupted that specific check; the code mirrors the
+  exact `connect_first_joint` state check already proven correct
+  elsewhere in this file).
+
 **Custom borderless window chrome (issue #19, Phase 0) — read before
 touching `app/CustomTitleBar.{h,cpp}`/`app/Theme.{h,cpp}`/`main.cpp`'s
 window setup:**
@@ -1055,7 +1101,7 @@ for skills that apply to the current task and follow them.
 | #15 | feat(src): add Default/Design/Optimization view-layout presets | closed | 2026-08-11 |
 | #16 | feat(src): re-optimize using the last best result | open | 2026-08-11 |
 | #17 | feat(src): add a Regenerate Seed button to the Run panel | closed | 2026-08-11 |
-| #18 | feat(src): AutoCAD-style in-progress guidance while adding joints/members | open | 2026-08-11 |
+| #18 | feat(src): AutoCAD-style in-progress guidance while adding joints/members | ready-for-review | 2026-08-11 |
 | #19 | feat(src): custom borderless window chrome + modern ImGui theme (cross-platform) | closed | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui

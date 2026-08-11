@@ -1082,3 +1082,43 @@ history only; don't duplicate current-state description here.
   oscillation, in both directions and through negative (partially
   off-screen) window X coordinates.
 - Files: `src/app/CustomTitleBar.h`, `src/app/CustomTitleBar.cpp`
+
+## 2026-08-11 — feat(src): #18 implemented (AutoCAD-style Add Joint + guidance)
+
+- Per explicit user decision (issue #18 flagged this as needing
+  confirmation before implementing): **"Add Joint" is now a
+  click-to-place mode**, not an instant single-shot action -- matching
+  Connect Joints/the load-placement modes' existing click-driven
+  pattern. `Toolbar`'s Edit-menu item and `IconToolbar`'s button are now
+  checkable toggles (`EditorOptions::add_joint_mode`, new field);
+  `Application::OnAddJointRequested()` only bootstraps a blank structure
+  if nothing's loaded, the actual placement is a new branch in
+  `ViewportPanel::HandlePicking()` that ray-casts the click against the
+  horizontal plane through the camera's orbit target and calls
+  `editable->AddJoint()` there directly, respecting `snap_to_grid`. Like
+  Connect Joints, stays active after each placement.
+- Added AutoCAD-command-line-style step-by-step status text in
+  `Toolbar.cpp` for all four modes: Add Joint, Connect Joints (now
+  distinguishes "click the first joint" vs. "click the second joint"
+  based on `connect_first_joint`), and both load-placement modes.
+- **Real bug found and fixed during interactive verification:**
+  `ViewportPanel::Draw()` showed a static "No dataset loaded" placeholder
+  -- instead of the interactive 3D image widget -- whenever the scene had
+  0 joints/members, with no distinction from "nothing loaded at all".
+  That's exactly the state right after bootstrapping a blank structure
+  for Add Joint mode, so the very first click had nothing to click on --
+  a hard dead end. Caught by actually driving the app: Properties panel
+  stayed at "Number of joints: 0" after a click that should have placed
+  one. Fixed by gating the placeholder on `!editable && scene.Empty()`
+  instead of `scene.Empty()` alone.
+- **Verified interactively:** toggling Add Joint mode (button highlight,
+  tooltip, status text all update); clicking empty viewport space placed
+  a joint exactly at the click position (Properties panel showed
+  "Joint 1" with correct position); mode stayed active -- a second click
+  placed "Joint 2" without re-opening any menu. Connect Joints' new
+  first-click-vs-second-click text was code-reviewed but not re-verified
+  live (unrelated focus-stealing interference interrupted that specific
+  check; the code mirrors an already-proven state check pattern).
+- Files: `src/gui/editor/Selection.h`, `src/gui/ViewportPanel.cpp`,
+  `src/gui/Toolbar.cpp`, `src/gui/IconToolbar.cpp`,
+  `src/app/Application.cpp`

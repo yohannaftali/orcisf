@@ -30,6 +30,14 @@ struct Selection {
 // Editor-wide interaction options, toggled from the Toolbar and read by
 // ViewportPanel's click handling.
 struct EditorOptions {
+    // Issue #18: while true, clicking empty space in the viewport places a
+    // new joint at the click's ray/ground-plane intersection instead of
+    // the old "Add Joint always instantly creates one at the scene center"
+    // behavior -- matches Connect Joints/the load-placement modes' own
+    // click-to-place pattern (and, like them, stays active after each
+    // placement so several joints can be added without re-toggling).
+    bool add_joint_mode = false;
+
     // While true, clicking joints in the viewport connects them with a new
     // member (issue #6's "add members ... directly in the 3D viewport")
     // instead of just selecting -- first click picks the start joint,

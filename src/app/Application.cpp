@@ -237,6 +237,12 @@ void Application::OnRunResult(engine::StructureData sd, std::string dataset_path
 }
 
 void Application::OnAddJointRequested() {
+    // Issue #18: Add Joint is now a click-to-place mode (toggled by the
+    // caller, see Toolbar/IconToolbar), not an instant single-shot add --
+    // this only handles the "make sure there's something to click into"
+    // bootstrap step. The actual placement happens in
+    // ViewportPanel::HandlePicking() when options.add_joint_mode is set,
+    // via editable_->AddJoint() directly at the click's 3D position.
     if (!editable_) {
         // No dataset loaded yet -- start a blank in-memory structure the
         // user can build up from scratch (issue #6's editor isn't only for
@@ -244,16 +250,7 @@ void Application::OnAddJointRequested() {
         LoadStructure(engine::StructureData{}, nullptr, "");
         log_panel_.AddLine("Started a new blank structure.");
     }
-
-    gui::math3d::Vec3 pos = scene_.Empty() ? gui::math3d::Vec3{0.f, 0.f, 0.f} : scene_.bounds_center;
-    undo_stack_.PushUndo(editable_->SdForUndo());
-    int joint_id = editable_->AddJoint(pos);
-    if (joint_id < 0) {
-        log_panel_.AddLine("Could not add joint: dataset is at its maximum size.");
-        return;
-    }
-    selection_ = {gui::SelectionKind::Joint, joint_id};
-    RebuildSceneAfterEdit();
+    log_panel_.AddLine("Add Joint mode: click in the viewport to place a joint. Click the button again to stop.");
 }
 
 void Application::OnUndo() {
