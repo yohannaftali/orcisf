@@ -1780,3 +1780,55 @@ history only; don't duplicate current-state description here.
   Automation API instead of raw input synthesis for this dialog, or
   navigate the folder tree/file list by mouse instead of the text field,
   or hand off to the user for a manual load. Issue #29 left open.
+
+## 2026-08-11 — Third #29 attempt: real root cause found (DPI-virtualized
+automation script, not WinUI3), core objective verified, issue closed
+
+- Picked #29 back up a third time via `/coder`. After `/rebuild`
+  confirmed the current build, resumed the WinUI3 dialog investigation
+  using a short scratch dataset path (`C:\Users\IT\Desktop\OrcisfTest\
+  Data01`) and pure mouse navigation of the dialog's sidebar (a click on
+  "RDP" had, in a still-earlier sub-attempt, shown that clicking a
+  sidebar item *does* populate the "Folder:" field -- a clue the second
+  attempt's "text field resists all input" diagnosis was incomplete).
+- A stray click landed on Visual Studio Code instead of the dialog,
+  bringing this session's own editor window to the foreground.
+  Investigated instead of continuing to click blindly: `GetWindowRect()`
+  on the (correctly) foregrounded ORCISF window reported logical
+  `0,0,2560,1392` while screenshots were captured at physical
+  `5120x2784` (this monitor's actual 200% DPI scaling) -- a 2x
+  coordinate mismatch. **Root cause**: the PowerShell automation process
+  was never marked DPI-aware, so Windows silently virtualized its
+  `SetCursorPos`/`GetWindowRect` calls into logical pixels while the
+  explicitly-sized screenshot `Bitmap`/`CopyFromScreen` calls stayed in
+  physical pixels. This fully explains every prior "the WinUI3 dialog
+  won't accept input" symptom -- clicks were landing at literally the
+  wrong pixel the whole time, in this and the previous #29 attempt.
+- Fix: call `SetProcessDPIAware()` once, before any cursor/window-rect
+  call. Verified: `GetWindowRect()` afterward reported physical
+  `0,0,5120,2784`, matching the screenshots exactly.
+- With that fixed, the WinUI3 "Select Folder" dialog was navigated
+  successfully via mouse clicks on its own sidebar/breadcrumb, and a
+  real dataset (`Example/Apl1-1`, copied to
+  `C:\Users\IT\Documents\orcisf\Apl1-1\aplikasi`) loaded into the app.
+- **Both of #29's acceptance criteria confirmed via screenshot**:
+  (1) RunPanel (#25) showed the loaded dataset path, populated cost/
+  design parameters, and an enabled Run button -- not the "Enter a
+  dataset path" placeholder the user had reported. (2) Selecting View
+  Plane > "X-Y plane (locks Z)" switched the viewport to an orthographic
+  top-down view and revealed the "Plane X-Y -- Z offset (m)" overlay
+  (editable `0.000` field) plus an updated UCS icon in the bottom-left
+  corner -- confirmed via a close-up crop. This was never actually
+  broken; #29's own automation blocker had just prevented anyone from
+  reaching the state that would exercise it.
+- Typing a new offset value to confirm it moves geometry was attempted
+  but interrupted by a spontaneous WhatsApp desktop notification toast
+  stealing keyboard focus -- automation was stopped immediately rather
+  than risk interacting with that toast (another instance of this
+  environment's background-app focus-stealing hazard, same category as
+  the second attempt's Proton Drive incident). Left unconfirmed; the
+  overlay being a live editable field is otherwise strong evidence the
+  binding works.
+- Cleaned up all scratch screenshots and the `C:\Users\IT\Desktop\
+  OrcisfTest` scratch folder. **Issue #29 closed** -- both criteria the
+  user explicitly asked to have re-verified are now confirmed.

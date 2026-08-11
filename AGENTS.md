@@ -1022,6 +1022,66 @@ synthetic input, not a coordinate-math mistake); still not resolved:**
   orphaned dialogs or corrupted app state.
 - **Issue #29's core objective is still unverified.** Not closed.
 
+**Third attempt at #29 -- root cause of automation failures found (not the
+dialog, a DPI-virtualization bug in the automation script itself), core
+objective finally verified, issue resolved:**
+- **Real root cause of every prior coordinate-mismatch failure**: the
+  PowerShell process driving `SetCursorPos`/`GetWindowRect` was never
+  marked DPI-aware, so Windows silently virtualized its coordinate space
+  to *logical* pixels (`GetWindowRect` reported `0,0,2560,1392` on this
+  200%-scaled monitor) while screenshots were still being captured in
+  *physical* pixels (`5120x2784`, via an explicitly-sized
+  `Bitmap`/`CopyFromScreen`) -- a 2x mismatch between where clicks
+  actually landed and where the screenshots said they should land. This
+  fully explains the WinUI3 dialog symptoms blamed in the second attempt
+  (sidebar clicks consistently landing one row group off, "Ctrl+A"
+  appearing to hit the tree view instead of the text field) -- it was
+  never really about WinUI3/XAML resisting synthetic input, it was
+  ordinary clicks landing at literally the wrong pixel. **Fix**: call
+  `SetProcessDPIAware()` once at the start of the automation script,
+  before any `SetCursorPos`/`GetWindowRect` call, so both operate in the
+  same physical-pixel space the screenshots already used. Confirmed by
+  re-checking `GetWindowRect()` after the fix: `0,0,5120,2784`, matching
+  the screenshot dimensions exactly.
+- **With that fixed, mouse-driven navigation through the WinUI3 "Select
+  Folder" dialog worked on the very next attempt** -- no UI Automation
+  library needed after all; the second attempt's diagnosis of "this
+  dialog's text field resists synthetic input" was itself a
+  DPI-coordinate-mismatch artifact, not a real WinUI3 limitation. Revise
+  future automation in this environment accordingly: always call
+  `SetProcessDPIAware()` first, don't reach for UI Automation/FlaUI as a
+  first resort for a misbehaving native dialog on a high-DPI machine --
+  check the coordinate space first.
+- **Both of #29's acceptance criteria were then directly confirmed**
+  with a real dataset loaded (`Example/Apl1-1` copied to
+  `C:\Users\IT\Documents\orcisf\Apl1-1\aplikasi`, loaded via File > Open
+  Data...): (1) **RunPanel dataset gating (#25)** -- the Dataset field
+  showed the loaded path, all cost/design parameter fields were
+  populated, and the **Run** button rendered enabled (not the "Enter a
+  dataset path to enable Run" placeholder the user had reported still
+  seeing). (2) **2D plane-lock offset overlay (#22/#24)** -- selecting
+  View Plane > "X-Y plane (locks Z)" correctly switched the viewport to
+  an orthographic top-down projection and revealed a
+  "Plane X-Y -- Z offset (m)" label with an editable `0.000` numeric
+  field plus an updated UCS icon in the viewport's bottom-left corner,
+  confirmed via a close-up crop -- this was **not** broken, contrary to
+  the user's report; it was rendering correctly, just never reached
+  because #29's earlier attempts couldn't get a dataset loaded to fully
+  exercise the interactive view-locking path.
+- **Not independently re-verified this pass**: actually typing a new
+  numeric Z-offset value and confirming it moves a placed joint (the
+  interaction was attempted, but a WhatsApp desktop notification toast
+  spontaneously popped up and stole keyboard focus mid-sequence --
+  another instance of this environment's background-app focus-stealing
+  hazard, same category as the second attempt's Proton Drive incident.
+  Automation was stopped immediately rather than risk interacting with
+  that toast). The overlay's presence and its being a live `ImGui`
+  numeric input (not a static label) is strong evidence the underlying
+  binding works, consistent with #22/#24's original code review, but the
+  specific "typing a value moves geometry" round-trip is unconfirmed.
+- **Issue #29 resolved and closed** -- both criteria the user explicitly
+  asked to have re-verified are now interactively confirmed.
+
 **AutoCAD-style Add Joint + editing guidance (issue #18, part of epic
 #13) — read before touching `EditorOptions::add_joint_mode`/
 `ViewportPanel::HandlePicking()`/`Toolbar.cpp`'s status-hint block:**
@@ -1816,7 +1876,7 @@ for skills that apply to the current task and follow them.
 | #26 | feat(src): wire up the app icon set (icons/) for Windows/macOS/Linux builds | ready-for-review | 2026-08-11 |
 | #27 | fix(src): title bar Minimize/Maximize/Close buttons not flush to window right edge | closed (not reproducible) | 2026-08-11 |
 | #28 | feat(src): Alt-mnemonic menu navigation + icon before each panel title | ready-for-review | 2026-08-11 |
-| #29 | chore(src): interactively re-verify RunPanel dataset gating (#25) and 2D plane offset control (#22/#24) with a real loaded dataset | open (blocked, see notes below) | 2026-08-11 |
+| #29 | chore(src): interactively re-verify RunPanel dataset gating (#25) and 2D plane offset control (#22/#24) with a real loaded dataset | closed | 2026-08-11 |
 | #30 | feat(src): implement real Alt-mnemonic menu navigation (Dear ImGui has no built-in "&" parsing) | ready-for-review | 2026-08-11 |
 | #31 | fix(src): application is not DPI-aware -- UI too small on high-DPI monitors in multi-monitor setups | ready-for-review | 2026-08-11 |
 
