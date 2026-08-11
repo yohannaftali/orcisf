@@ -713,3 +713,24 @@ history only; don't duplicate current-state description here.
     this environment, but the process-exit behavior is the same
     either way since there's only one process).
   - Files: `src/CMakeLists.txt`, `src/app/main.cpp`
+
+## 2026-08-11 — #11 expanded: title/material form + auto-calculated params
+
+- **#11 expanded again:** added GUI form-input acceptance criteria for
+  dataset-level scalar properties -- all fields already exist on
+  `engine::StructureData` (verified against `Optimasi Beton/Source/
+  Variabel.hpp`/`CETAK.HPP`), this is purely a missing GUI form, no new
+  engine fields needed:
+  - `ISN` (Title / "Informasi nama struktur")
+  - `E`/`G` (Young's Modulus / Shear Modulus, N/m^2, "Modulus
+    Elastisitas aksial" / "Modulus Geser")
+  - `FC`/`FY`/`FYS` (f'c / fy / fyt, MPa -- note legacy identifier for
+    stirrup strength is `FYS`, not `FYT`)
+  - Read-only auto-calculated: `M`/`N`/`NJ`/`NR`/`NRJ` (members/DOF/
+    joints/support restraints/restrained joints), explicitly pointed at
+    reusing `engine::WriteStructureFile()`'s existing `NRJ`/`NR`/`ND`/`N`
+    re-derivation from `sd.JRL` rather than recomputing it a second way
+  - Pinned the exact `.inf` section order/labels from `CETAK.HPP` lines
+    26-83 (title -> Parameter Struktur -> Properti Elemen Material ->
+    coordinates -> members -> restraints) as the target format for #11's
+    `.inf`-preview acceptance criterion.
