@@ -1101,7 +1101,7 @@ for skills that apply to the current task and follow them.
 | #15 | feat(src): add Default/Design/Optimization view-layout presets | closed | 2026-08-11 |
 | #16 | feat(src): re-optimize using the last best result | open | 2026-08-11 |
 | #17 | feat(src): add a Regenerate Seed button to the Run panel | closed | 2026-08-11 |
-| #18 | feat(src): AutoCAD-style in-progress guidance while adding joints/members | ready-for-review | 2026-08-11 |
+| #18 | feat(src): AutoCAD-style in-progress guidance while adding joints/members | closed | 2026-08-11 |
 | #19 | feat(src): custom borderless window chrome + modern ImGui theme (cross-platform) | closed | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui

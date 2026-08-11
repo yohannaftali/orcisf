@@ -1122,3 +1122,14 @@ history only; don't duplicate current-state description here.
 - Files: `src/gui/editor/Selection.h`, `src/gui/ViewportPanel.cpp`,
   `src/gui/Toolbar.cpp`, `src/gui/IconToolbar.cpp`,
   `src/app/Application.cpp`
+
+## 2026-08-11 — Epic #13 close/reopen correction
+
+- Mistakenly closed epic #13 with a comment claiming all 5 sub-issues
+  were done, including #16 (re-optimize using the last best result) --
+  #16 was never implemented; it was explicitly deferred earlier the same
+  day in favor of #18 due to its larger scope (needs real engine-level
+  changes to the optimizer's initial population, not just GUI). Caught
+  immediately by re-checking #16's actual state via the API before
+  reporting completion. Reopened #13 and posted a correction comment.
+  Status: #14/#15/#17/#18 closed, #16 open, #13 open pending #16.
