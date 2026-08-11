@@ -1436,3 +1436,12 @@ history only; don't duplicate current-state description here.
   launched and ran without crashing after the `RunPanel` changes, but the
   UI itself wasn't click-tested interactively. Issue #25 status set to
   `ready-for-review`, not `done`, until that's confirmed.
+
+## 2026-08-11 — Published GitHub Release v0.0.2-alpha
+
+- Tag `v0.0.2-alpha` (pre-release), with a prebuilt Windows x64 binary
+  (`orcisf_gui-v0.0.2-alpha-windows-x64.zip`) built from the same
+  `windows-release` MSVC/Ninja build used to verify issue #25. Bumped
+  from `v0.0.1-alpha` per `AGENTS.md`'s alpha versioning scheme (patch
+  number increments each alpha). Release notes summarize what changed
+  since `v0.0.1-alpha`: issues #21-#25.
