@@ -39,21 +39,28 @@ targets on every push/PR touching `src/`.
 
 ## Layout
 
+Epic #1 (issues #2–#12) has landed the full pipeline: load/create a
+dataset, view and edit it in 3D, run the threaded optimizer, inspect
+results including reinforcement detailing, and export a PDF report or the
+full legacy text file set. `src/`'s top-level shape:
+
 ```
 src/
-├── vcpkg.json           # dependency manifest
-├── CMakeLists.txt
-├── CMakePresets.json     # windows-{debug,release}, macos-{debug,release}, linux-{debug,release}
-├── app/
-│   ├── main.cpp          # GLFW/OpenGL3/ImGui bootstrap + render loop
-│   └── Application.{h,cpp}  # owns the docking layout + panels
-└── gui/
-    ├── Toolbar.{h,cpp}         # top menu bar (placeholders; real actions land in #4/#7)
-    ├── ViewportPanel.{h,cpp}   # 3D view (placeholder; real rendering lands in #5)
-    ├── PropertiesPanel.{h,cpp} # selection editor (placeholder; lands in #6/#7)
-    └── LogPanel.{h,cpp}        # run/status log (functional; detailed calc log lands in #3)
+├── vcpkg.json / CMakeLists.txt / CMakePresets.json
+├── app/          # main.cpp (GLFW/OpenGL3/ImGui bootstrap), Application.{h,cpp}
+│                 # (docking layout, owns the loaded dataset + editor state)
+├── gui/          # Toolbar, ViewportPanel, PropertiesPanel, LoadsPanel,
+│                 # DetailingPanel, RunPanel, LogPanel + viewport/editor/
+│                 # detailing subsystems
+├── report/       # PDF + legacy-text export
+└── engine/       # headless analysis/design/optimizer library + CLI
 ```
 
-Everything under `gui/` beyond the docking skeleton is intentionally a
-placeholder in this scaffold — see the linked issues for the real
-implementations.
+`src/`'s `File` menu: `New Data` (prompts for a save location, starts a
+blank editable dataset), `Open Data...` (load an existing one),
+`Save`/`Save As...`, `Save Loads (.bbn)`, `Export PDF.../Export
+Text.../Export INF Preview...`.
+
+See [`AGENTS.md`](../AGENTS.md) at the repo root for the full
+per-subsystem architecture writeup — this file stays intentionally
+high-level; don't duplicate AGENTS.md's detail here.

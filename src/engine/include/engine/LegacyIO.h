@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "engine/StructureData.h"
 
@@ -26,6 +27,22 @@ struct DatasetPaths {
 
 DatasetPaths MakeDatasetPaths(const std::string& generic);
 
+// Derives NRJ/NR/ND/N (and the ascending list of restrained joint indices,
+// replacing sd.T_K) from sd.JRL/sd.NJ. sd's own NRJ/NR/ND/N/T_K fields are
+// only trustworthy right after ReadStructureFile() reads a real .inp -- the
+// GUI editor (issue #6) never maintains them as joints/restraints change.
+// Shared by WriteStructureFile(), WriteInfPreview() (issue #11), and the
+// GUI's read-only "auto-calculated structural parameter" fields so all
+// three always agree on the same derivation.
+struct RestraintSummary {
+    int nrj = 0; // Jumlah titik kumpul yang dikekang (joints with >=1 restrained DOF)
+    int nr = 0;  // Jumlah pengekang tumpuan (total restrained DOF)
+    int nd = 0;  // 6*NJ
+    int n = 0;   // nd - nr (structural DOF)
+    std::vector<int> restrained_joints; // 1-based joint indices, ascending
+};
+RestraintSummary ComputeRestraintSummary(const StructureData& sd);
+
 // Reads the .inp file into sd (legacy `baca_data()`'s first half: ISN, M,
 // NJ, NRJ, NR, E, G, FC, FY, FYS, ND, N, joint coordinates, restraints,
 // member topology).
@@ -45,6 +62,17 @@ void ReadDiscreteTables(StructureData& sd, const DatasetPaths& paths);
 // (not forced to all-6 for a partially-restrained joint loaded from a
 // real dataset, e.g. a pin support).
 void WriteStructureFile(const StructureData& sd, const std::string& inp_path);
+
+// New in this port (issue #11): writes only the .inf "input echo" portion
+// (title, structural parameters, material properties, joint coordinates,
+// member topology, joint restraints -- CETAK.HPP's `hinf` lines 26-83,
+// minus the two load-echo sections that follow it) from the current
+// in-memory sd, independent of a completed optimization run. Unlike
+// WriteFinalResults()'s WriteInformasi() (which trusts sd.NR/NRJ/N/T_K,
+// only ever populated by ReadStructureFile()), this uses
+// ComputeRestraintSummary() so it also works for a brand-new or
+// GUI-edited dataset.
+void WriteInfPreview(const StructureData& sd, const std::string& inf_path);
 
 // New in this port (issue #9): writes the five discrete-table files,
 // mirroring ReadDiscreteTables() exactly in reverse. These tables aren't

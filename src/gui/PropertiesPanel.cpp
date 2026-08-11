@@ -2,12 +2,55 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 #include <imgui.h>
+
+#include "engine/LegacyIO.h"
 
 namespace orcisf::gui {
 
 namespace {
+
+// Issue #11: title + material property inputs and read-only auto-calculated
+// structural parameters, shown when nothing is selected. All fields already
+// exist on engine::StructureData (ISN/E/G/FC/FY/FYS, M/NJ) -- this is
+// purely a missing form, no new engine data. The read-only fields reuse
+// engine::ComputeRestraintSummary() (the same derivation
+// WriteStructureFile()/WriteInfPreview() use) rather than trusting sd's own
+// NR/NRJ/N, which the GUI editor never maintains as joints/restraints
+// change.
+void DrawGeneralProperties(EditableStructure* editable) {
+    if (!editable) {
+        ImGui::TextDisabled("Click a joint or member in the Viewport to see its data here.");
+        return;
+    }
+    engine::StructureData& sd = editable->Sd();
+
+    ImGui::SeparatorText("General");
+    char title_buf[80];
+    std::snprintf(title_buf, sizeof(title_buf), "%s", sd.ISN.c_str());
+    if (ImGui::InputText("Title", title_buf, sizeof(title_buf))) {
+        sd.ISN = title_buf;
+    }
+
+    ImGui::SeparatorText("Material Properties");
+    ImGui::InputFloat("Young's Modulus / E (N/m^2)", &sd.E, 0.f, 0.f, "%.6g");
+    ImGui::InputFloat("Shear Modulus / G (N/m^2)", &sd.G, 0.f, 0.f, "%.6g");
+    ImGui::InputFloat("f'c (MPa)", &sd.FC, 0.f, 0.f, "%.6g");
+    ImGui::InputFloat("fy (MPa)", &sd.FY, 0.f, 0.f, "%.6g");
+    ImGui::InputFloat("fyt (MPa)", &sd.FYS, 0.f, 0.f, "%.6g");
+
+    engine::RestraintSummary summary = engine::ComputeRestraintSummary(sd);
+    ImGui::SeparatorText("Structural Parameters (auto-calculated)");
+    ImGui::BeginDisabled();
+    ImGui::Text("Number of members: %d", sd.M);
+    ImGui::Text("DOF: %d", summary.n);
+    ImGui::Text("Number of joints: %d", sd.NJ);
+    ImGui::Text("Number of support restraints: %d", summary.nr);
+    ImGui::Text("Number of restrained joints: %d", summary.nrj);
+    ImGui::EndDisabled();
+}
 
 void DrawValidationSection(const std::vector<std::string>& issues, bool has_dataset) {
     if (!has_dataset) return;
@@ -187,7 +230,7 @@ void PropertiesPanel::Draw(bool* open, const SceneModel& scene, Selection& selec
             DrawMemberProperties(scene, selection, editable, undo, on_geometry_changed);
             break;
         case SelectionKind::None:
-            ImGui::TextDisabled("Click a joint or member in the Viewport to see its data here.");
+            DrawGeneralProperties(editable);
             break;
     }
 

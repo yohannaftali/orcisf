@@ -34,6 +34,13 @@ public:
     // before a mutating call below.
     const engine::StructureData& SdForUndo() const { return sd_; }
 
+    // Mutable access for structure-wide scalar fields (title, material
+    // properties -- issue #11) that don't need a dedicated setter/undo path
+    // the way geometry does: they don't affect array sizes or indices, so
+    // direct assignment from the GUI can't corrupt the joint/member
+    // compaction invariants the setters above protect.
+    engine::StructureData& Sd() { return sd_; }
+
     // Returns the new joint's 1-based index, or -1 if the fixed-size
     // legacy arrays (kMak) are already full.
     int AddJoint(const math3d::Vec3& pos);

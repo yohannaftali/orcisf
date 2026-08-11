@@ -14,8 +14,16 @@ namespace orcisf::gui {
 class Toolbar {
 public:
     void Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_text, bool can_export_pdf,
-              EditorOptions& options);
+              bool can_export_inf, EditorOptions& options);
 
+    // Issue #11: starts a brand-new, empty dataset in the editor.
+    void SetOnNewData(std::function<void()> callback);
+    // Writes the full legacy input file set (.inp/.isd/.idl/.ijl/.ids/.ijs/
+    // .bbn) back to the dataset's current path; falls back to Save As if
+    // there isn't one yet.
+    void SetOnSave(std::function<void()> callback);
+    // Same, but always asks for a new folder + base filename first.
+    void SetOnSaveAs(std::function<void()> callback);
     void SetOnOpenFolder(std::function<void()> callback);
     void SetOnUndo(std::function<void()> callback);
     void SetOnRedo(std::function<void()> callback);
@@ -29,8 +37,14 @@ public:
     // Issue #9: full legacy text file set / PDF report, via an NFD save dialog.
     void SetOnExportText(std::function<void()> callback);
     void SetOnExportPdf(std::function<void()> callback);
+    // Issue #11: .inf preview generated directly from the in-GUI dataset,
+    // independent of a completed optimization run.
+    void SetOnExportInf(std::function<void()> callback);
 
 private:
+    std::function<void()> on_new_data_;
+    std::function<void()> on_save_;
+    std::function<void()> on_save_as_;
     std::function<void()> on_open_folder_;
     std::function<void()> on_undo_;
     std::function<void()> on_redo_;
@@ -38,6 +52,7 @@ private:
     std::function<void()> on_save_loads_;
     std::function<void()> on_export_text_;
     std::function<void()> on_export_pdf_;
+    std::function<void()> on_export_inf_;
 };
 
 } // namespace orcisf::gui

@@ -470,6 +470,69 @@ than risk showing numbers the user never entered.
   bit-identical after a write+re-read) and `SetMemberLoad()`'s UDL
   fixed-end-force formula were also unit-tested standalone beforehand.
 
+**Issue #11 additions (File > New Data/Open Data..., title/material form,
+`.inf` preview) — read before touching this area:**
+- **`File > New Data`** (`Application::OnNewDataRequested()`) prompts for
+  a save location up front via `PromptForGenericPath()` (a single NFD
+  save dialog reused by `Save As...` too -- folder navigation + typed
+  filename, extension stripped to get the legacy generic path), then
+  calls the same `LoadStructure(engine::StructureData{}, nullptr, ...)`
+  path `OnAddJointRequested()` already used implicitly when nothing was
+  loaded, and immediately writes the initial file set via
+  `report::WriteTextExport()` so the chosen location has real files on
+  disk right away (not just a remembered path). Cancelling the dialog
+  leaves whatever was previously loaded untouched. `Open Folder...` is
+  relabeled `Open Data...` (label only, same NFD folder-picker/callback).
+- **`File > Save`/`Save As...`** are thin wrappers around the existing
+  `report::WriteTextExport()` (issue #9) -- `Save` writes to
+  `loaded_dataset_path_` (falling back to `Save As...` if empty),
+  `Save As...` always re-prompts via `PromptForGenericPath()` and updates
+  the tracked path on success. No new export logic; this was purely
+  missing menu entry points into machinery #9 already built.
+- **`PropertiesPanel`'s new "General" section** (shown when nothing is
+  selected) is a direct-mutation form over `EditableStructure::Sd()` (a
+  new mutable accessor, alongside the existing const `SdForUndo()`) for
+  `ISN`/`E`/`G`/`FC`/`FY`/`FYS` -- all pre-existing `StructureData`
+  fields, this was purely a missing form. Deliberately **not** routed
+  through `UndoStack`/`GeometrySnapshot` like geometry edits are: these
+  are scalar fields that don't affect array sizes/indices, so there's no
+  compaction invariant to protect (same reasoning `RunPanel`'s
+  `harga_beton_`/`harga_besi_` fields already use). The read-only
+  "Structural Parameters (auto-calculated)" fields (members/DOF/joints/
+  restraints) call `engine::ComputeRestraintSummary()`, not `sd`'s own
+  `NR`/`NRJ`/`N` -- see next bullet.
+- **`engine::ComputeRestraintSummary()`** (new in `LegacyIO.h`/`.cpp`) is
+  `WriteStructureFile()`'s existing NRJ/NR/ND/N-from-JRL recomputation
+  logic, extracted into a shared public function (also returns the
+  restrained-joint index list, replacing `sd.T_K`) so
+  `WriteStructureFile()`, the new `WriteInfPreview()`, and the Properties
+  panel's read-only fields all agree on one derivation instead of three.
+- **`engine::WriteInfPreview()`** writes only the .inf "input echo"
+  portion (title/params/material/coordinates/members/restraints --
+  `CETAK.HPP` lines 26-83) from the *current* in-memory `sd`, independent
+  of a completed run -- unlike `WriteFinalResults()`'s private
+  `WriteInformasi()`, which trusts `sd.NR`/`NRJ`/`N`/`T_K` and is only
+  ever called post-run. Deliberately excludes the two load-echo sections
+  that follow in the real legacy `.inf` (`Gaya di Ujung Batang Terkekang
+  Akibat Beban`, `Beban Titik`) -- issue #11 didn't ask for them; add
+  them the same way if a future issue wants full `.inf` parity. Wired to
+  `File > Export INF Preview...` via an NFD save dialog.
+- **What was verified:** the full GUI build succeeds and the app launches/
+  runs without crashing with all of the above wired in (confirmed via
+  `Get-CimInstance`, same technique as issue #12's verification).
+  `WriteInfPreview()`'s output was verified standalone (not through the
+  GUI) against a real dataset: read `Example/Apl1-1`, wrote a fresh
+  `.inf` to a scratch path, and diffed every one of the six sections
+  against the checked-in `aplikasi.inf` -- numerically identical (only
+  whitespace/column-alignment differs, since the new writer uses
+  tab-separated output rather than `CETAK.HPP`'s `setw()` column
+  formatting). **Not verified interactively in this environment:**
+  actually clicking `New Data`/`Open Data...`/`Save`/`Save As...`/`Export
+  INF Preview...` or typing into the new General-section fields in the
+  live GUI (would need synthesized mouse/keyboard input, as issue #6's PR
+  used, which wasn't performed for this pass) -- the code path was
+  reasoned through and unit-tested at the engine level instead.
+
 **`gui/viewport/` (issue #5) — three things worth knowing before touching it:**
 - **Member cross-section thickness/orientation is a schematic
   approximation, not the legacy local-axis convention.** `SceneRenderer`
@@ -795,7 +858,7 @@ for skills that apply to the current task and follow them.
 | #8 | feat(src): reinforcement detailing drawings per beam/column | closed | 2026-08-10 |
 | #9 | feat(src): PDF + legacy-text export of results | closed | 2026-08-10 |
 | #10 | fix(src): CI build-src.yml failing on Linux and Windows targets | closed | 2026-08-10 |
-| #11 | feat(src): add File > New Data action, rename Open Folder... to Open Data... | open | 2026-08-10 |
+| #11 | feat(src): add File > New Data action, rename Open Folder... to Open Data... | ready-for-review | 2026-08-11 |
 | #12 | fix(src): orcisf_gui.exe opens an extra console window on Windows | closed | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui

@@ -34,6 +34,9 @@ public:
 
 private:
     void BuildDockspace();
+    void OnNewDataRequested();
+    void OnSaveRequested();
+    void OnSaveAsRequested();
     void OnOpenFolderRequested();
     void OnRunResult(engine::StructureData sd, std::string dataset_path);
     void OnAddJointRequested();
@@ -42,6 +45,7 @@ private:
     void OnSaveLoadsRequested();
     void OnExportTextRequested();
     void OnExportPdfRequested();
+    void OnExportInfRequested();
 
     // Common load path for both OnOpenFolderRequested (view-only, no
     // results yet) and OnRunResult (results available): replaces

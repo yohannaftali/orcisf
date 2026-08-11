@@ -27,6 +27,27 @@ namespace {
 // ".inp" extension -- the legacy naming convention uses inconsistent
 // casing across datasets (GEDUNG.INP vs aplikasi.inp), see AGENTS.md's
 // "Data / File Format Convention".
+// Issue #11/follow-up: asks the user for a folder + base filename via a
+// single NFD save dialog (folder navigation + typed name, same pattern
+// OnExportPdfRequested/OnExportInfRequested already use), returning the
+// legacy generic path (extension stripped) or nullopt if cancelled.
+std::optional<std::string> PromptForGenericPath(const char* default_name) {
+    nfdu8filteritem_t filter{"ORCISF Dataset", "inp"};
+    nfdu8char_t* out_path = nullptr;
+    nfdsavedialogu8args_t args{};
+    args.filterList = &filter;
+    args.filterCount = 1;
+    args.defaultName = default_name;
+    nfdresult_t result = NFD_SaveDialogU8_With(&out_path, &args);
+    if (result != NFD_OKAY) {
+        return std::nullopt;
+    }
+    std::filesystem::path chosen = out_path;
+    NFD_FreePathU8(out_path);
+    chosen.replace_extension();
+    return chosen.string();
+}
+
 std::optional<std::string> FindDatasetGenericPath(const std::string& folder) {
     namespace fs = std::filesystem;
     std::error_code ec;
@@ -54,6 +75,9 @@ Application::Application() {
     run_panel_.SetOnResult([this](engine::StructureData sd, std::string dataset_path) {
         OnRunResult(std::move(sd), std::move(dataset_path));
     });
+    toolbar_.SetOnNewData([this]() { OnNewDataRequested(); });
+    toolbar_.SetOnSave([this]() { OnSaveRequested(); });
+    toolbar_.SetOnSaveAs([this]() { OnSaveAsRequested(); });
     toolbar_.SetOnOpenFolder([this]() { OnOpenFolderRequested(); });
     toolbar_.SetOnUndo([this]() { OnUndo(); });
     toolbar_.SetOnRedo([this]() { OnRedo(); });
@@ -61,6 +85,59 @@ Application::Application() {
     toolbar_.SetOnSaveLoads([this]() { OnSaveLoadsRequested(); });
     toolbar_.SetOnExportText([this]() { OnExportTextRequested(); });
     toolbar_.SetOnExportPdf([this]() { OnExportPdfRequested(); });
+    toolbar_.SetOnExportInf([this]() { OnExportInfRequested(); });
+}
+
+void Application::OnNewDataRequested() {
+    // Asks where to put the new dataset up front (follow-up to #11) rather
+    // than leaving loaded_dataset_path_ empty until the user happens to hit
+    // Save -- a blank in-memory-only structure with no path is easy to lose
+    // (e.g. Open Data replacing it) with no obvious way to save it.
+    // Cancelling the dialog leaves whatever was previously loaded alone.
+    std::optional<std::string> generic = PromptForGenericPath("struktur.inp");
+    if (!generic) return;
+
+    LoadStructure(engine::StructureData{}, nullptr, *generic);
+    std::string err = report::WriteTextExport(loaded_sd_, *generic, /*has_run_results=*/false, "");
+    if (err.empty()) {
+        log_panel_.AddLine("Started a new structure at: " + *generic);
+    } else {
+        log_panel_.AddLine("Started a new structure, but failed to write initial files: " + err);
+    }
+}
+
+void Application::OnSaveRequested() {
+    if (!editable_) return;
+    if (loaded_dataset_path_.empty()) {
+        OnSaveAsRequested();
+        return;
+    }
+    std::string err =
+        report::WriteTextExport(loaded_sd_, loaded_dataset_path_, has_run_results_, loaded_dataset_path_);
+    if (err.empty()) {
+        log_panel_.AddLine("Saved: " + loaded_dataset_path_);
+    } else {
+        log_panel_.AddLine("Save failed: " + err);
+    }
+}
+
+void Application::OnSaveAsRequested() {
+    if (!editable_) return;
+    std::string default_name = "struktur.inp";
+    if (!loaded_dataset_path_.empty()) {
+        default_name = std::filesystem::path(loaded_dataset_path_).filename().string() + ".inp";
+    }
+    std::optional<std::string> generic = PromptForGenericPath(default_name.c_str());
+    if (!generic) return;
+
+    std::string source = loaded_dataset_path_;
+    std::string err = report::WriteTextExport(loaded_sd_, *generic, has_run_results_, source);
+    if (err.empty()) {
+        loaded_dataset_path_ = *generic;
+        log_panel_.AddLine("Saved as: " + loaded_dataset_path_);
+    } else {
+        log_panel_.AddLine("Save As failed: " + err);
+    }
 }
 
 void Application::LoadStructure(engine::StructureData sd, const std::vector<engine::MemberResult>* results,
@@ -245,6 +322,31 @@ void Application::OnExportPdfRequested() {
     }
 }
 
+void Application::OnExportInfRequested() {
+    if (!editable_) return;
+
+    nfdu8filteritem_t filter{"INF", "inf"};
+    nfdu8char_t* out_path = nullptr;
+    nfdsavedialogu8args_t args{};
+    args.filterList = &filter;
+    args.filterCount = 1;
+    args.defaultName = "struktur.inf";
+    nfdresult_t result = NFD_SaveDialogU8_With(&out_path, &args);
+    if (result != NFD_OKAY) {
+        if (result == NFD_ERROR) log_panel_.AddLine(std::string("Save dialog error: ") + NFD_GetError());
+        return;
+    }
+    std::string inf_path = out_path;
+    NFD_FreePathU8(out_path);
+
+    try {
+        engine::WriteInfPreview(loaded_sd_, inf_path);
+        log_panel_.AddLine("Exported .inf preview to: " + inf_path);
+    } catch (const std::exception& e) {
+        log_panel_.AddLine(std::string("INF export failed: ") + e.what());
+    }
+}
+
 void Application::BuildDockspace() {
     ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
     ImGui::DockSpaceOverViewport(dockspace_id, ImGui::GetMainViewport(),
@@ -279,8 +381,9 @@ void Application::OnFrame() {
     bool can_save = editable_.has_value() && !loaded_dataset_path_.empty();
     bool can_export_text = editable_.has_value();
     bool can_export_pdf = has_run_results_;
+    bool can_export_inf = editable_.has_value();
     toolbar_.Draw(undo_stack_.CanUndo(), undo_stack_.CanRedo(), can_save, can_export_text, can_export_pdf,
-                  editor_options_);
+                  can_export_inf, editor_options_);
     BuildDockspace();
 
     gui::EditableStructure* editable_ptr = editable_ ? &*editable_ : nullptr;

@@ -734,3 +734,70 @@ history only; don't duplicate current-state description here.
     26-83 (title -> Parameter Struktur -> Properti Elemen Material ->
     coordinates -> members -> restraints) as the target format for #11's
     `.inf`-preview acceptance criterion.
+
+## 2026-08-11 — fix(src): #11 implemented (New Data, title/material form, .inf preview)
+
+- Implemented against issue #11's expanded acceptance criteria:
+  - `File > New Data` (new `Application::OnNewDataRequested()`, reuses
+    the existing blank-`StructureData` path `OnAddJointRequested()`
+    already had); `Open Folder...` relabeled `Open Data...`.
+  - `PropertiesPanel`'s new "General" section (shown when nothing is
+    selected): direct-edit form for `ISN`/`E`/`G`/`FC`/`FY`/`FYS`
+    (all pre-existing `StructureData` fields, no engine changes needed)
+    via a new `EditableStructure::Sd()` mutable accessor, plus read-only
+    auto-calculated `M`/DOF/`NJ`/`NR`/`NRJ`.
+  - New `engine::ComputeRestraintSummary()` (`LegacyIO.h`/`.cpp`):
+    extracted `WriteStructureFile()`'s NRJ/NR/ND/N-from-JRL logic into a
+    shared function (also returns the restrained-joint list, replacing
+    `sd.T_K`), now used by `WriteStructureFile()`, the new
+    `WriteInfPreview()`, and the Properties panel's read-only fields.
+  - New `engine::WriteInfPreview()`: writes the six .inf "input echo"
+    sections (title/params/material/coordinates/members/restraints, per
+    `CETAK.HPP` lines 26-83) from the live in-memory dataset, independent
+    of a completed run -- wired to a new `File > Export INF Preview...`
+    menu item (NFD save dialog).
+  - Point/member/restraint editing itself needed no new code -- issue #6
+    already covers it and works the same whether the dataset came from
+    `Open Data...` or `New Data`.
+- **Verified:** full GUI build succeeds (MSVC/vcpkg, same toolchain as
+  #10/#12); app launches and runs without crashing with the new code.
+  `WriteInfPreview()` was verified standalone against a real dataset
+  (`Example/Apl1-1`): read it, wrote a fresh `.inf` to a scratch path,
+  diffed all six sections against the checked-in `aplikasi.inf` --
+  numerically identical (only whitespace/column-width formatting
+  differs). **Not verified:** interactively clicking the new menu items
+  or typing into the new General-section fields in the live GUI --
+  reasoned through and engine-level tested instead, not exercised
+  end-to-end with synthesized input the way issue #6/#7 were.
+- Files: `src/engine/include/engine/LegacyIO.h`,
+  `src/engine/src/LegacyIO.cpp`, `src/gui/editor/EditableStructure.h`,
+  `src/gui/PropertiesPanel.cpp`, `src/gui/Toolbar.h`, `src/gui/Toolbar.cpp`,
+  `src/app/Application.h`, `src/app/Application.cpp`
+
+## 2026-08-11 — feat(src): New Data asks for a save location; add Save/Save As...
+
+- Follow-up to #11 (still open, no separate issue filed -- this extends
+  the same `File` menu work): `New Data` now prompts for a folder + base
+  filename via NFD (`Application::PromptForGenericPath()`, reusing the
+  `NFD_SaveDialogU8_With` pattern `Export PDF...`/`Export INF
+  Preview...` already used) and immediately writes the initial file set
+  there via `report::WriteTextExport()`, instead of leaving a blank
+  in-memory structure with no path until the user happened to hit Save.
+  Cancelling the dialog leaves whatever was previously loaded untouched.
+- Added `File > Save` (writes the full legacy input set --
+  `.inp`/`.isd`/`.idl`/`.ijl`/`.ids`/`.ijs`/`.bbn`, plus
+  `.opt`/`.str`/`.kdl`/`.inf` if a completed run exists -- back to the
+  current path; falls back to Save As if there isn't one yet) and
+  `File > Save As...` (always prompts for a new location, updates the
+  tracked path). Both are thin wrappers around the already-existing
+  `report::WriteTextExport()` (issue #9) -- no new engine/export code
+  needed, this was purely a missing menu entry point plus the New Data
+  prompt.
+- **Verified:** full GUI build succeeds; app launches/runs without
+  crashing with the new menu items and callbacks wired in.
+  `report::WriteTextExport()` itself was already verified in #9's own
+  pass (see that dated entry). **Not verified:** clicking through the
+  actual New Data/Save/Save As... dialogs interactively in this
+  environment.
+- Files: `src/app/Application.h`, `src/app/Application.cpp`,
+  `src/gui/Toolbar.h`, `src/gui/Toolbar.cpp`

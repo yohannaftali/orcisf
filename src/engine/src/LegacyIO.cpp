@@ -135,24 +135,33 @@ void ReadDiscreteTables(StructureData& sd, const DatasetPaths& paths) {
     }
 }
 
-void WriteStructureFile(const StructureData& sd, const std::string& inp_path) {
-    std::ofstream tulis = OpenWrite(inp_path);
-
-    // Recompute the derived counts from the current JRL rather than trust
-    // sd.NRJ/NR/ND/N -- see header comment.
-    int nrj = 0, nr = 0;
+RestraintSummary ComputeRestraintSummary(const StructureData& sd) {
+    RestraintSummary summary;
     for (int j = 1; j <= sd.NJ; ++j) {
         bool any = false;
         for (int dof = 0; dof < 6; ++dof) {
             if (sd.JRL[6 * j - 5 + dof] == 1) {
                 any = true;
-                ++nr;
+                ++summary.nr;
             }
         }
-        if (any) ++nrj;
+        if (any) {
+            ++summary.nrj;
+            summary.restrained_joints.push_back(j);
+        }
     }
-    int nd = 6 * sd.NJ;
-    int n = nd - nr;
+    summary.nd = 6 * sd.NJ;
+    summary.n = summary.nd - summary.nr;
+    return summary;
+}
+
+void WriteStructureFile(const StructureData& sd, const std::string& inp_path) {
+    std::ofstream tulis = OpenWrite(inp_path);
+
+    // Recompute the derived counts from the current JRL rather than trust
+    // sd.NRJ/NR/ND/N -- see header comment.
+    RestraintSummary summary = ComputeRestraintSummary(sd);
+    int nrj = summary.nrj, nr = summary.nr;
 
     tulis << sd.ISN << "\n";
     tulis << sd.M << "\n";
@@ -164,8 +173,8 @@ void WriteStructureFile(const StructureData& sd, const std::string& inp_path) {
     tulis << sd.FC << "\n";
     tulis << sd.FY << "\n";
     tulis << sd.FYS << "\n";
-    tulis << nd << "\n";
-    tulis << n << "\n";
+    tulis << summary.nd << "\n";
+    tulis << summary.n << "\n";
 
     tulis << "[Koordinat]\n";
     for (int j = 1; j <= sd.NJ; ++j) {
@@ -191,6 +200,50 @@ void WriteStructureFile(const StructureData& sd, const std::string& inp_path) {
         if (sd.IA[i] != 0) {
             tulis << sd.XP[i] << "\n" << sd.YP[i] << "\n" << sd.ZP[i] << "\n";
         }
+    }
+}
+
+void WriteInfPreview(const StructureData& sd, const std::string& inf_path) {
+    std::ofstream hinf = OpenWrite(inf_path);
+    RestraintSummary summary = ComputeRestraintSummary(sd);
+
+    hinf << "  Struktur Portal Ruang " << sd.ISN << "\n\n";
+    hinf << "  Parameter Struktur\n";
+    hinf << "  Jumlah batang : " << sd.M << "\n";
+    hinf << "  DOF : " << summary.n << "\n";
+    hinf << "  Jumlah joint : " << sd.NJ << "\n";
+    hinf << "  Jumlah pengekang tumpuan : " << summary.nr << "\n";
+    hinf << "  Jumlah titik kumpul yang dikekang : " << summary.nrj << "\n";
+    hinf << "  Modulus Elastisitas aksial : " << sd.E << " N/m^2\n";
+    hinf << "  Modulus Geser : " << sd.G << " N/m^2\n\n";
+    hinf << "  Properti Elemen Material\n";
+    hinf << "  Kuat desak beton karakteristik : " << sd.FC << " MPa\n";
+    hinf << "  Kuat tarik baja tulangan : " << sd.FY << " MPa\n";
+    hinf << "  Kuat tarik tulangan sengkang : " << sd.FYS << " MPa\n";
+
+    hinf << "\n  Koordinat Titik Kumpul (m)\n";
+    hinf << "  Titik     X             Y             Z \n";
+    for (int kout = 1; kout <= sd.NJ; ++kout) {
+        hinf << "  " << kout << "\t" << sd.X[kout] << "\t" << sd.Y[kout] << "\t" << sd.Z[kout] << "\n";
+    }
+
+    hinf << "\n  Informasi Batang \n";
+    hinf << "  Batang  JJ      JK      IA\n";
+    for (int iout = 1; iout <= sd.M; ++iout) {
+        hinf << "  " << iout << "\t" << sd.JJ[iout] << "\t" << sd.JK[iout] << "\t" << sd.IA[iout] << "\n";
+        if (sd.IA[iout] != 0) {
+            hinf << "  XP = " << sd.XP[iout] << "  YP = " << sd.YP[iout] << "  ZP = " << sd.ZP[iout] << "\n\n";
+        }
+    }
+
+    hinf << "\n  Pengekang Titik Kumpul \n";
+    hinf << "  Titik     JR1   JR2   JR3   JR4   JR5   JR6\n";
+    for (int joint : summary.restrained_joints) {
+        hinf << "  " << joint;
+        for (int k = 5; k >= 0; --k) {
+            hinf << "\t" << sd.JRL[6 * joint - k];
+        }
+        hinf << "\n";
     }
 }
 

@@ -4,6 +4,9 @@
 
 namespace orcisf::gui {
 
+void Toolbar::SetOnNewData(std::function<void()> callback) { on_new_data_ = std::move(callback); }
+void Toolbar::SetOnSave(std::function<void()> callback) { on_save_ = std::move(callback); }
+void Toolbar::SetOnSaveAs(std::function<void()> callback) { on_save_as_ = std::move(callback); }
 void Toolbar::SetOnOpenFolder(std::function<void()> callback) { on_open_folder_ = std::move(callback); }
 void Toolbar::SetOnUndo(std::function<void()> callback) { on_undo_ = std::move(callback); }
 void Toolbar::SetOnRedo(std::function<void()> callback) { on_redo_ = std::move(callback); }
@@ -11,13 +14,24 @@ void Toolbar::SetOnAddJoint(std::function<void()> callback) { on_add_joint_ = st
 void Toolbar::SetOnSaveLoads(std::function<void()> callback) { on_save_loads_ = std::move(callback); }
 void Toolbar::SetOnExportText(std::function<void()> callback) { on_export_text_ = std::move(callback); }
 void Toolbar::SetOnExportPdf(std::function<void()> callback) { on_export_pdf_ = std::move(callback); }
+void Toolbar::SetOnExportInf(std::function<void()> callback) { on_export_inf_ = std::move(callback); }
 
 void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_text, bool can_export_pdf,
-                    EditorOptions& options) {
+                    bool can_export_inf, EditorOptions& options) {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("Open Folder...")) {
+            if (ImGui::MenuItem("New Data")) {
+                if (on_new_data_) on_new_data_();
+            }
+            if (ImGui::MenuItem("Open Data...")) {
                 if (on_open_folder_) on_open_folder_();
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Save", "Ctrl+S", false, can_export_text)) {
+                if (on_save_) on_save_();
+            }
+            if (ImGui::MenuItem("Save As...", nullptr, false, can_export_text)) {
+                if (on_save_as_) on_save_as_();
             }
             if (ImGui::MenuItem("Save Loads (.bbn)", nullptr, false, can_save)) {
                 if (on_save_loads_) on_save_loads_();
@@ -28,6 +42,10 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
             }
             if (ImGui::MenuItem("Export Text...", nullptr, false, can_export_text)) {
                 if (on_export_text_) on_export_text_();
+            }
+            if (ImGui::MenuItem("Export INF Preview (Koordinat/Batang/Pengekang)...", nullptr, false,
+                                 can_export_inf)) {
+                if (on_export_inf_) on_export_inf_();
             }
             ImGui::EndMenu();
         }
