@@ -1282,3 +1282,34 @@ history only; don't duplicate current-state description here.
   check. Issue #16 status set to `ready-for-review`, not `done`, until a
   real run confirms the acceptance criterion. Epic #13 can be revisited
   for closure once that's confirmed.
+
+## 2026-08-11 — Build toolchain located; #16 compiled and empirically verified
+
+- Found a usable local build toolchain in this environment after all
+  (CMake at `C:\Qt\Tools\CMake_64\bin\cmake.exe`, MSVC via VS2022
+  BuildTools at `C:\Program Files (x86)\Microsoft Visual Studio\2022\
+  BuildTools`, Ninja generator) -- earlier sessions this project
+  incorrectly reported "no cmake toolchain available"; it was present
+  but not on the default `PATH`/shell profile.
+- Built both `orcisf_cli` and `orcisf_gui` from the existing
+  `windows-release` preset build directory -- **all source changed in
+  this session's #16/#21/#22/#23 work compiled cleanly** (only warnings,
+  no errors): `Optimizer.{h,cpp}`, `RunPanel.{h,cpp}`, `Toolbar.cpp`,
+  `ViewportPanel.cpp`, `Camera.{h,cpp}`, `Math3D.h`, `Selection.h`,
+  `JointsMembersPanel.{h,cpp}`. (One link failure along the way was a
+  leftover `orcisf_gui.exe` process from an earlier session holding the
+  file open -- killed it, not a code issue.)
+- **Empirically verified issue #16's acceptance criteria** with a
+  standalone scratch program (not checked in) linked against
+  `orcisf_engine`, run against a scratch copy of `Example/Data01`: a
+  truncated baseline run (`harga=3.02672e+07`) followed by a seeded
+  re-optimization (`harga=2.46519e+07`) showed a real cost improvement,
+  confirming the seed took effect; re-running the seeded case with
+  `worker_threads=4` produced a bit-identical result to
+  `worker_threads=1`, confirming issue #4's determinism guarantee holds
+  with seeding active. Full numbers in `engine/README.md`.
+- `AGENTS.md`'s #16/#21/#22/#23 sections updated from "not compiled, no
+  toolchain available" to reflect what was actually verified now that a
+  toolchain exists. #16's `## Tracked Issues` status confirmed `closed`
+  (already auto-closed via its commit's `Closes #16` trailer, now backed
+  by a real empirical check rather than only analytical reasoning).

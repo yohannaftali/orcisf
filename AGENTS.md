@@ -741,16 +741,18 @@ callers:**
   toolchain available in this environment this session, see Validation
   below); re-verify the modal actually opens on a real cascade-delete
   before treating #21 as fully done.
-- **What was verified vs. not:** the code follows `LoadsPanel`'s and
+- **What was verified:** the code follows `LoadsPanel`'s and
   `PropertiesPanel`'s already-proven patterns (row selection sync,
   inline edit commit, `math3d::Vec3` construction) exactly, and
   `EditableStructure`'s public API/field names (`JJ`/`JK`/`M`/`SdForUndo()`)
-  were cross-checked against `EditableStructure.h`/`.cpp` directly. No
-  `cmake`/build toolchain was available in this environment this session
-  to compile-check or interactively exercise it -- say so explicitly if
-  asked, don't claim it was built or run. CI
-  (`.github/workflows/build-src.yml`) is the first real compile check
-  this change will get.
+  were cross-checked against `EditableStructure.h`/`.cpp` directly.
+  **Compiled successfully** in a later session (MSVC/Ninja,
+  `windows-release` preset, both `orcisf_cli` and `orcisf_gui` targets) --
+  see the #16 entry below for how a build toolchain became available.
+  Interactive exercise of the cascade-delete modal specifically (does it
+  actually pop up on a real multi-member joint delete) was not re-checked
+  -- CI plus a real interactive pass are still the next steps for full
+  confidence.
 
 **2D plane-locked drawing (issue #22, part of epic #20) — read before
 touching `gui/viewport/Camera.{h,cpp}`, `gui/viewport/Math3D.h`'s
@@ -811,16 +813,16 @@ touching `gui/viewport/Camera.{h,cpp}`, `gui/viewport/Math3D.h`'s
   "shown at the bottom" acceptance criterion without needing a literal
   ViewCube widget (none exists in this project; see issue #23 for the
   separate UCS icon).
-- **What was verified vs. not:** the cross-product/up-vector math was
+- **What was verified:** the cross-product/up-vector math was
   hand-derived and re-checked (catching the Y-Z sign bug above); the
   code was reviewed against `Camera.h`/`.cpp`'s existing patterns
   (`Pan()`/`ScreenRay()`'s `Cross(right,forward)` up-derivation,
-  `EyePosition()`'s `target - Forward()*distance`). **No local `cmake`
-  build toolchain was available in this environment this session** -- this
-  was not compiled or interactively run. CI is the first real check;
-  don't treat #22 as fully done until that (or a real interactive pass)
-  confirms the three plane views actually render correctly and
-  click-to-place lands exactly on the locked plane.
+  `EyePosition()`'s `target - Forward()*distance`). **Compiled
+  successfully** in a later session (MSVC/Ninja, `windows-release`
+  preset) -- see the #16 entry below. The three plane views' actual
+  on-screen rendering and click-to-place-on-the-locked-plane behavior
+  were not interactively exercised in a running app; that's still the
+  next step for full confidence (CI plus a real interactive pass).
 
 **"Re-optimize from last best result" (issue #16, part of epic #13) — read
 before touching `engine::OptimizationOptions`'s `seed_*` fields,
@@ -860,17 +862,22 @@ before touching `engine::OptimizationOptions`'s `seed_*` fields,
   runs *before* any worker threads exist -- `worker_threads` still only
   changes wall-clock time, never the numeric result, with or without
   seeding.
-- **What was verified vs. not:** the "cost never gets worse" claim was
-  reasoned through analytically from the already-validated
-  `EvaluateCandidateFull`/`Sort`/`GantiBaru`/`Penyusutan` logic (see
-  `engine/README.md`'s new "Re-optimize from last best" section for the
-  full argument), not confirmed with a real run. **No local `cmake`
-  toolchain was available in this environment this session** -- not
-  compiled or interactively run. Before treating #16 as fully done: run a
-  real optimization, capture its best design, re-run with "Re-optimize
-  from last best result" checked against the *same* dataset path, and
-  confirm the second run's final cost is ≤ the first's (the issue's own
-  stated acceptance criterion).
+- **What was verified:** compiled cleanly (both `orcisf_cli` and
+  `orcisf_gui`, MSVC/Ninja, `windows-release` preset) and empirically
+  exercised via a standalone scratch program linked against
+  `orcisf_engine` (not checked in) against a scratch copy of
+  `Example/Data01`: a truncated baseline run
+  (`harga=3.02672e+07 kendala=0`) followed by a seeded re-optimization
+  (`harga=2.46519e+07 kendala=0`) -- lower cost, confirming the seed took
+  effect and the search genuinely continues rather than restarting.
+  Re-running the seeded case with `worker_threads=4` produced a
+  bit-identical result to `worker_threads=1`, confirming issue #4's
+  determinism guarantee holds with seeding active. Full details and exact
+  numbers in `engine/README.md`'s "Re-optimize from last best" section.
+  The GUI checkbox/wiring itself (`RunPanel`'s `has_result_`/
+  `reoptimize_from_last_`) was reviewed but not interactively clicked
+  through in a running app this session -- the underlying engine
+  mechanism it drives is what was directly verified.
 
 **UCS icon overlay (issue #23, part of epic #20) — read before touching
 `ViewportPanel.cpp`'s `DrawUcsIcon()`:**
@@ -899,16 +906,15 @@ before touching `engine::OptimizationOptions`'s `seed_*` fields,
   unconditionally (every frame, every view mode); the plane-offset text
   box (only shown when a plane is locked) starts past that reserved area
   instead of overlapping it.
-- **What was verified vs. not:** the dot-product projection math was
+- **What was verified:** the dot-product projection math was
   hand-checked for a few reference orientations (default orbit camera:
   X should point right-ish, Y up, Z out-of-screen-ish) and the code
   reuses already-verified `Camera` methods rather than new vector math.
-  **No local `cmake` build toolchain was available in this environment
-  this session** -- not compiled or interactively run. CI is the first
-  real check; the icon's live rotation-with-camera behavior and its
-  non-overlap with #22's readout specifically should be re-verified
-  interactively (or via a real build + screenshot) before treating #23
-  as fully done.
+  **Compiled successfully** in a later session (MSVC/Ninja,
+  `windows-release` preset) -- see the #16 entry below. The icon's live
+  rotation-with-camera behavior and its non-overlap with #22's readout
+  were not interactively exercised in a running app; still the next step
+  for full confidence.
 
 **Custom borderless window chrome (issue #19, Phase 0) — read before
 touching `app/CustomTitleBar.{h,cpp}`/`app/Theme.{h,cpp}`/`main.cpp`'s
@@ -1313,7 +1319,7 @@ for skills that apply to the current task and follow them.
 | #13 | epic(src): more user-friendly GUI (icon toolbar, view presets, re-optimize, editing guidance) | open | 2026-08-11 |
 | #14 | feat(src): add a configurable icon toolbar below the menu bar | closed | 2026-08-11 |
 | #15 | feat(src): add Default/Design/Optimization view-layout presets | closed | 2026-08-11 |
-| #16 | feat(src): re-optimize using the last best result | ready-for-review | 2026-08-11 |
+| #16 | feat(src): re-optimize using the last best result | closed | 2026-08-11 |
 | #17 | feat(src): add a Regenerate Seed button to the Run panel | closed | 2026-08-11 |
 | #18 | feat(src): AutoCAD-style in-progress guidance while adding joints/members | closed | 2026-08-11 |
 | #19 | feat(src): custom borderless window chrome + modern ImGui theme (cross-platform) | closed | 2026-08-11 |

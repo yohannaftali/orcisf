@@ -150,15 +150,28 @@ bit-reproducible anyway, per point 2 above), so validation targets what
    layout (per-member dimensions, reinforcement, cost, and constraint
    breakdown) — see `LegacyIO.cpp`.
 
-**Issue #16 (re-optimize from last best) was not exercised with a real
-build/run** -- no local `cmake` toolchain was available in the environment
-this was implemented in. The "cost never gets worse" claim above is
-reasoned through analytically from the existing (already-validated)
-`EvaluateCandidateFull`/`Sort`/`GantiBaru`/`Penyusutan` logic, not
-confirmed empirically. Before treating #16 as fully done, run a real
-optimization, capture its best design, re-run with
-"Re-optimize from last best" checked against the same dataset, and
-confirm the second run's final cost is <= the first run's.
+**Issue #16 (re-optimize from last best) was empirically verified** with a
+standalone scratch program (not checked in) linking directly against
+`orcisf_engine`, against a scratch copy of `Example/Data01`:
+1. A deliberately-truncated baseline run (`j_iterasi_mak=3`, unlikely to
+   have converged) finished at `harga=3.02672e+07 kendala=0`.
+2. A second run seeded from that best design (`seed_from_previous_best=true`,
+   `j_iterasi_mak=50`, a *different* `rng_seed` for the rest of the
+   population) finished at `harga=2.46519e+07 kendala=0` -- lower cost,
+   confirming both that the seed actually took effect and that continuing
+   the search from it improves on the truncated starting point (the
+   "cost never gets worse than the seed" argument above, now confirmed
+   empirically rather than only analytically).
+3. Re-running the seeded case with `worker_threads=4` produced a
+   bit-identical result (`fitstr`/`hargastr`/`kendalastr` all equal) to
+   the `worker_threads=1` seeded run for the same `rng_seed` -- confirms
+   issue #4's determinism guarantee holds with seeding active too, per
+   #16's explicit acceptance criterion.
+A run with an already-converged baseline (`j_iterasi_mak=50` for both
+runs) produced an *identical* result on the second run rather than a
+further improvement -- expected, not a bug: there's nothing left to
+improve once the baseline already found the same optimum the seeded
+search would converge to.
 
 **⚠️ Always point the CLI/GUI at a scratch copy of a dataset, not the
 checked-in `Optimasi Beton/Example/` archive** — output filenames are
