@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=ORCISF
+Comment=Optimizing Reinforced Concrete In Space Frame structure
+Exec=orcisf_gui
+Icon=orcisf
+Terminal=false
+Categories=Engineering;Science;

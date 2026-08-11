@@ -1,0 +1,7 @@
+// Issue #26: embeds icons/windows/orcisf.ico as orcisf_gui.exe's icon
+// (shown in Explorer, the taskbar, Alt+Tab). Only one ICON resource in
+// this file, so both MSVC's rc.exe and MinGW's windres pick it as the
+// executable's "main" icon automatically (lowest/only resource ID wins).
+// Numeric ID (not a symbolic #define'd name) so this file needs no
+// companion resource.h.
+101 ICON "../../icons/windows/orcisf.ico"

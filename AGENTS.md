@@ -135,7 +135,12 @@ src/
 ├── app/
 │   ├── main.cpp             # GLFW/OpenGL3/ImGui bootstrap + render loop;
 │   │                        # also: gl3w init, NFD_Init/Quit; #19: sets
-│   │                        # GLFW_DECORATED=false, calls ApplyModernTheme()
+│   │                        # GLFW_DECORATED=false, calls ApplyModernTheme();
+│   │                        # #26: calls AppIcon::ApplyWindowIcon(window)
+│   ├── AppIcon.{h,cpp}      # #26: runtime taskbar/window icon via
+│   │                        # glfwSetWindowIcon() + libpng (Windows/Linux
+│   │                        # only -- no-op on macOS, see its own header)
+│   ├── orcisf.rc            # #26: Windows .exe icon resource (icons/windows/orcisf.ico)
 │   ├── CustomTitleBar.{h,cpp} # #19 Phase 0: title text/drag-zone/Minimize-
 │   │                        # Maximize-Close, drawn *inside* Toolbar's menu
 │   │                        # bar row (not its own window -- see the #19
@@ -713,6 +718,70 @@ handling or `engine::RunFullOptimization()`'s output paths:**
   `RunPanel` UI changes, but the dataset-path-sync/Run-panel-display
   itself was not click-tested interactively; that's still a good next
   step for full confidence.
+
+**App icon set wired into the build (issue #26) — read before touching
+`src/app/AppIcon.{h,cpp}`, `src/app/orcisf.rc`, `src/packaging/
+orcisf.desktop`, or the icon-related blocks in `src/CMakeLists.txt`:**
+- **`icons/` lives at the repo root, not under `src/`** (shared
+  reference art, not build-generated) -- `CMakeLists.txt` sets
+  `ORCISF_ICONS_DIR` once (`${CMAKE_CURRENT_SOURCE_DIR}/../icons`) and
+  every platform block below reuses it. See `icons/README.txt` for what
+  each subfolder/file is for.
+- **Three genuinely different mechanisms, one per platform** -- don't
+  assume one implementation covers all three:
+  - **Windows**: `app/orcisf.rc` (a single numeric-ID `ICON` resource,
+    no companion `resource.h` needed) embeds `icons/windows/orcisf.ico`
+    as the `.exe`'s own icon. Added to `orcisf_gui`'s sources only under
+    `if(WIN32)` -- CMake auto-detects the `.rc` extension and invokes
+    `rc.exe`/`windres` for it, no `enable_language()` call needed.
+  - **macOS**: `MACOSX_BUNDLE TRUE` + `MACOSX_BUNDLE_ICON_FILE` (naming
+    `icons/macos/orcisf.icns`, added to the target's sources with
+    `MACOSX_PACKAGE_LOCATION "Resources"`) packages `orcisf_gui` as a
+    real `.app` bundle. This is the *only* place macOS gets an icon from
+    -- `AppIcon.cpp`'s `ApplyWindowIcon()` is a deliberate no-op there
+    (see next bullet).
+  - **Windows/Linux runtime window icon** (taskbar/Alt+Tab/window-manager
+    decorations, independent of the `.exe`/bundle icon above):
+    `AppIcon.cpp`'s `ApplyWindowIcon()` decodes PNGs via libpng's
+    simplified API (`png_image_begin_read_from_file`/`_finish_read` --
+    far less boilerplate than the full streaming API for one-shot small
+    icons) and calls `glfwSetWindowIcon()`. **GLFW does not support
+    `glfwSetWindowIcon()` on macOS** (documented GLFW behavior, not a
+    bug) -- `ApplyWindowIcon()` returns immediately there.
+- **`libpng` is now a *direct* `vcpkg.json` dependency**, even though it
+  was already an installed transitive one (via `libharu`'s PNG-in-PDF
+  embedding) -- confirmed via `vcpkg_installed/vcpkg/info/libpng_*.list`
+  before adding it. Declaring it directly means this doesn't silently
+  break if `libharu` ever stops needing PNG.
+- **Runtime icon PNGs are resolved relative to the executable's own
+  directory, not the process's current working directory** -- a real
+  gotcha `AppIcon.cpp`'s `ExecutableDir()` exists specifically to avoid
+  (platform-specific: `GetModuleFileNameW` on Windows, `readlink
+  ("/proc/self/exe")` on Linux; unused/never called on macOS). CMake's
+  `POST_BUILD` step copies `icons/png/icon_{16,32,48,256}x*.png` into a
+  `icons/` subfolder next to the built executable -- same reasoning as
+  the pre-existing MinGW-runtime-DLL `POST_BUILD` copy in this file.
+- **Linux packaging (`.desktop` file + hicolor icon theme install) only
+  takes effect via `cmake --install`**, a packaging step this project
+  doesn't otherwise script or run in CI -- the `install()` rules
+  (`if(UNIX AND NOT APPLE)`) were reviewed against XDG conventions but
+  **not exercised on a real Linux machine** (none available in this
+  environment).
+- **What was verified vs. not:** compiled successfully on Windows
+  (MSVC/Ninja, `windows-release` preset) -- confirmed the `.rc` resource
+  actually compiles (`orcisf.rc.res` generated) and links, the runtime
+  icon PNGs land next to the built `.exe`, and the app launches/runs
+  without crashing with `ApplyWindowIcon()` wired in. **The icon's
+  actual on-screen appearance (Explorer/taskbar/window) was not
+  confirmed via screenshot** in this pass (a screenshot attempt captured
+  an unrelated foreground window instead, a known hazard in this
+  environment -- see the focus-stealing note elsewhere in this file; not
+  worth repeatedly retrying for a cosmetic check). macOS bundle
+  packaging and Linux `.desktop`/install rules were written against each
+  platform's documented CMake convention but have **no local toolchain
+  to verify against** (Windows-only dev environment) -- CI
+  (`build-src.yml`, matrix over all three OSes) is the first real
+  cross-platform check for those two.
 
 **AutoCAD-style Add Joint + editing guidance (issue #18, part of epic
 #13) — read before touching `EditorOptions::add_joint_mode`/
@@ -1441,7 +1510,10 @@ for skills that apply to the current task and follow them.
 | #23 | feat(src): UCS icon overlay in the viewport | closed | 2026-08-11 |
 | #24 | fix(src): 2D plane offset control unreachable from the viewport (move it under the UCS icon) | ready-for-review | 2026-08-11 |
 | #25 | fix(src): Run panel dataset-path field is redundant; write each run into a timestamped output subfolder | ready-for-review | 2026-08-11 |
-| #26 | feat(src): wire up the app icon set (icons/) for Windows/macOS/Linux builds | open | 2026-08-11 |
+| #26 | feat(src): wire up the app icon set (icons/) for Windows/macOS/Linux builds | ready-for-review | 2026-08-11 |
+| #27 | fix(src): title bar Minimize/Maximize/Close buttons not flush to window right edge | open | 2026-08-11 |
+| #28 | feat(src): Alt-mnemonic menu navigation + icon before each panel title | open | 2026-08-11 |
+| #29 | chore(src): interactively re-verify RunPanel dataset gating (#25) and 2D plane offset control (#22/#24) with a real loaded dataset | open | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

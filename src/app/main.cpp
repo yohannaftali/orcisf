@@ -3,6 +3,7 @@
 // engine/viewport/editor/export features are separate issues (#3-#9);
 // this file only wires up the window, render loop, and docking layout.
 
+#include "app/AppIcon.h"
 #include "app/Application.h"
 #include "app/Theme.h"
 
@@ -79,6 +80,11 @@ int main(int, char**) {
         glfwTerminate();
         return 1;
     }
+    // Issue #26: taskbar/Alt+Tab window icon on Windows/Linux (no-op on
+    // macOS, see AppIcon.h's comment). Best-effort -- a missing/unreadable
+    // icon file never blocks startup.
+    orcisf::app::ApplyWindowIcon(window);
+
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // vsync
 

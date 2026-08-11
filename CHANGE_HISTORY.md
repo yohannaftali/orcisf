@@ -1462,3 +1462,92 @@ history only; don't duplicate current-state description here.
   doesn't support `glfwSetWindowIcon` on macOS). Left the PNG-decoder
   choice for the runtime window icon (existing transitive `libpng` vs. a
   small vendored decoder) as an implementation decision, not dictated.
+
+## 2026-08-11 — feat(src): implement issue #26 (app icon set wired into the build)
+
+- **Windows**: new `src/app/orcisf.rc` (single numeric-ID `ICON`
+  resource) embeds `icons/windows/orcisf.ico` as `orcisf_gui.exe`'s icon;
+  added to the target's sources under `if(WIN32)`.
+- **macOS**: `CMakeLists.txt` sets `MACOSX_BUNDLE TRUE` +
+  `MACOSX_BUNDLE_ICON_FILE` (`icons/macos/orcisf.icns`, added with
+  `MACOSX_PACKAGE_LOCATION "Resources"`) so a real `.app` bundle gets a
+  Finder/Dock icon.
+- **Windows/Linux runtime window icon**: new `src/app/AppIcon.{h,cpp}` --
+  `ApplyWindowIcon()` decodes `icons/png/icon_{16,32,48,256}x*.png` via
+  libpng's simplified API and calls `glfwSetWindowIcon()`; a deliberate
+  no-op on macOS (GLFW doesn't support that call there). Icon PNGs are
+  copied next to the built executable by a new `CMakeLists.txt`
+  `POST_BUILD` step (same reasoning as the pre-existing MinGW-DLL copy);
+  `AppIcon.cpp` resolves them relative to the executable's own directory
+  (`GetModuleFileNameW`/`readlink("/proc/self/exe")`), not the process's
+  cwd. Wired into `main.cpp` right after window creation.
+- **Linux**: new `src/packaging/orcisf.desktop` + `install()` rules
+  (`.desktop` file + a `hicolor` theme icon) for desktop-environment
+  integration, effective via `cmake --install`.
+- Added `libpng` as a *direct* `vcpkg.json` dependency (was already an
+  installed transitive one via `libharu`'s PNG-in-PDF support --
+  confirmed via `vcpkg_installed/vcpkg/info/libpng_*.list` before adding
+  it explicitly).
+- Files: `src/vcpkg.json`, `src/CMakeLists.txt`, `src/app/main.cpp`,
+  `src/app/AppIcon.{h,cpp}` (new), `src/app/orcisf.rc` (new),
+  `src/packaging/orcisf.desktop` (new). Also checked in the `icons/`
+  asset directory itself (25 files, ~8.2MB) in a preceding commit, since
+  it was sitting untracked in the working directory.
+- **Compiled and empirically verified on Windows** (MSVC/Ninja,
+  `windows-release` preset): the `.rc` resource compiles and links
+  (`orcisf.rc.res` generated), the runtime icon PNGs land next to the
+  built `.exe`, and the app launches/runs without crashing with
+  `ApplyWindowIcon()` wired in. The icon's actual on-screen appearance
+  was not confirmed via screenshot (a screenshot attempt captured an
+  unrelated foreground window instead -- a known focus-stealing hazard
+  in this environment, not worth repeatedly retrying for a cosmetic
+  check). **macOS/Linux have no local toolchain to verify against** in
+  this Windows-only dev environment -- written against each platform's
+  documented CMake convention; CI (`build-src.yml`'s three-OS matrix) is
+  the first real cross-platform check. Issue #26 status set to
+  `ready-for-review`, not `done`, until CI (and ideally a real
+  interactive screenshot on Windows) confirms it.
+
+## 2026-08-11 — User retest of #21-#25: three follow-up issues filed
+
+- User asked (`/planner`) to retest issues #21-#25 against a real running
+  build and reported: (a) issue #25's "Enter a dataset path" message and
+  Run-blocking still appearing, (b) a cosmetic gap between the title
+  bar's Close button and the window's right edge, (c) no icon before
+  panel titles, (d) no VS Code-style Alt-mnemonic menu access, (e) issue
+  #22/#24's plane-offset control not visibly showing up.
+- Did real interactive testing this session: launched the current build
+  (MSVC/Ninja, `windows-release`, includes all of #21-#26), confirmed a
+  DPI-awareness pitfall again applied to screen-coordinate automation
+  (same issue #11's interactive-verification pass hit previously --
+  fixed with `SetProcessDPIAware()`), opened the File menu and screenshotted
+  it (now shows a **separate top-level "View Plane" menu**, confirming
+  that part of #22 is present), and confirmed via a zoomed screenshot
+  crop that the title bar buttons **do** have a visible gap before the
+  window's right edge.
+- Attempting to load a real dataset via the native "Open Data..."
+  folder-picker to test the RunPanel/offset-visibility claims with
+  blind coordinate-based UI automation did not cleanly succeed after a
+  few attempts -- stopped rather than keep retrying, per this project's
+  own "avoid automation rabbit holes" guidance (see AGENTS.md).
+- Code review of current `main` found: (a) #25's fix (new wording, no
+  editable field, `SetDatasetPath()` wired correctly) is genuinely
+  present in current source -- if the user is still seeing the *old*
+  message text, they're likely testing a build that predates commit
+  `9fc3e17` (e.g. `v0.0.1-alpha`); (b) #22/#24's offset overlay code is
+  also present and looks correctly gated, no code-level bug found by
+  inspection.
+- Filed three issues:
+  - **#27** (bug) -- title bar buttons not flush to the window's right
+    edge, confirmed via screenshot; hypothesized root cause
+    (`ImGui::SameLine()`'s offset being relative to content-region start,
+    not raw window width) documented for whoever fixes it, not asserted
+    as certain.
+  - **#28** (enhancement) -- Alt-mnemonic menu navigation (`&`-prefixed
+    labels) + an icon before each panel's title, bundled since both are
+    from the same UX-polish request.
+  - **#29** (bug) -- tracks finishing the interactive re-verification
+    this session couldn't complete (load a real dataset, confirm Run
+    panel and plane-offset-overlay behavior end-to-end), and explicitly
+    asks to confirm which build/commit the original report was made
+    against.
