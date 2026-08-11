@@ -801,3 +801,8 @@ history only; don't duplicate current-state description here.
   environment.
 - Files: `src/app/Application.h`, `src/app/Application.cpp`,
   `src/gui/Toolbar.h`, `src/gui/Toolbar.cpp`
+- Committed as `6ca2d51` with "Closes #11" in the message -- GitHub
+  auto-closed #11 on push to `main` as a side effect (not a separate
+  explicit close action). Worth noting since the interactive-GUI
+  verification gap above was flagged at the same time; reopen if that
+  gap turns out to matter.
