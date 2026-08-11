@@ -1240,3 +1240,18 @@ history only; don't duplicate current-state description here.
 - No local `cmake` toolchain was available this session -- not compiled
   or interactively run. CI is the first real build check. Issue #23
   status set to `ready-for-review`, not `done`, until confirmed.
+
+## 2026-08-11 — Epic status recheck (/planner): closed #1 and #20
+
+- Re-synced all 23 tracked issues' actual state against `AGENTS.md`. Found
+  #21/#22/#23 already `closed` on GitHub (auto-closed by their "Closes
+  #N" commit trailers) but still recorded as `ready-for-review` --
+  corrected.
+- **Epic #1** (port ORCISF to a modern GUI): all sub-issues #2-#9 closed
+  -- closed with a summary comment.
+- **Epic #20** (joints/members list, 2D plane-locked drawing, UCS icon):
+  all sub-issues #21/#22/#23 closed -- closed with a summary comment.
+- **Epic #13** (more user-friendly GUI) intentionally left open -- #16
+  (re-optimize using the last best result) is still open (deferred
+  earlier for needing real engine-level optimizer changes, not just
+  GUI), so #13 isn't actually done yet.

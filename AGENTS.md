@@ -1248,7 +1248,7 @@ for skills that apply to the current task and follow them.
 ## Tracked Issues
 | ID | Title | Status | Last Checked |
 |----|-------|--------|--------------|
-| #1 | epic(src): port ORCISF to a modern cross-platform GUI application | open | 2026-08-10 |
+| #1 | epic(src): port ORCISF to a modern cross-platform GUI application | closed | 2026-08-11 |
 | #2 | feat(src): choose GUI stack & scaffold cross-platform CMake build (Win/macOS/Linux) | closed | 2026-08-10 |
 | #3 | feat(src): port structural-analysis + RC-design + Flexible-Polyhedron engine as a headless library | closed | 2026-08-10 |
 | #4 | feat(src): multi-threaded optimization core with configurable core count + cancellable progress | closed | 2026-08-10 |
@@ -1267,10 +1267,10 @@ for skills that apply to the current task and follow them.
 | #17 | feat(src): add a Regenerate Seed button to the Run panel | closed | 2026-08-11 |
 | #18 | feat(src): AutoCAD-style in-progress guidance while adding joints/members | closed | 2026-08-11 |
 | #19 | feat(src): custom borderless window chrome + modern ImGui theme (cross-platform) | closed | 2026-08-11 |
-| #20 | epic(src): joints/members list panel, 2D plane-locked drawing, UCS icon | open | 2026-08-11 |
-| #21 | feat(src): add a Joints/Members list panel (editable, delete-with-cascade-warning) | ready-for-review | 2026-08-11 |
-| #22 | feat(src): 2D plane-locked drawing (X-Y/X-Z/Y-Z orthographic views + adjustable offset) | ready-for-review | 2026-08-11 |
-| #23 | feat(src): UCS icon overlay in the viewport | ready-for-review | 2026-08-11 |
+| #20 | epic(src): joints/members list panel, 2D plane-locked drawing, UCS icon | closed | 2026-08-11 |
+| #21 | feat(src): add a Joints/Members list panel (editable, delete-with-cascade-warning) | closed | 2026-08-11 |
+| #22 | feat(src): 2D plane-locked drawing (X-Y/X-Z/Y-Z orthographic views + adjustable offset) | closed | 2026-08-11 |
+| #23 | feat(src): UCS icon overlay in the viewport | closed | 2026-08-11 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
