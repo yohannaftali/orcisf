@@ -384,6 +384,16 @@ void Application::OnFrame() {
     bool can_export_inf = editable_.has_value();
     toolbar_.Draw(undo_stack_.CanUndo(), undo_stack_.CanRedo(), can_save, can_export_text, can_export_pdf,
                   can_export_inf, editor_options_);
+
+    // Ctrl+S was only ever a display hint on the File > Save menu item
+    // (ImGui::MenuItem's shortcut text is cosmetic, it doesn't bind the
+    // key) -- actually wire it here. No text-input focus check: none of
+    // this app's text fields are multi-line/expect Ctrl+S themselves, so
+    // there's no conflicting consumer to route around.
+    if (can_export_text && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S)) {
+        OnSaveRequested();
+    }
+
     BuildDockspace();
 
     gui::EditableStructure* editable_ptr = editable_ ? &*editable_ : nullptr;

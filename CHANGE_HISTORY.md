@@ -806,3 +806,48 @@ history only; don't duplicate current-state description here.
   explicit close action). Worth noting since the interactive-GUI
   verification gap above was flagged at the same time; reopen if that
   gap turns out to matter.
+
+## 2026-08-11 — Interactive verification of the New Data flow; Ctrl+S fix
+
+- Closed the "not verified interactively" gap flagged in the two entries
+  above: drove `orcisf_gui.exe` with synthesized mouse/keyboard input
+  (Win32 `SetCursorPos`/`mouse_event`, DPI-aware -- `SetProcessDPIAware()`
+  was required for `SetCursorPos` coordinates to match actual screen
+  pixels, a per-monitor-DPI machine otherwise silently misplaces every
+  click) and screenshots, end to end:
+  - `File` menu opens with all items correctly labeled and enabled/
+    disabled as coded (`Save`/`Save As...`/exports greyed out with
+    nothing loaded).
+  - `New Data` opened the real native Save-As dialog (pre-filled
+    `struktur.inp`, `ORCISF Dataset (*.inp)` filter); typed a scratch
+    path, saved -- app logged "Started a new structure at: ..." and all
+    7 legacy files actually appeared on disk.
+  - The new `PropertiesPanel` "General" section rendered correctly
+    (Title/E/G/f'c/fy/fyt + auto-calculated Structural Parameters, all
+    zero for the blank structure).
+  - Typed into the Title field, tabbed out, clicked `File > Save` --
+    confirmed the edit round-tripped to the `.inp` file on disk.
+- **Bug found during this pass and fixed:** `Ctrl+S` was display-only.
+  `ImGui::MenuItem`'s shortcut-text parameter is cosmetic -- it does not
+  bind the key chord, and no separate keyboard handler existed. Fixed by
+  adding `ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S)` in
+  `Application::OnFrame()`, gated on the same `can_export_text` condition
+  the menu item itself uses. Re-verified with the actual key chord (not
+  a menu click): typed a new title, pressed Ctrl+S, confirmed the `.inp`
+  file changed and the log line read "Saved: ...".
+- **Environment hazard hit mid-pass (not this project's bug):** a
+  separate, live browser-automation session repeatedly stole foreground
+  focus from `orcisf_gui.exe`, and on one retry a `SetForegroundWindow`
+  call silently failed, sending a `Ctrl+A` + typed path + Enter into
+  VS Code's file explorer instead (it opened several `Example/Data04+3`
+  files as tabs -- no edits, `git status` confirmed no repo files were
+  touched). Recovered by re-verifying `GetForegroundWindow() == target`
+  before every input sequence from that point on, and by getting exact
+  click coordinates via `GetClientRect`/`ClientToScreen` instead of
+  eyeballing screenshot pixel positions (which was itself unreliable --
+  small cropped screenshots appear to get silently resized for display,
+  breaking manual pixel math; the fix was cropping at 2x with
+  nearest-neighbor scaling and reading text directly off the crop rather
+  than computing from perceived proportions).
+- Files: `src/app/Application.cpp` (Ctrl+S fix only -- the verification
+  itself touched no code)

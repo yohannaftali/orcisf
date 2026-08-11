@@ -526,12 +526,22 @@ than risk showing numbers the user never entered.
   against the checked-in `aplikasi.inf` -- numerically identical (only
   whitespace/column-alignment differs, since the new writer uses
   tab-separated output rather than `CETAK.HPP`'s `setw()` column
-  formatting). **Not verified interactively in this environment:**
-  actually clicking `New Data`/`Open Data...`/`Save`/`Save As...`/`Export
-  INF Preview...` or typing into the new General-section fields in the
-  live GUI (would need synthesized mouse/keyboard input, as issue #6's PR
-  used, which wasn't performed for this pass) -- the code path was
-  reasoned through and unit-tested at the engine level instead.
+  formatting).
+- **Interactively verified in a follow-up pass** (synthesized Win32
+  mouse/keyboard input + screenshots, same technique issue #6 used --
+  see `CHANGE_HISTORY.md`'s 2026-08-11 "Interactive verification" entry
+  for the full account, including a DPI-awareness pitfall and an
+  unrelated-window-focus hazard hit along the way): `New Data` opening
+  the real native Save-As dialog, saving actually writing all 7 files,
+  the General section rendering and being live-editable (typed a title,
+  confirmed it round-tripped through `File > Save` to the `.inp` file on
+  disk). This also caught a real bug: **`Ctrl+S` was display-only** --
+  `ImGui::MenuItem`'s shortcut-text parameter doesn't bind the key
+  chord by itself. Fixed with an explicit
+  `ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S)` check in
+  `Application::OnFrame()`, gated on the same `can_export_text`
+  condition the menu item uses, and re-verified with the actual key
+  chord (not a menu click).
 
 **`gui/viewport/` (issue #5) — three things worth knowing before touching it:**
 - **Member cross-section thickness/orientation is a schematic
