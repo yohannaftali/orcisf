@@ -840,11 +840,17 @@ and issue #30:**
 - **`ViewportPanel::Draw()`'s icon header consumes a little of
   `ImGui::GetContentRegionAvail()`** before the 3D render texture size
   is computed -- intentional and harmless, not a bug.
-- **Confirmed genuinely working via a real screenshot** (issue #29's
-  retest pass): the small hand-drawn icon renders correctly before
-  "Viewport"'s title text in the panel's content area, exactly as
-  designed. This is the one part of #28 that's actually verified, not
-  just compiled-and-launched.
+- **Confirmed genuinely working via real screenshots**, first for
+  Viewport (issue #29's retest pass), then re-confirmed on a fresh build
+  plus two more panels (Properties, Log) in a dedicated "build and test
+  #28" pass: the small hand-drawn icon renders correctly before each
+  panel's title text in its content area, exactly as designed. The
+  remaining four panels (`RunPanel`, `LoadsPanel`, `JointsMembersPanel`,
+  `DetailingPanel`) weren't individually screenshotted -- they call the
+  exact same `DrawPanelIconHeader()` function, so three-for-three
+  confirmations across genuinely different panels is treated as
+  sufficient confidence for the rest rather than clicking through every
+  remaining tab for marginal additional certainty.
 
 **Part 1 (Alt-mnemonics) was reverted -- Dear ImGui does NOT parse
 `&`-prefixed labels; this was a wrong assumption, caught by actually

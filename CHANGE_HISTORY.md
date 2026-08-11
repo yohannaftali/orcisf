@@ -1661,3 +1661,19 @@ history only; don't duplicate current-state description here.
   the full account plus a lesson for the next attempt (always recompute
   click coordinates fresh from the most recent screenshot's own physical
   pixel space, consider keyboard-only navigation for native dialogs).
+
+## 2026-08-11 — "Build and test issue #28": rebuild + panel-icon re-confirmation
+
+- Used the `rebuild` skill to confirm `main`'s current state (mnemonic
+  revert + panel icons) is already built (`ninja: no work to do`).
+- Re-launched with the `AttachThreadInput` foreground-grab technique
+  (worked reliably again) and a DPI-aware physical-pixel screenshot:
+  re-confirmed plain menu labels (no stray `&`) and the Viewport panel's
+  icon header, then additionally confirmed the Properties and Log
+  panels' icon headers via targeted crops of the same screenshot --
+  three different panels now individually verified, all going through
+  the same `DrawPanelIconHeader()` code path, giving high confidence in
+  the remaining four (`RunPanel`/`LoadsPanel`/`JointsMembersPanel`/
+  `DetailingPanel`) without clicking through every tab individually.
+- No code changes -- this was a verification-only pass. Issue #28 stays
+  closed; no new issues found.
