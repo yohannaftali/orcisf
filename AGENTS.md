@@ -696,6 +696,62 @@ two different valid positive seeds).
   exact `connect_first_joint` state check already proven correct
   elsewhere in this file).
 
+**`gui/JointsMembersPanel.{h,cpp}` (issue #21, part of epic #20) — read
+before touching this panel or `EditableStructure::DeleteJoint()`'s
+callers:**
+- **Docked as "Joints/Members", tabbed alongside "Loads" in all three
+  view-layout presets** (`Application.cpp`'s `BuildDefaultLayout()`/
+  `BuildDesignLayout()`/`BuildOptimizationLayout()`) -- mirrors where
+  `LoadsPanel` lives, since both are tabular schedule/list panels over the
+  same `SceneModel`.
+- **Reuses `LoadsPanel`'s exact pattern deliberately, not a new one**:
+  `ImGui::Selectable(..., ImGuiSelectableFlags_SpanAllColumns)` per row
+  syncing `Selection` (so the 3D viewport highlights/frames the clicked
+  row), inline `ImGui::InputFloat` + `IsItemDeactivatedAfterEdit()` for
+  numeric edits, `SmallButton("Delete")` per row. Joint position edits go
+  through `EditableStructure::MoveJoint()` -- the **same** call path the
+  ImGuizmo gizmo and Properties panel's numeric fields already use, so
+  this is a third *entry point* to move a joint, not a second
+  implementation of movement.
+- **Deleting a joint that has connected members now shows a confirmation
+  modal listing which members will also be deleted, instead of deleting
+  silently.** `EditableStructure::DeleteJoint()` itself is unchanged --
+  it already cascades (see the `gui/editor/` note above) -- this panel
+  just computes the touching-member list itself (`TouchingMembers()` in
+  `JointsMembersPanel.cpp`, a read-only walk of `sd.JJ`/`sd.JK`) *before*
+  calling `DeleteJoint()`, and only calls it immediately (no modal) when
+  that list is empty. A joint delete from the 3D viewport or Properties
+  panel (if either grows one later) does **not** get this warning --
+  scoped to this panel only, per issue #21's acceptance criteria; extend
+  the same `TouchingMembers()` + modal pattern there if a future issue
+  asks for it.
+- **The confirmation popup's `OpenPopup`/`BeginPopupModal` calls
+  deliberately live outside each row's `ImGui::PushID(joint_id)` scope.**
+  `ImGui::OpenPopup(str_id)` hashes the popup's ID together with
+  whatever's on the current ID stack -- calling it *inside* a row's
+  `PushID` would produce a per-row-unique popup ID that
+  `BeginPopupModal` (called once, outside any row loop) could never
+  match, so the modal would silently never open. The fix: the Delete
+  button handler only sets a `bool& open_delete_popup` out-parameter and
+  pending-state fields; `JointsMembersPanel::Draw()` calls
+  `ImGui::OpenPopup()` itself after the table/row loop has fully
+  unwound. Caught by reasoning through ImGui's ID-stack model while
+  writing this, not by interactive testing -- **this panel has not yet
+  been interactively verified in a running build** (no local build
+  toolchain available in this environment this session, see Validation
+  below); re-verify the modal actually opens on a real cascade-delete
+  before treating #21 as fully done.
+- **What was verified vs. not:** the code follows `LoadsPanel`'s and
+  `PropertiesPanel`'s already-proven patterns (row selection sync,
+  inline edit commit, `math3d::Vec3` construction) exactly, and
+  `EditableStructure`'s public API/field names (`JJ`/`JK`/`M`/`SdForUndo()`)
+  were cross-checked against `EditableStructure.h`/`.cpp` directly. No
+  `cmake`/build toolchain was available in this environment this session
+  to compile-check or interactively exercise it -- say so explicitly if
+  asked, don't claim it was built or run. CI
+  (`.github/workflows/build-src.yml`) is the first real compile check
+  this change will get.
+
 **Custom borderless window chrome (issue #19, Phase 0) — read before
 touching `app/CustomTitleBar.{h,cpp}`/`app/Theme.{h,cpp}`/`main.cpp`'s
 window setup:**
@@ -1104,7 +1160,7 @@ for skills that apply to the current task and follow them.
 | #18 | feat(src): AutoCAD-style in-progress guidance while adding joints/members | closed | 2026-08-11 |
 | #19 | feat(src): custom borderless window chrome + modern ImGui theme (cross-platform) | closed | 2026-08-11 |
 | #20 | epic(src): joints/members list panel, 2D plane-locked drawing, UCS icon | open | 2026-08-11 |
-| #21 | feat(src): add a Joints/Members list panel (editable, delete-with-cascade-warning) | open | 2026-08-11 |
+| #21 | feat(src): add a Joints/Members list panel (editable, delete-with-cascade-warning) | ready-for-review | 2026-08-11 |
 | #22 | feat(src): 2D plane-locked drawing (X-Y/X-Z/Y-Z orthographic views + adjustable offset) | open | 2026-08-11 |
 | #23 | feat(src): UCS icon overlay in the viewport | open | 2026-08-11 |
 

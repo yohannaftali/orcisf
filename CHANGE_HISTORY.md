@@ -1161,3 +1161,26 @@ history only; don't duplicate current-state description here.
     only the confirmation warning is new scope (#21).
   - Epic #20's body was PATCHed after sub-issue creation to link the real
     issue numbers, following the #1/#13 epic pattern.
+
+## 2026-08-11 — feat(src): implement issue #21 (Joints/Members list panel)
+
+- Added `src/gui/JointsMembersPanel.{h,cpp}`: a "Joints/Members" panel,
+  docked alongside "Loads" in all three view-layout presets, listing
+  every joint (X/Y/Z inline-editable, restraint toggle, delete) and
+  member (joint A/B, delete) in the loaded dataset. Reuses `LoadsPanel`'s
+  row-select/inline-edit pattern; joint moves go through the same
+  `EditableStructure::MoveJoint()` the gizmo/Properties panel already use.
+- Deleting a joint with connected members now shows a confirmation modal
+  (which members will be deleted) before calling
+  `EditableStructure::DeleteJoint()` -- that function's cascade-delete
+  behavior itself is unchanged (pre-existing, see `gui/editor/` notes);
+  only the warning is new, and only from this panel.
+- Wired into `src/app/Application.{h,cpp}` (new panel member, dock
+  windows, `OnFrame()` draw call) and `src/CMakeLists.txt` (new source
+  file).
+- No local `cmake`/build toolchain was available in this environment this
+  session -- the change was reviewed against `LoadsPanel.cpp`/
+  `PropertiesPanel.cpp`'s exact patterns and `EditableStructure.h`'s
+  actual API, but **not compiled or interactively run**. CI is the first
+  real build check. Issue #21 status set to `ready-for-review`, not
+  `done`, until that's confirmed.

@@ -373,6 +373,7 @@ void BuildDefaultLayout(ImGuiID dock_main) {
     ImGui::DockBuilderDockWindow("Properties", dock_right);
     ImGui::DockBuilderDockWindow("Run Optimization", dock_right);
     ImGui::DockBuilderDockWindow("Loads", dock_bottom);
+    ImGui::DockBuilderDockWindow("Joints/Members", dock_bottom);
     ImGui::DockBuilderDockWindow("Log", dock_bottom);
 }
 
@@ -391,6 +392,7 @@ void BuildDesignLayout(ImGuiID dock_main) {
     ImGui::DockBuilderDockWindow("Detailing", dock_main);
     ImGui::DockBuilderDockWindow("Properties", dock_right);
     ImGui::DockBuilderDockWindow("Loads", dock_bottom);
+    ImGui::DockBuilderDockWindow("Joints/Members", dock_bottom);
     ImGui::DockBuilderDockWindow("Run Optimization", dock_bottom_right);
     ImGui::DockBuilderDockWindow("Log", dock_bottom_right);
 }
@@ -410,6 +412,7 @@ void BuildOptimizationLayout(ImGuiID dock_main) {
     ImGui::DockBuilderDockWindow("Detailing", dock_right);
     ImGui::DockBuilderDockWindow("Properties", dock_right_bottom);
     ImGui::DockBuilderDockWindow("Loads", dock_right_bottom);
+    ImGui::DockBuilderDockWindow("Joints/Members", dock_right_bottom);
 }
 
 } // namespace
@@ -482,6 +485,8 @@ void Application::OnFrame() {
     properties_panel_.Draw(&properties_open_, scene_, selection_, editable_ptr, &undo_stack_, validation_issues_,
                             on_geometry_changed);
     loads_panel_.Draw(&loads_open_, scene_, selection_, editable_ptr, &undo_stack_, on_geometry_changed);
+    joints_members_panel_.Draw(&joints_members_open_, scene_, selection_, editable_ptr, &undo_stack_,
+                                on_geometry_changed);
     detailing_panel_.Draw(&detailing_open_, scene_, selection_);
     run_panel_.Draw(&run_open_);
     log_panel_.Draw(&log_open_);
