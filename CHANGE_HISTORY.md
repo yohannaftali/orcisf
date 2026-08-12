@@ -2678,3 +2678,19 @@ the shared mechanism.
   `InputText` cell underneath -- the user has to click further down before
   the input becomes editable. Affects all three panels sharing this pattern
   (#21/#36).
+
+## [2026-08-12] — fix(src): implement issue #38 -- preset tab grouping fix
+
+- Default preset: Log moved out of the bottom Joints/Members/Loads strip
+  into the right-side node, now tabbed Properties -> Optimization -> Log.
+- Design preset: removed the separate `dock_bottom_right` split; Properties
+  (previously alone in its own column) is now tabbed together with
+  Optimization and Log in one right-side node, same order.
+- Tab order needed no `Draw()` call reordering in `OnFrame()` -- the
+  existing call sequence already puts Properties/Run/Log in the right
+  relative order (established convention from #36: `DockBuilderDockWindow()`
+  call order doesn't control on-screen tab order, `Draw()` call order does).
+- `BuildOptimizationLayout()` untouched, confirmed unaffected.
+- Verified interactively via screenshots of all three presets switched
+  through the View > Layout menu.
+- Files: `src/app/Application.cpp`, `AGENTS.md`

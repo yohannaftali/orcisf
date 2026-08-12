@@ -1110,6 +1110,22 @@ before touching `Application::OnFrame()`'s per-panel `Draw()` calls,
   re-clicked (low risk; details: `CHANGE_HISTORY.md`, 2026-08-11,
   issue #37).
 
+**Preset tab grouping fix (issue #38, follow-up to #15/#36/#37) — read
+before touching `BuildDefaultLayout()`/`BuildDesignLayout()`:** Properties,
+Optimization, and Log are now tabbed together in one right-side dock node
+in both the Default and Design presets (Log used to sit in the bottom
+Joints/Members/Loads strip in Default; Design used to split Optimization+Log
+into a separate `dock_bottom_right` node while Properties sat alone --
+that extra split is gone). Tab order (Properties -> Optimization -> Log)
+needed no `OnFrame()` `Draw()`-call reordering -- the existing call order
+(Viewport, Properties, Joints, Members, Loads, Detailing, Run, Log)
+already puts these three in the right relative sequence, per the
+`DockBuilderDockWindow()`-order-doesn't-matter convention from #36.
+`BuildOptimizationLayout()` is untouched. **Verified interactively** via
+screenshots of all three presets: Default (Properties/Optimization/Log
+grouped, bottom strip is Joints/Members/Loads only), Design (same
+right-side grouping, no leftover empty node), Optimization (unchanged).
+
 **2D plane-locked drawing (issue #22, part of epic #20) — read before
 touching `gui/viewport/Camera.{h,cpp}`, `gui/viewport/Math3D.h`'s
 `Orthographic()`, or `ViewportPanel`'s `add_joint_mode` branch:**
@@ -1896,7 +1912,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #35 | fix(src): move panel icons onto the dock tab button, remove the in-content icon+title header row (#28 correction) | ready-for-review | 2026-08-11 |
 | #36 | feat(src): split Joints/Members panel into separate Joints and Members panels; order Loads tab immediately after them | ready-for-review | 2026-08-11 |
 | #37 | feat(src): View menu Menubar/Subwindows/Layout sections + fix tab close button + rename "Run Optimization" panel | ready-for-review | 2026-08-11 |
-| #38 | fix(src): move Log tab into right-side Properties/Optimization group; fix Design preset's Properties/Optimization/Log tab order | open | 2026-08-12 |
+| #38 | fix(src): move Log tab into right-side Properties/Optimization group; fix Design preset's Properties/Optimization/Log tab order | ready-for-review | 2026-08-12 |
 | #39 | feat(src): editable member type/joint endpoints + Add Member/Add Joint buttons, with joint/member labels in viewport | open | 2026-08-12 |
 | #40 | feat(src): per-DOF joint restraint editing (6 checkboxes + Fixed/Pinned/Roller/Free quick-support buttons) | open | 2026-08-12 |
 | #41 | fix(src): row-selection Selectable overlaps/covers editable input cells in Joints/Members/Loads tables | open | 2026-08-12 |

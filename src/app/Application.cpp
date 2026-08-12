@@ -364,48 +364,52 @@ namespace {
 
 // Issue #15's "Default" preset -- exactly the single fixed layout this app
 // always had (no regression for existing users): Viewport/Detailing
-// large+center, Properties/Optimization (renamed from "Run Optimization",
-// issue #37) tabbed on the right, Joints/Members/Loads/Log tabbed along
-// the bottom (issue #36 split what used to be a single combined
-// Joints/Members tab into two).
+// large+center, Properties/Optimization/Log (renamed from "Run
+// Optimization", issue #37; regrouped with Log here per issue #38 -- Log
+// used to sit in the bottom strip instead) tabbed on the right,
+// Joints/Members/Loads tabbed along the bottom (issue #36 split what used
+// to be a single combined Joints/Members tab into two).
 void BuildDefaultLayout(ImGuiID dock_main) {
     ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.25f, nullptr, &dock_main);
     ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.25f, nullptr, &dock_main);
 
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kViewportId).c_str(), dock_main);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kDetailingId).c_str(), dock_main);
+    // Issue #38: Properties, Optimization, Log tabbed together here -- tab
+    // order (Properties -> Optimization -> Log) comes from OnFrame()'s
+    // Draw() call order, not from the order they're listed below (see the
+    // comment there, established by issue #36).
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kPropertiesId).c_str(), dock_right);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kRunOptimizationId).c_str(), dock_right);
-    // Issue #36: these three (plus Log) end up tabbed together in this
-    // node -- the actual left-to-right tab order comes from OnFrame()'s
-    // panel Draw() call order, not from the order they're listed here
-    // (see the comment there).
-    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kJointsId).c_str(), dock_bottom);
-    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kMembersId).c_str(), dock_bottom);
-    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLoadsId).c_str(), dock_bottom);
-    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLogId).c_str(), dock_bottom);
-}
-
-// "Design" preset: focuses on geometry/load input -- Viewport+Detailing
-// stay large, Properties gets its own dedicated (not shared/tabbed) column,
-// Loads gets a bigger bottom strip. Optimization/Log are still present,
-// just tabbed in less prominent corners rather than hidden -- nothing a
-// Design-focused user needs is ever unreachable.
-void BuildDesignLayout(ImGuiID dock_main) {
-    ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.22f, nullptr, &dock_main);
-    ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.32f, nullptr, &dock_main);
-    ImGuiID dock_bottom_right =
-        ImGui::DockBuilderSplitNode(dock_bottom, ImGuiDir_Right, 0.3f, nullptr, &dock_bottom);
-
-    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kViewportId).c_str(), dock_main);
-    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kDetailingId).c_str(), dock_main);
-    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kPropertiesId).c_str(), dock_right);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLogId).c_str(), dock_right);
     // Issue #36: tab order (Joints, Members, Loads) comes from OnFrame().
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kJointsId).c_str(), dock_bottom);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kMembersId).c_str(), dock_bottom);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLoadsId).c_str(), dock_bottom);
-    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kRunOptimizationId).c_str(), dock_bottom_right);
-    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLogId).c_str(), dock_bottom_right);
+}
+
+// "Design" preset: focuses on geometry/load input -- Viewport+Detailing
+// stay large, Loads gets a bigger bottom strip. Properties/Optimization/Log
+// are tabbed together in a single right-side column (issue #38 -- Properties
+// used to be alone in this column with Optimization+Log split into a
+// separate bottom-right node; that extra split is gone) -- still present,
+// just tabbed in a less prominent corner rather than hidden, so nothing a
+// Design-focused user needs is ever unreachable.
+void BuildDesignLayout(ImGuiID dock_main) {
+    ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.22f, nullptr, &dock_main);
+    ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.32f, nullptr, &dock_main);
+
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kViewportId).c_str(), dock_main);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kDetailingId).c_str(), dock_main);
+    // Issue #38: tab order (Properties -> Optimization -> Log) comes from
+    // OnFrame()'s Draw() call order, same convention as #36 below.
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kPropertiesId).c_str(), dock_right);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kRunOptimizationId).c_str(), dock_right);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLogId).c_str(), dock_right);
+    // Issue #36: tab order (Joints, Members, Loads) comes from OnFrame().
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kJointsId).c_str(), dock_bottom);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kMembersId).c_str(), dock_bottom);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLoadsId).c_str(), dock_bottom);
 }
 
 // "Optimization" preset (a view-layout preset name, distinct from the
