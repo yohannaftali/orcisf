@@ -245,6 +245,25 @@ sample datasets.
   `Optimasi Beton/Source/ORCISF.ide`. See [`AGENTS.md`](AGENTS.md) for
   details.
 
+## Algorithms
+
+Every formula this application implements — load handling, structural
+analysis, beam/column design, and the Flexible Polyhedron optimizer — is
+documented in `documentation/`, with each formula cited against both the
+original 1999 source and the modern `src/engine/` port:
+
+- [A. Loads](documentation/loads.md) — reading load input, self-weight
+  calculation, assembling the global load vector.
+- [B. Structural Analysis](documentation/structural-analysis.md) — inertia/
+  torsion constants, member inclination ("kemiringan"), stiffness matrix
+  assembly, the modified-Choleski solve, and recovering displacements/
+  forces/reactions.
+- [C. Beam](documentation/beam.md) — flexural, shear, and deflection design.
+- [D. Column](documentation/column.md) — slenderness, biaxial P-M
+  interaction, and stirrup design.
+- [E. Optimization](documentation/optimization.md) — the Flexible
+  Polyhedron (Nelder–Mead family) direct-search method.
+
 ## Documentation
 
 The full thesis manuscript (Indonesian, legacy MS Word `.doc` format) is under

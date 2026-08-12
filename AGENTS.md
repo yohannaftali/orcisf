@@ -71,6 +71,11 @@ orcisf/
 ├── icons/                           # app icon set (issue #26 wires this into src/'s build --
 │                                    # windows/orcisf.ico, macos/orcisf.icns, linux/+png/ PNG
 │                                    # sizes, variants/ concepts; see icons/README.txt)
+├── documentation/                   # epic #43: per-algorithm formula docs (A-E, one .md each),
+│                                    # linked from README.md's "Algorithms" section -- every
+│                                    # formula cites both the legacy Optimasi Beton/Source/*.hpp
+│                                    # and the modern src/engine/ port; each page opens/closes
+│                                    # with a "🏠 Home" link back to README.md#algorithms
 └── Optimasi Beton/                  # the original 1998-1999 thesis deliverable
     ├── BacaSaya.txt                 # original Indonesian README / user manual
     ├── orcisf.exe / orcisf.ico      # compiled Win32 console binary + icon
@@ -2142,12 +2147,12 @@ later, different one (e.g. closing an issue or cutting a release).
 | #40 | feat(src): per-DOF joint restraint editing (6 checkboxes + Fixed/Pinned/Roller/Free quick-support buttons) | closed | 2026-08-12 |
 | #41 | fix(src): row-selection Selectable overlaps/covers editable input cells in Joints/Members/Loads tables | closed | 2026-08-12 |
 | #42 | fix(src): JRL/AJ arrays sized kMak but indexed 6x-per-joint -- latent OOB past ~137 joints | closed | 2026-08-12 |
-| #43 | epic(docs): document all algorithms/formulas used in the application | open | 2026-08-12 |
-| #44 | docs(loads): document load input, self-weight calculation, and load vector assembly | open | 2026-08-12 |
-| #45 | docs(structural-analysis): document inertia/kemiringan, matrix assembly, modified Choleski, and result recovery | open | 2026-08-12 |
-| #46 | docs(beam): document beam flexural, shear, and deflection design | open | 2026-08-12 |
-| #47 | docs(column): document column slenderness, biaxial interaction, and stirrup design | open | 2026-08-12 |
-| #48 | docs(optimization): document the Flexible Polyhedron (Nelder-Mead family) algorithm | open | 2026-08-12 |
+| #43 | epic(docs): document all algorithms/formulas used in the application | ready-for-review | 2026-08-12 |
+| #44 | docs(loads): document load input, self-weight calculation, and load vector assembly | ready-for-review | 2026-08-12 |
+| #45 | docs(structural-analysis): document inertia/kemiringan, matrix assembly, modified Choleski, and result recovery | ready-for-review | 2026-08-12 |
+| #46 | docs(beam): document beam flexural, shear, and deflection design | ready-for-review | 2026-08-12 |
+| #47 | docs(column): document column slenderness, biaxial interaction, and stirrup design | ready-for-review | 2026-08-12 |
+| #48 | docs(optimization): document the Flexible Polyhedron (Nelder-Mead family) algorithm | ready-for-review | 2026-08-12 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

@@ -3000,3 +3000,53 @@ the shared mechanism.
   Step 1B check: #24, #25, #26, #28, #30, #32 were all already `closed`
   on GitHub but still showed `ready-for-review` in `AGENTS.md`.
 - Files: `AGENTS.md`, `CHANGE_HISTORY.md`
+
+
+## [2026-08-12] — feat(docs): implement algorithm-documentation epic #43-#48
+
+- New `documentation/` folder (root), one page per lettered section, each
+  opening/closing with a "🏠 Home" link back to `README.md#algorithms`
+  (the new "Algorithms" section added there, indexing all five pages):
+  - `loads.md` (#44) -- `.bbn` format, member-load fixed-end-force
+    formulas, self-weight (beam-as-distributed-load vs.
+    column-as-joint-point-load), and the `beban()`/`Beban()` global
+    load-vector assembly.
+  - `structural-analysis.md` (#45) -- cross-section inertia/torsion
+    (including the Roark's-formula branch), member inclination
+    ("kemiringan"/`periksa_batang()`), local-to-global stiffness matrix
+    assembly + banded superposition, the modified-Choleski
+    `banfac()`/`bansol()` solve, and full result recovery
+    (`hasil()`: displacements, member forces, support reactions).
+  - `beam.md` (#46) -- the lapangan/tumpuan dual-region design rationale,
+    Whitney-stress-block flexural design, stirrup/shear design, and the
+    cracked-transformed-section deflection check.
+  - `column.md` (#47) -- reinforcement ratio/spacing, slenderness,
+    Hulse & Mosley's equivalent-uniaxial biaxial P-M interaction method
+    (including the false-position root-finding search for the neutral
+    axis), and stirrup design.
+  - `optimization.md` (#48) -- the discrete design-variable model
+    (`JVD`), the fitness function, and the full Flexible Polyhedron
+    driver loop (centroid search direction, discrete-step new-point
+    search, replace-or-shrink, convergence), explicitly mapped against
+    classic Nelder-Mead's reflect/expand/contract/shrink steps to show
+    what's the same and what's adapted; a summary-level pointer to
+    `AGENTS.md`'s already-authoritative issue #4 threading notes rather
+    than duplicating them.
+- Every formula cites both the original 1999 Borland source
+  (`Optimasi Beton/Source/*.hpp`, exact line ranges) and the modern
+  `src/engine/` port (exact file/function), per the epic's own
+  requirement and the user's explicit "code-cited, not theory-only"
+  confirmation when this epic was planned. Verified every cited legacy
+  file/line range and every cited modern file exists and matches (spot-
+  checked function-boundary lines directly against the source).
+- This is documentation only -- no `src/` code changed, nothing to
+  build or run; verification was reading the actual source line-by-line
+  against what each page claims, not a compile/GUI check.
+- Per this project's standing overnight-autonomous-work convention (see
+  the 2026-08-11/2026-08-12 entries for issues #38-#42), issues #43-#48
+  are left **open** for the user's own review rather than closed
+  automatically.
+- Files: `README.md`, `documentation/loads.md`,
+  `documentation/structural-analysis.md`, `documentation/beam.md`,
+  `documentation/column.md`, `documentation/optimization.md`,
+  `AGENTS.md`
