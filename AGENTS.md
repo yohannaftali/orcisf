@@ -1177,6 +1177,85 @@ any `ImGui::Selectable(...)` row in `JointsPanel.cpp`/`MembersPanel.cpp`/
   `ImGui::IsMouseClicked()`) and remove it again before committing,
   don't leave it in.
 
+**Editable member type/endpoints, Add Member/Add Joint buttons, viewport
+number labels (issue #39) — read before touching `EditableStructure::
+SetMemberEndpoints()`/`SetMemberTypeOverride()`, `MembersPanel.cpp`/
+`JointsPanel.cpp`'s new top-right buttons, or `ViewportPanel.cpp`'s
+`DrawEntityLabels()`:**
+- **A member's beam/column type is purely geometry-derived (`CXZ`,
+  `periksa_batang()`) throughout `engine::StructuralAnalysis`/`Optimizer`
+  (design-variable count `JVD`, self-weight direction, the RC design
+  path) — this port deliberately does NOT let the Members panel's type
+  dropdown change that.** The dropdown (`EditableStructure::
+  SetMemberTypeOverride()`/`GetMemberTypeOverride()`, 0/1/2 =
+  Auto/Beam/Column, a new GUI-only `std::array<int, kMak>` inside
+  `EditableStructure`, shifted in lockstep with `JJ`/`JK`/`IA` on
+  Add/DeleteMember) only affects this port's own display (folded into
+  `MemberVisual::is_beam` via a new optional `BuildSceneModel()`
+  parameter — viewport color, Properties/Detailing panel labels) — a
+  `Run` always uses the real geometry-derived classification, never this
+  override. This was a deliberate, documented engineering call (not an
+  oversight): silently letting a GUI dropdown change what the ported 1999
+  algorithm's core classification computes would risk corrupting
+  analysis/optimization results for a cosmetic convenience, exactly the
+  kind of "don't fix a deliberate deviation" risk this file's `engine/`
+  section warns about elsewhere. Instead, `EditableStructure::Validate()`
+  gained a check: whenever a member's override disagrees with its actual
+  geometry, it surfaces as a Properties-panel validation issue (e.g.
+  *"Member 1's selected type (Column) doesn't match its geometry (would
+  classify as Beam) -- a Run always uses the geometry-derived type"*) so
+  the user is warned rather than silently misled. **Confirmed
+  interactively**: setting a horizontal test member's override to
+  "Column" immediately updated the Properties panel title to "Batang 1
+  (Kolom)" and produced exactly that validation warning.
+- **`EditableStructure::SetMemberEndpoints(member_id, joint_a, joint_b)`**
+  (new) backs the Members panel's editable Joint A/Joint B cells —
+  validates `joint_a != joint_b` and both in `[1, NJ]` *before* touching
+  `sd_.JJ`/`sd_.JK`, returning `false` (arrays untouched) on any invalid
+  input, so an in-progress/bad edit (e.g. a joint number that doesn't
+  exist) can never corrupt the compacted-index invariant. **Confirmed
+  interactively**: retargeting a member's Joint A from 2 to 1 correctly
+  reconnected it in the viewport and updated its computed length in
+  Properties; typing an out-of-range value (99, with only 3 joints
+  present) left Joint A/B and the computed length completely unchanged —
+  the edit was silently rejected, not applied-then-caught.
+- **"+ Add Member"/"+ Add Joint" (top-right of `MembersPanel`/
+  `JointsPanel`, above the table header)** insert a *real* member/joint
+  immediately via the existing `AddMember()`/`AddJoint()` (never a
+  "pending" row — the fixed-size legacy `JJ`/`JK`/`X`/`Y`/`Z` arrays have
+  no concept of one), which the user then edits in place. Add Member
+  defaults to connecting the *last two* existing joints (disabled with a
+  tooltip if fewer than 2 joints exist, since `AddMember()` itself
+  already rejects `joint_a == joint_b`); Add Joint defaults to the
+  current joints' centroid (origin for an empty structure) — same
+  "produce something visible/editable, not a silent no-op" reasoning
+  issue #7 used for load-placement defaults. Both are additional entry
+  points alongside the pre-existing toolbar/viewport-click Add Joint flow
+  (#14/#18) and viewport connect-mode for members, not a replacement.
+  **Confirmed interactively**: from a blank structure, placed 3 joints
+  via viewport clicks, then Add Member correctly created a member
+  connecting joints 2 and 3.
+- **Viewport joint/member number labels (`ViewportPanel.cpp`'s new
+  `DrawEntityLabels()`)** are hand-drawn `ImDrawList` text (matching this
+  project's established icon-overlay approach, e.g. the UCS icon from
+  #23) but unlike that icon's direction-only dot-product projection, a
+  label needs a real world-to-screen point: `proj * view * point` (the
+  same matrices `SceneRenderer` already renders with) evaluated on the
+  CPU, perspective-divided, then mapped into the viewport image's pixel
+  rect. Points behind the eye (`w <= ~0`) or well outside the NDC range
+  are skipped rather than drawn off-screen. **Confirmed interactively**:
+  `J1`/`J2`/`J3` labels tracked each joint's cube correctly at its
+  on-screen position, and `M1` rendered at the connecting member's
+  midpoint, through multiple geometry edits (retargeting, add/delete).
+- **What was NOT part of this issue's scope**: the type-override array
+  is intentionally excluded from `UndoStack`'s `GeometrySnapshot` (it
+  lives in `EditableStructure`, not `engine::StructureData`, and
+  `GeometrySnapshot` only ever mutates `sd` directly) — an Undo/Redo
+  after setting a type override can leave the override pointing at a
+  member index that geometry undo just shifted. Documented here as a
+  known, deliberate scope limit rather than silently unhandled; revisit
+  only if a future issue specifically needs override/undo consistency.
+
 **2D plane-locked drawing (issue #22, part of epic #20) — read before
 touching `gui/viewport/Camera.{h,cpp}`, `gui/viewport/Math3D.h`'s
 `Orthographic()`, or `ViewportPanel`'s `add_joint_mode` branch:**
@@ -1964,7 +2043,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #36 | feat(src): split Joints/Members panel into separate Joints and Members panels; order Loads tab immediately after them | ready-for-review | 2026-08-11 |
 | #37 | feat(src): View menu Menubar/Subwindows/Layout sections + fix tab close button + rename "Run Optimization" panel | ready-for-review | 2026-08-11 |
 | #38 | fix(src): move Log tab into right-side Properties/Optimization group; fix Design preset's Properties/Optimization/Log tab order | ready-for-review | 2026-08-12 |
-| #39 | feat(src): editable member type/joint endpoints + Add Member/Add Joint buttons, with joint/member labels in viewport | open | 2026-08-12 |
+| #39 | feat(src): editable member type/joint endpoints + Add Member/Add Joint buttons, with joint/member labels in viewport | ready-for-review | 2026-08-12 |
 | #40 | feat(src): per-DOF joint restraint editing (6 checkboxes + Fixed/Pinned/Roller/Free quick-support buttons) | open | 2026-08-12 |
 | #41 | fix(src): row-selection Selectable overlaps/covers editable input cells in Joints/Members/Loads tables | ready-for-review | 2026-08-12 |
 

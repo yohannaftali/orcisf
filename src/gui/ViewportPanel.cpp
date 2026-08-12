@@ -6,6 +6,8 @@
 #include <imgui.h>
 #include <ImGuizmo.h>
 
+#include <string>
+
 #include "gui/PanelIcons.h"
 #include "gui/PanelTitles.h"
 #include "gui/UiScale.h"
@@ -63,6 +65,58 @@ void DrawUcsIcon(ImDrawList* dl, ImVec2 center, float radius, const Camera& came
         dl->AddCircleFilled(tip, Scaled(3.f), a.color);
         ImVec2 label_pos(tip.x + (tip.x >= center.x ? label_gap : -label_back), tip.y - label_rise);
         dl->AddText(label_pos, a.color, a.label);
+    }
+}
+
+// Issue #39: joint/member number labels, so a user cross-referencing the
+// Joints/Members tables against the 3D view can tell which dot/segment is
+// which row. Reuses this project's established hand-drawn-ImDrawList-
+// overlay approach (see DrawUcsIcon above / IconToolbar.cpp) rather than a
+// new text-rendering dependency -- ImGui's own AddText already does
+// everything needed here. Unlike the UCS icon's direction-only dot-product
+// projection, a label needs an actual world-to-screen point, so this does
+// a real clip-space projection (proj * view * point, perspective divide)
+// -- the same view/projection matrices SceneRenderer already renders with,
+// just evaluated on the CPU for these few label anchors instead of the GPU.
+void DrawEntityLabels(ImDrawList* dl, const SceneModel& scene, const Camera& camera, float aspect, ImVec2 image_min,
+                       ImVec2 image_size) {
+    Mat4 view = camera.ViewMatrix();
+    Mat4 proj = camera.ProjectionMatrix(aspect);
+    Mat4 vp = Mat4::Multiply(proj, view);
+
+    // Returns false for points behind the eye (w <= ~0) or far enough off
+    // to the side that drawing them would be pointless -- callers just
+    // skip the label for that entity this frame.
+    auto project = [&](const Vec3& world, ImVec2& out_screen) {
+        float x = world.x, y = world.y, z = world.z;
+        float cx = vp.m[0] * x + vp.m[4] * y + vp.m[8] * z + vp.m[12];
+        float cy = vp.m[1] * x + vp.m[5] * y + vp.m[9] * z + vp.m[13];
+        float cw = vp.m[3] * x + vp.m[7] * y + vp.m[11] * z + vp.m[15];
+        if (cw < 1e-4f) return false;
+        float ndc_x = cx / cw;
+        float ndc_y = cy / cw;
+        if (ndc_x < -1.3f || ndc_x > 1.3f || ndc_y < -1.3f || ndc_y > 1.3f) return false;
+        out_screen.x = image_min.x + (ndc_x * 0.5f + 0.5f) * image_size.x;
+        out_screen.y = image_min.y + (1.f - (ndc_y * 0.5f + 0.5f)) * image_size.y;
+        return true;
+    };
+
+    const ImU32 joint_color = IM_COL32(255, 225, 120, 255);
+    const ImU32 member_color = IM_COL32(150, 210, 255, 255);
+    const float dx = Scaled(5.f);
+    const float dy = Scaled(5.f);
+
+    for (const JointVisual& j : scene.joints) {
+        ImVec2 screen;
+        if (!project(j.pos, screen)) continue;
+        std::string label = "J" + std::to_string(j.no_joint);
+        dl->AddText(ImVec2(screen.x + dx, screen.y - dy), joint_color, label.c_str());
+    }
+    for (const MemberVisual& m : scene.members) {
+        ImVec2 screen;
+        if (!project((m.a + m.b) * 0.5f, screen)) continue;
+        std::string label = "M" + std::to_string(m.no_batang);
+        dl->AddText(ImVec2(screen.x + dx, screen.y - dy), member_color, label.c_str());
     }
 }
 
@@ -310,6 +364,11 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
     const float ucs_bottom_gap = Scaled(96.f);  // vertical distance from the bottom edge
     ImVec2 ucs_center(image_min.x + ucs_margin, image_min.y + image_size.y - ucs_bottom_gap);
     DrawUcsIcon(ImGui::GetForegroundDrawList(), ucs_center, ucs_radius, camera_);
+
+    // Issue #39: joint/member number labels, drawn after the UCS icon so
+    // they layer on top of it if one ever happens to land nearby.
+    DrawEntityLabels(ImGui::GetForegroundDrawList(), scene, camera_, image_size.x / image_size.y, image_min,
+                      image_size);
 
     // Issue #24: the plane-offset control used to live only in Toolbar's
     // "View Plane" menu, which had to be reopened for every adjustment --

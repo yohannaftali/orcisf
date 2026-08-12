@@ -50,10 +50,12 @@ bool EditableStructure::DeleteMember(int member_id) {
         sd_.JK[i] = sd_.JK[i + 1];
         sd_.IA[i] = sd_.IA[i + 1];
         sd_.W[i] = sd_.W[i + 1];
+        member_type_override_[i] = member_type_override_[i + 1];
         for (int j = 1; j <= 12; ++j) {
             sd_.AML[j][i] = sd_.AML[j][i + 1];
         }
     }
+    member_type_override_[sd_.M] = 0;
     --sd_.M;
     return true;
 }
@@ -105,6 +107,7 @@ int EditableStructure::AddMember(int joint_a, int joint_b) {
     sd_.JK[m] = joint_b;
     sd_.IA[m] = 0;
     sd_.W[m] = 0.f;
+    member_type_override_[m] = 0;
     for (int j = 1; j <= 12; ++j) {
         sd_.AML[j][m] = 0.f;
     }
@@ -131,6 +134,35 @@ void ComputeUdlFixedEndForces(float w, float length, engine::StructureData& sd, 
     sd.AML[12][member_id] = -w * length * length / 12.f;
 }
 } // namespace
+
+bool EditableStructure::SetMemberEndpoints(int member_id, int joint_a, int joint_b) {
+    if (member_id < 1 || member_id > sd_.M) return false;
+    if (joint_a == joint_b) return false;
+    if (joint_a < 1 || joint_a > sd_.NJ || joint_b < 1 || joint_b > sd_.NJ) return false;
+
+    sd_.JJ[member_id] = joint_a;
+    sd_.JK[member_id] = joint_b;
+
+    // Re-derive fixed-end forces for the new length, same as SetMemberLoad()
+    // -- a retargeted member keeps whatever W it already had, just applied
+    // over its new span.
+    float dx = sd_.X[joint_b] - sd_.X[joint_a];
+    float dy = sd_.Y[joint_b] - sd_.Y[joint_a];
+    float dz = sd_.Z[joint_b] - sd_.Z[joint_a];
+    float length = std::sqrt(dx * dx + dy * dy + dz * dz);
+    ComputeUdlFixedEndForces(sd_.W[member_id], length, sd_, member_id);
+    return true;
+}
+
+void EditableStructure::SetMemberTypeOverride(int member_id, int mode) {
+    if (member_id < 1 || member_id > sd_.M) return;
+    member_type_override_[member_id] = mode;
+}
+
+int EditableStructure::GetMemberTypeOverride(int member_id) const {
+    if (member_id < 1 || member_id > sd_.M) return 0;
+    return member_type_override_[member_id];
+}
 
 bool EditableStructure::SetMemberLoad(int member_id, float w_n_per_m) {
     if (member_id < 1 || member_id > sd_.M) return false;
@@ -189,6 +221,26 @@ std::vector<std::string> EditableStructure::Validate() const {
             std::ostringstream oss;
             oss << "Member " << i << " has zero length (joints " << ja << ", " << jb << ")";
             issues.push_back(oss.str());
+        }
+        // Issue #39: a member's beam/column *analysis* classification is
+        // always geometry-derived (CXZ, see periksa_batang()) -- the
+        // Members panel's type dropdown only overrides GUI display, never
+        // what a Run actually computes. Warn here (rather than silently
+        // diverge) whenever the two disagree, using the exact same
+        // CXZ > 0.001 threshold SceneModel.cpp/Optimizer.cpp use.
+        int override_mode = member_type_override_[i];
+        if (override_mode != 0 && dist >= kCoincidentEpsilon) {
+            float cx = (sd_.X[jb] - sd_.X[ja]) / dist;
+            float cz = (sd_.Z[jb] - sd_.Z[ja]) / dist;
+            bool geometry_is_beam = std::fabs(std::sqrt(cx * cx + cz * cz)) > 0.001f;
+            bool override_is_beam = (override_mode == 1);
+            if (geometry_is_beam != override_is_beam) {
+                std::ostringstream oss;
+                oss << "Member " << i << "'s selected type (" << (override_is_beam ? "Beam" : "Column")
+                    << ") doesn't match its geometry (would classify as "
+                    << (geometry_is_beam ? "Beam" : "Column") << ") -- a Run always uses the geometry-derived type";
+                issues.push_back(oss.str());
+            }
         }
         for (int j = i + 1; j <= sd_.M; ++j) {
             bool same_pair = (sd_.JJ[j] == ja && sd_.JK[j] == jb) || (sd_.JJ[j] == jb && sd_.JK[j] == ja);

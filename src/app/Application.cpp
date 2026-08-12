@@ -168,7 +168,7 @@ void Application::LoadStructure(engine::StructureData sd, const std::vector<engi
     has_run_results_ = (results != nullptr);
     current_results_ = results ? *results : std::vector<engine::MemberResult>{};
 
-    scene_ = gui::BuildSceneModel(loaded_sd_, results, loaded_dataset_path_);
+    scene_ = gui::BuildSceneModel(loaded_sd_, results, loaded_dataset_path_, &editable_->MemberTypeOverrides());
     validation_issues_ = editable_->Validate();
     viewport_panel_.FrameScene(scene_);
 }
@@ -177,7 +177,7 @@ void Application::RebuildSceneAfterEdit() {
     if (!editable_) return;
     has_run_results_ = false;
     current_results_.clear();
-    scene_ = gui::BuildSceneModel(loaded_sd_, nullptr, loaded_dataset_path_);
+    scene_ = gui::BuildSceneModel(loaded_sd_, nullptr, loaded_dataset_path_, &editable_->MemberTypeOverrides());
     validation_issues_ = editable_->Validate();
 }
 

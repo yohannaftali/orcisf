@@ -159,6 +159,36 @@ void JointsPanel::Draw(bool* open, const SceneModel& scene, Selection& selection
         ImGui::End();
         return;
     }
+
+    // Issue #39: "+ Add Joint", top-right, above the table header --
+    // mirrors MembersPanel's button. A second, table-driven entry point
+    // alongside the existing toolbar/viewport-click Add Joint flow
+    // (#14/#18); doesn't replace it. Defaults to the current joints'
+    // centroid (or the origin for an empty structure) rather than a fixed
+    // world position, so it lands somewhere relevant to what's already
+    // there -- same "should produce something visible/editable, not a
+    // silent no-op" reasoning issue #7 used for load placement defaults.
+    {
+        const char* add_label = "+ Add Joint";
+        float add_w = ImGui::CalcTextSize(add_label).x + ImGui::GetStyle().FramePadding.x * 2.f;
+        ImGui::SetCursorPosX(ImGui::GetWindowWidth() - add_w - ImGui::GetStyle().WindowPadding.x);
+        ImGui::BeginDisabled(!editable);
+        if (ImGui::Button(add_label)) {
+            math3d::Vec3 centroid{0.f, 0.f, 0.f};
+            if (!scene.joints.empty()) {
+                for (const JointVisual& jv : scene.joints) centroid = centroid + jv.pos;
+                centroid = centroid * (1.f / static_cast<float>(scene.joints.size()));
+            }
+            if (undo) undo->PushUndo(editable->SdForUndo());
+            int new_id = editable->AddJoint(centroid);
+            if (new_id > 0) {
+                selection = {SelectionKind::Joint, new_id};
+                if (on_geometry_changed) on_geometry_changed();
+            }
+        }
+        ImGui::EndDisabled();
+    }
+
     if (scene.joints.empty()) {
         ImGui::TextDisabled("No dataset loaded, or no joints yet.");
         ImGui::End();

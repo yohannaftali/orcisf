@@ -12,7 +12,7 @@ using engine::StructureData;
 using math3d::Vec3;
 
 SceneModel BuildSceneModel(const StructureData& sd, const std::vector<MemberResult>* results,
-                            std::string dataset_path) {
+                            std::string dataset_path, const std::array<int, engine::kMak>* type_overrides) {
     SceneModel scene;
     scene.dataset_path = std::move(dataset_path);
 
@@ -60,6 +60,12 @@ SceneModel BuildSceneModel(const StructureData& sd, const std::vector<MemberResu
             float cx = (mv.b.x - mv.a.x) / len;
             float cz = (mv.b.z - mv.a.z) / len;
             mv.is_beam = std::fabs(std::sqrt(cx * cx + cz * cz)) > 0.001f;
+        }
+
+        // Issue #39: Members panel type-dropdown override, display-only
+        // (see SceneModel.h/EditableStructure.h) -- 0 = no override.
+        if (type_overrides && i < static_cast<int>(type_overrides->size()) && (*type_overrides)[i] != 0) {
+            mv.is_beam = (*type_overrides)[i] == 1;
         }
 
         auto it = result_by_batang.find(i);

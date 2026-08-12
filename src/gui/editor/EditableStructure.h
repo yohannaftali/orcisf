@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -66,6 +67,33 @@ public:
     // Returns false if member_id is out of [1, M].
     bool DeleteMember(int member_id);
 
+    // Issue #39: retargets which joints an existing member connects (the
+    // Members panel's editable Joint A/Joint B fields). Returns false --
+    // and leaves JJ/JK untouched -- if member_id is out of [1, M],
+    // joint_a == joint_b, or either joint id is out of [1, NJ], so an
+    // in-progress/invalid edit (e.g. a joint number that doesn't exist
+    // yet) can never corrupt the array. Recomputes the member's UDL
+    // fixed-end-forces for its new length, same as SetMemberLoad().
+    bool SetMemberEndpoints(int member_id, int joint_a, int joint_b);
+
+    // Issue #39: GUI-only per-member beam/column override for the Members
+    // panel's type dropdown (0 = auto/geometry-derived, 1 = force beam,
+    // 2 = force column). Deliberately NOT read by engine::StructuralAnalysis
+    // or engine::Optimizer -- those classify beam-vs-column purely from a
+    // member's geometry (CXZ, the ported periksa_batang() check) throughout
+    // the analysis/RC-design/optimization pipeline (design-variable count,
+    // self-weight direction, ...), so this override only affects this
+    // port's own GUI display (Members panel, viewport color, detailing/
+    // properties labels) -- it never silently changes what a Run computes.
+    // A mismatch between a member's override and its actual geometry is
+    // surfaced as a Validate() warning instead. Not part of UndoStack's
+    // GeometrySnapshot (a documented, deliberate scope limit -- see
+    // AGENTS.md); out-of-range member_id is a no-op / returns 0.
+    void SetMemberTypeOverride(int member_id, int mode);
+    int GetMemberTypeOverride(int member_id) const;
+    // Full 1-based array, for BuildSceneModel() to fold into MemberVisual::is_beam.
+    const std::array<int, engine::kMak>& MemberTypeOverrides() const { return member_type_override_; }
+
     // Sets a uniform distributed load (N/m, legacy convention: transverse
     // to the member, gravity-direction sense -- see Pembebanan.hpp's
     // load_data()) and recomputes its 12 fixed-end-force components (AML)
@@ -91,6 +119,10 @@ public:
 
 private:
     engine::StructureData& sd_;
+    // Issue #39: 1-based like every other legacy per-member array (index 0
+    // unused), shifted in lockstep with JJ/JK/IA on AddMember/DeleteMember
+    // so it never drifts out of sync with the compacted member indices.
+    std::array<int, engine::kMak> member_type_override_{};
 };
 
 } // namespace orcisf::gui

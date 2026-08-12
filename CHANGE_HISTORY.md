@@ -2726,3 +2726,53 @@ the shared mechanism.
   diagnostic code in it.
 - Files: `src/gui/JointsPanel.cpp`, `src/gui/MembersPanel.cpp`,
   `src/gui/LoadsPanel.cpp`, `src/app/Application.cpp`, `AGENTS.md`
+
+## [2026-08-12] — feat(src): implement issue #39 -- editable member type/endpoints, Add Member/Add Joint, viewport labels
+
+- `EditableStructure::SetMemberEndpoints()` (new): retargets a member's
+  Joint A/Joint B, validating both are in range and distinct before
+  touching `JJ`/`JK` (no-op, arrays untouched, on invalid input) --
+  recomputes UDL fixed-end-forces for the new length.
+- `EditableStructure::SetMemberTypeOverride()`/`GetMemberTypeOverride()`
+  (new): a GUI-only per-member beam/column override (0/1/2 =
+  Auto/Beam/Column), a new `std::array<int, kMak>` inside
+  `EditableStructure`, shifted in lockstep with `JJ`/`JK`/`IA` on
+  Add/DeleteMember. Deliberately NOT read by `engine::StructuralAnalysis`/
+  `Optimizer` (both classify beam-vs-column purely from geometry
+  throughout the ported algorithm) -- it only feeds `BuildSceneModel()`
+  (new optional parameter) for display. `Validate()` now warns when an
+  override disagrees with the member's actual geometry, since a Run
+  always uses the geometry-derived type regardless of the override.
+- `MembersPanel.cpp`: Type column is now an editable combo (Auto/Beam/
+  Column); Joint A/Joint B are now editable `InputInt` cells wired to
+  `SetMemberEndpoints()`; a new "+ Add Member" button (top-right, above
+  the table) inserts a real member connecting the last two existing
+  joints (disabled with a tooltip below 2 joints).
+- `JointsPanel.cpp`: new "+ Add Joint" button (top-right, above the
+  table) inserts a real joint at the current joints' centroid (origin if
+  empty) -- an additional entry point alongside the existing toolbar/
+  viewport-click Add Joint flow (#14/#18), not a replacement.
+- `ViewportPanel.cpp`: new `DrawEntityLabels()` draws each joint's/
+  member's number (`J1`, `M1`, ...) as hand-drawn `ImDrawList` text at
+  its projected screen position (`proj * view * point`, perspective
+  divide, clipped against the eye/NDC range) -- same overlay philosophy
+  as the UCS icon (#23), but a real world-to-screen projection instead
+  of direction-only dot products.
+- Verified interactively end-to-end in this environment (screenshots at
+  each step): placed 3 joints from a blank structure via viewport
+  clicks (confirmed `J1`/`J2`/`J3` labels track each joint); Add Member
+  created a member connecting joints 2/3 (confirmed `M1` label at its
+  midpoint); setting its type override to Column updated the Properties
+  panel title to "Batang 1 (Kolom)" and produced the expected geometry-
+  mismatch validation warning; retargeting Joint A from 2 to 1 correctly
+  reconnected the member and updated its computed length; typing an
+  out-of-range joint number (99) was silently rejected with no change to
+  the table, computed length, or viewport.
+- Known scope limit (documented in AGENTS.md): the type-override array
+  is not part of `UndoStack`'s `GeometrySnapshot`, so Undo/Redo can
+  leave an override pointing at a shifted member index after a
+  geometry-affecting undo.
+- Files: `src/gui/editor/EditableStructure.{h,cpp}`,
+  `src/gui/viewport/SceneModel.{h,cpp}`, `src/gui/MembersPanel.cpp`,
+  `src/gui/JointsPanel.cpp`, `src/gui/ViewportPanel.cpp`,
+  `src/app/Application.cpp`, `AGENTS.md`

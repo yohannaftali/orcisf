@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -70,8 +71,14 @@ struct SceneModel {
 // #7) -- callers must have populated those via engine::ReadLoadsRaw() (or
 // left them at zero), never via engine::ReadLoads(), or self-weight would
 // show up as a phantom "user load".
+// `type_overrides`, if non-null (issue #39, see EditableStructure::
+// MemberTypeOverrides()), folds each member's GUI-only type override into
+// MemberVisual::is_beam so the viewport/Properties/Detailing panels agree
+// with what the Members panel's dropdown shows -- purely a display choice,
+// never fed into engine::StructuralAnalysis/Optimizer (see EditableStructure.h).
 SceneModel BuildSceneModel(const engine::StructureData& sd, const std::vector<engine::MemberResult>* results,
-                            std::string dataset_path);
+                            std::string dataset_path,
+                            const std::array<int, engine::kMak>* type_overrides = nullptr);
 
 // Returns the no_batang of the member whose centerline is closest to the
 // ray (world-space origin/direction, direction must be normalized), or -1
