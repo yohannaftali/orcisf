@@ -22,6 +22,20 @@ namespace orcisf::engine {
 inline constexpr int kMak = 825; // mirrors ORCISF.cpp's `const int mak=825;`
 inline constexpr int kMD = 12;   // mirrors Variabel.hpp's `#define MD 12`
 
+// Issue #42: `JRL`/`AJ`/`ID`/`DF`/`AE`/`AC`/`AR`/`DJ` are declared `[mak]`
+// in the *original* 1999 Borland source too (Variabel.hpp) -- but they're
+// indexed by global DOF number (`6*joint_id - 5 + dof`, or an equation
+// number derived from it in StructuralAnalysis.cpp's `Hasil()`/stiffness
+// assembly), which needs up to `6*NJ` slots, not `NJ`. This was a latent
+// bug in the original program too (never hit in 27 years since no real
+// dataset comes anywhere near `kMak/6` joints), confirmed unreachable-in-
+// practice but real: past ~137 joints, the original `[mak]`-sized arrays
+// silently overflow. `kMaxDof` is the corrected size for exactly those 8
+// fields -- every field genuinely bounded by joint/member *count* (X/Y/Z/
+// JJ/JK/IA/T_K/IM/...) stays `kMak`-sized, unchanged, since AddJoint()'s
+// own `NJ >= kMak - 1` guard already caps those correctly.
+inline constexpr int kMaxDof = 6 * kMak;
+
 inline constexpr float kPi = 3.14f;
 inline constexpr float kTeta = 0.8f;       // strength reduction factor used throughout Kendala_Harga-equivalent code
 inline constexpr float kLimitNol = 1.E-3f; // "limit_nol"
@@ -32,7 +46,17 @@ inline constexpr float kBjBesi = 7850.f;   // steel unit weight (kg/m^3)
 template <typename T>
 class LegacyArray {
 public:
-    LegacyArray() : data_(kMak, T{}) {}
+    // Defaults to kMak, the size every field needs except the handful of
+    // DOF-indexed ones (see kMaxDof above) that construct with an explicit
+    // larger size via in-class initializers, e.g. `LegacyArray<int> JRL{kMaxDof};`.
+    // Not marked `explicit` -- `StructureData` is an aggregate relying on
+    // value-initializing every LegacyArray field with no initializer of its
+    // own (e.g. `T_K`) via this constructor's default argument; MSVC (under
+    // -std:c++20) doesn't consider an `explicit` constructor eligible there
+    // (`engine::StructureData{}` failed with "no appropriate default
+    // constructor available") even though nothing here needs the implicit-
+    // conversion protection `explicit` would normally add.
+    LegacyArray(int size = kMak) : data_(static_cast<size_t>(size), T{}) {}
     T& operator[](int i) { return data_[static_cast<size_t>(i)]; }
     const T& operator[](int i) const { return data_[static_cast<size_t>(i)]; }
     void assign_all(T value) { std::fill(data_.begin(), data_.end(), value); }
@@ -63,9 +87,9 @@ struct StructureData {
 
     // ---- Mekanika rekayasa portal ruang ----
     int NB = 0, M = 0, NJ = 0, NR = 0, NRJ = 0;
-    LegacyArray<int> JRL, T_K;
+    LegacyArray<int> JRL{kMaxDof}, T_K; // JRL: issue #42, see kMaxDof's comment
     int ND = 0, N = 0;
-    LegacyArray<int> IA, JJ, JK, ID;
+    LegacyArray<int> IA, JJ, JK, ID{kMaxDof}; // ID: issue #42
     int IR = 0, IC = 0;
     LegacyArray<int> IM, LML;
 
@@ -84,11 +108,11 @@ struct StructureData {
     LegacyArray2D<float> SMRT{13, 13};
     LegacyArray2D<float> SMS{kMak, kMak};
     LegacyArray2D<float> SFF{kMak, kMak};
-    LegacyArray<float> DF, AJ;
+    LegacyArray<float> DF{kMaxDof}, AJ{kMaxDof}; // issue #42
     LegacyArray2D<float> AML{13, kMak};
-    LegacyArray<float> AE, AC, DJ, AMD;
+    LegacyArray<float> AE{kMaxDof}, AC{kMaxDof}, DJ{kMaxDof}, AMD; // AE/AC/DJ: issue #42; AMD stays kMak (only ever indexed 1..12)
     LegacyArray2D<float> AM{kMak, kMak};
-    LegacyArray<float> AR, W, W_Balok, P_Kolom;
+    LegacyArray<float> AR{kMaxDof}, W, W_Balok, P_Kolom; // AR: issue #42
 
     LegacyArray<float> MTUM_KI, MTUM_KA, MLAP, GESER_KI, GESER_KA;
     LegacyArray<float> MKX, MKY, PK, GK;

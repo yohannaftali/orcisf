@@ -2885,3 +2885,39 @@ the shared mechanism.
   #35-#41's changes.
 - Files: `AGENTS.md`, `CHANGE_HISTORY.md` (no functional code changed
   by this pass itself).
+
+## [2026-08-12] — fix(src): implement issue #42 -- JRL/AJ array-sizing fix
+
+- Investigation before implementing found the real scope was bigger than
+  #42's own text: not just `JRL`/`AJ` but 6 more fields
+  (`ID`/`DF`/`AE`/`AC`/`AR`/`DJ`) share the identical bug -- all declared
+  `LegacyArray<T>` (sized `kMak`=825) but indexed by global DOF number
+  (up to `6*NJ`) inside `StructuralAnalysis.cpp`'s actual solver
+  (`Hasil()`, stiffness assembly), confirmed by tracing every one against
+  `StructuralAnalysis.cpp`/`LegacyIO.cpp`. `IM`/`AMD`/`T_K`/`LML` were
+  checked too and don't need it (indexed by small fixed ranges, not
+  DOF-range). This settled the issue's own open "resize vs. cap" question:
+  capping GUI-added joints wouldn't fully fix it, since a hand-edited
+  `.inp` file loaded directly bypasses any GUI cap and reaches the same
+  solver code.
+- Fix: new `engine::kMaxDof = 6 * kMak` constant; `LegacyArray`'s
+  constructor now takes an optional `size` parameter (default `kMak`,
+  unchanged for every other field); the 8 affected fields construct with
+  `{kMaxDof}` via in-class initializers. Pure data-layout change -- every
+  call site already used the correct `6*joint-5+dof` indexing formula,
+  they were just writing into an undersized backing array.
+- Real build issue hit and fixed: marking the new constructor `explicit`
+  broke `engine::StructureData{}` aggregate-initialization under MSVC
+  (`-std:c++20`) with "no appropriate default constructor available" --
+  MSVC doesn't consider an `explicit` constructor eligible there even
+  though it's usable with zero arguments via its default argument.
+  Removed `explicit` (not needed here; nothing in this codebase relies on
+  blocking implicit `int -> LegacyArray` conversions) and the build
+  succeeded.
+- Verified: a temporary standalone test (not checked in) constructed a
+  `StructureData` with 200 joints (index up to 1200, past the old
+  825-sized bound) and round-tripped values on all 8 fields correctly;
+  `orcisf_cli info`/`equilibrium` against a real `Example/Apl1-1` dataset
+  showed no regression (identical 0.015625 equilibrium residual); GUI
+  smoke-tested (Add Joint, restraint label) with no crash.
+- Files: `src/engine/include/engine/StructureData.h`, `AGENTS.md`

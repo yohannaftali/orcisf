@@ -1751,6 +1751,32 @@ things every future agent touching it must know:
   scratch copy. (This is exactly how the checked-in Example outputs almost
   got overwritten during #3's own validation — restored via `git restore`,
   no harm done, but a real hazard for the next agent too.)
+- **`kMaxDof` (issue #42) — `JRL`/`AJ`/`ID`/`DF`/`AE`/`AC`/`AR`/`DJ` are
+  sized `6 * kMak`, not `kMak`, unlike every other `LegacyArray` field.**
+  These 8 fields are indexed by *global DOF number* (`6*joint_id - 5 + dof`,
+  or an equation number derived from it in `StructuralAnalysis.cpp`'s
+  `Hasil()`/stiffness assembly), which needs up to `6*NJ` slots — not `NJ`.
+  This was a real latent bug, inherited unchanged from the original 1999
+  Borland source (`Variabel.hpp` declares all of these `[mak]` too), never
+  hit in 27 years since no real dataset comes anywhere near `kMak/6` (~137)
+  joints — but reachable via the GUI's own "+ Add Joint" button (#39) with
+  no cap besides the unrelated `NJ >= kMak - 1` guard in
+  `EditableStructure::AddJoint()`. **If you add a new field to
+  `StructureData` that's indexed by DOF number rather than joint/member
+  count, size it `{kMaxDof}` too** (see `StructureData.h`'s constructor
+  comment on `LegacyArray` for the exact mechanism) — every *other* field
+  (`X`/`Y`/`Z`/`JJ`/`JK`/`IA`/`T_K`/`IM`/...) is correctly `kMak`-sized and
+  must stay that way, since `AddJoint()`/`AddMember()`'s own bounds checks
+  are calibrated against `kMak`. `IM` and `AMD` look similar but only need
+  `kMak` (each is only ever indexed 1..12, a fixed per-element range, not
+  DOF-range) — don't over-apply `kMaxDof` to them. Memory cost of the 8
+  resized fields: ~130KB per `StructureData` (out of ~14MB), negligible
+  even across `#4`'s worker-thread clones. Verified via a standalone test
+  (not checked in): 200 joints (index up to 1200, past the old 825-sized
+  bound) round-trip correctly on all 8 fields; `orcisf_cli
+  info`/`equilibrium` against a real `Example/Apl1-1` dataset confirmed no
+  regression (same 0.015625 residual as before); GUI smoke-tested (Add
+  Joint, restraint label) with no crash.
 
 ---
 
@@ -2115,7 +2141,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #39 | feat(src): editable member type/joint endpoints + Add Member/Add Joint buttons, with joint/member labels in viewport | closed | 2026-08-12 |
 | #40 | feat(src): per-DOF joint restraint editing (6 checkboxes + Fixed/Pinned/Roller/Free quick-support buttons) | closed | 2026-08-12 |
 | #41 | fix(src): row-selection Selectable overlaps/covers editable input cells in Joints/Members/Loads tables | closed | 2026-08-12 |
-| #42 | fix(src): JRL/AJ arrays sized kMak but indexed 6x-per-joint -- latent OOB past ~137 joints | open | 2026-08-12 |
+| #42 | fix(src): JRL/AJ arrays sized kMak but indexed 6x-per-joint -- latent OOB past ~137 joints | ready-for-review | 2026-08-12 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
