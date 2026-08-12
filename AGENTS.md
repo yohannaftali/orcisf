@@ -2141,7 +2141,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #39 | feat(src): editable member type/joint endpoints + Add Member/Add Joint buttons, with joint/member labels in viewport | closed | 2026-08-12 |
 | #40 | feat(src): per-DOF joint restraint editing (6 checkboxes + Fixed/Pinned/Roller/Free quick-support buttons) | closed | 2026-08-12 |
 | #41 | fix(src): row-selection Selectable overlaps/covers editable input cells in Joints/Members/Loads tables | closed | 2026-08-12 |
-| #42 | fix(src): JRL/AJ arrays sized kMak but indexed 6x-per-joint -- latent OOB past ~137 joints | ready-for-review (tester: 4/4 PASS) | 2026-08-12 |
+| #42 | fix(src): JRL/AJ arrays sized kMak but indexed 6x-per-joint -- latent OOB past ~137 joints | closed | 2026-08-12 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
