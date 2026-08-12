@@ -2108,13 +2108,14 @@ later, different one (e.g. closing an issue or cutting a release).
 | #30 | feat(src): implement real Alt-mnemonic menu navigation (Dear ImGui has no built-in "&" parsing) | ready-for-review | 2026-08-11 |
 | #31 | fix(src): application is not DPI-aware -- UI too small on high-DPI monitors in multi-monitor setups | closed | 2026-08-11 |
 | #32 | chore(src): add one-shot build scripts (build.ps1 for Windows, build.sh for macOS/Linux) | ready-for-review | 2026-08-11 |
-| #35 | fix(src): move panel icons onto the dock tab button, remove the in-content icon+title header row (#28 correction) | ready-for-review (tester: all criteria PASS, 1 via user's manual DPI check) | 2026-08-12 |
-| #36 | feat(src): split Joints/Members panel into separate Joints and Members panels; order Loads tab immediately after them | ready-for-review (tester: all criteria PASS, 1 via user's manual DPI check) | 2026-08-12 |
-| #37 | feat(src): View menu Menubar/Subwindows/Layout sections + fix tab close button + rename "Run Optimization" panel | ready-for-review (tester: all criteria PASS, 1 via user's manual DPI check) | 2026-08-12 |
-| #38 | fix(src): move Log tab into right-side Properties/Optimization group; fix Design preset's Properties/Optimization/Log tab order | ready-for-review (tester: all criteria PASS, 1 via user's manual DPI check) | 2026-08-12 |
-| #39 | feat(src): editable member type/joint endpoints + Add Member/Add Joint buttons, with joint/member labels in viewport | ready-for-review (tester: all criteria PASS, 1 via user's manual DPI check) | 2026-08-12 |
-| #40 | feat(src): per-DOF joint restraint editing (6 checkboxes + Fixed/Pinned/Roller/Free quick-support buttons) | ready-for-review (tester: all criteria PASS, 1 via user's manual DPI check) | 2026-08-12 |
-| #41 | fix(src): row-selection Selectable overlaps/covers editable input cells in Joints/Members/Loads tables | ready-for-review (tester: all criteria PASS, 1 via user's manual DPI check) | 2026-08-12 |
+| #35 | fix(src): move panel icons onto the dock tab button, remove the in-content icon+title header row (#28 correction) | closed | 2026-08-12 |
+| #36 | feat(src): split Joints/Members panel into separate Joints and Members panels; order Loads tab immediately after them | closed | 2026-08-12 |
+| #37 | feat(src): View menu Menubar/Subwindows/Layout sections + fix tab close button + rename "Run Optimization" panel | closed | 2026-08-12 |
+| #38 | fix(src): move Log tab into right-side Properties/Optimization group; fix Design preset's Properties/Optimization/Log tab order | closed | 2026-08-12 |
+| #39 | feat(src): editable member type/joint endpoints + Add Member/Add Joint buttons, with joint/member labels in viewport | closed | 2026-08-12 |
+| #40 | feat(src): per-DOF joint restraint editing (6 checkboxes + Fixed/Pinned/Roller/Free quick-support buttons) | closed | 2026-08-12 |
+| #41 | fix(src): row-selection Selectable overlaps/covers editable input cells in Joints/Members/Loads tables | closed | 2026-08-12 |
+| #42 | fix(src): JRL/AJ arrays sized kMak but indexed 6x-per-joint -- latent OOB past ~137 joints | open | 2026-08-12 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

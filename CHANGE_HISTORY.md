@@ -2853,3 +2853,35 @@ the shared mechanism.
 - Per this project's tester-skill convention, no remote issue was
   commented on, closed, or otherwise modified -- final QA/close-out is
   the `reviewer` skill's job, not `tester`'s.
+
+## [2026-08-12] — chore(src): reviewer pass on #35-#41, all closed, #42 filed, v0.0.4-alpha released
+
+- Ran the `reviewer` skill against #35-#41: architecture/design audit
+  (patterns, scope discipline, regressions against documented
+  "deliberate deviation" notes), bug/security audit, and a fresh
+  end-to-end confirmation on a freshly built binary. Verdict: PASS WITH
+  NOTES on all seven -- every Acceptance Criterion genuinely met, no
+  regressions, no scope creep in any of the seven commits (`git show
+  --stat` confirmed each touches only files relevant to its own issue).
+- **Real finding, filed as a new issue (#42) rather than blocking this
+  batch**: `engine::StructureData::JRL`/`AJ` are sized `kMak` (825) but
+  every per-DOF accessor (`EditableStructure::AddJoint`/
+  `SetJointRestrained`/`SetJointLoad`/#40's `SetJointDof`/`GetJointDof`)
+  indexes them via `6 * joint_id - 5 + dof`, needing up to `6 * NJ`
+  slots -- a latent out-of-bounds write past ~137 joints, via
+  `LegacyArray::operator[]`'s unchecked `std::vector::operator[]`. This
+  predates #35-#41 (the same indexing formula exists in the original
+  1999 Borland source and in issue #6/#7's original per-DOF code) but
+  is more easily reachable now that #39 added a one-click "+ Add Joint"
+  button. No dataset in this repo comes close to 137 joints.
+- Commented on and closed #35, #36, #37, #38, #39, #40, #41 on GitHub
+  (each comment summarizes what was independently re-confirmed for that
+  issue plus a pointer to #42).
+- Filed #42 (`fix(src): JRL/AJ arrays sized kMak but indexed
+  6x-per-joint -- latent OOB past ~137 joints`) with the finding above
+  as its Objective/Acceptance Criteria.
+- Released **v0.0.4-alpha** (GitHub Release, prebuilt Windows binary),
+  the first release since v0.0.3-alpha (2026-08-11) to include all of
+  #35-#41's changes.
+- Files: `AGENTS.md`, `CHANGE_HISTORY.md` (no functional code changed
+  by this pass itself).
