@@ -2840,8 +2840,16 @@ the shared mechanism.
   directly re-tested: double-clicking the very top pixels of a table
   row's `InputFloat` cell, immediately below the row-above's separator,
   correctly activated the field rather than just selecting the row.
-- Unverified (not FAIL): #35's DPI-scaled icon sizing wasn't checked at
-  a non-100% `ORCISF_UI_SCALE` this pass.
+- The one criterion this tester pass left UNVERIFIED (#35's DPI-scaled
+  icon sizing at non-100% `ORCISF_UI_SCALE`, not checked automatically
+  this session) was closed out the same day by the user, who manually
+  tested it on a real high-DPI monitor at their office and confirmed
+  icons resize correctly -- this matches what #35's own implementation
+  session already found at 100%/200% via `ORCISF_UI_SCALE` (see
+  `AGENTS.md`'s issue #35 section), now independently reconfirmed on
+  real hardware. With this, every Acceptance Criterion across #35-#41
+  is PASS (automated or user-confirmed) -- no FAIL, no remaining
+  UNVERIFIED.
 - Per this project's tester-skill convention, no remote issue was
   commented on, closed, or otherwise modified -- final QA/close-out is
   the `reviewer` skill's job, not `tester`'s.
