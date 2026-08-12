@@ -2694,3 +2694,35 @@ the shared mechanism.
 - Verified interactively via screenshots of all three presets switched
   through the View > Layout menu.
 - Files: `src/app/Application.cpp`, `AGENTS.md`
+
+## [2026-08-12] — fix(src): implement issue #41 -- Selectable click-blocking on editable table rows
+
+- Root cause: `ImGuiSelectableFlags_SpanAllColumns` alone unconditionally
+  claims every click across a row, at any Y, blocking later-column
+  widgets (`InputFloat`) from ever receiving a click -- not a row-height
+  mismatch as first assumed and shipped untested. Disproven by testing
+  (multi-Y synthetic clicks + typed-value checks showed no effect from a
+  height-only fix), then root-caused by adding direct
+  `ImGui::GetHoveredID()`/`GetActiveID()` logging to the app's own
+  `LogPanel` and, as a controlled diagnostic, temporarily removing
+  `SpanAllColumns` entirely -- that alone restored click routing to the
+  `InputFloat`.
+- Real fix: `ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap`
+  together (documented in `imgui.h` as letting subsequent overlapping
+  widgets win hit-testing), plus an explicit `ImVec2(0, GetFrameHeight())`
+  height kept for the cosmetic full-row highlight.
+- Applied to all four `Selectable()` call sites: `JointsPanel.cpp` (one,
+  canonical comment), `MembersPanel.cpp` (one, currently inert --
+  pre-empts the same bug for issue #39's upcoming editable fields),
+  `LoadsPanel.cpp` (two: member-loads and joint-loads tables).
+- Verified via the same `ActiveID`/`HoveredID` instrumentation against
+  `JointsPanel` (InputFloat activates and stays active after a direct
+  click; the Joint-number column still selects the row transiently, and
+  the viewport gizmo follows). `MembersPanel`/`LoadsPanel` got the
+  byte-identical fix and a visual spot-check, not independently
+  re-instrumented.
+- All temporary debug logging (and its `#include <cstdio>`) removed
+  from `Application::OnFrame()` before commit -- final binary has no
+  diagnostic code in it.
+- Files: `src/gui/JointsPanel.cpp`, `src/gui/MembersPanel.cpp`,
+  `src/gui/LoadsPanel.cpp`, `src/app/Application.cpp`, `AGENTS.md`

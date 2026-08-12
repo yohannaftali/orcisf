@@ -1126,6 +1126,57 @@ screenshots of all three presets: Default (Properties/Optimization/Log
 grouped, bottom strip is Joints/Members/Loads only), Design (same
 right-side grouping, no leftover empty node), Optimization (unchanged).
 
+**Row `Selectable` click-blocking fix (issue #41) — read before touching
+any `ImGui::Selectable(...)` row in `JointsPanel.cpp`/`MembersPanel.cpp`/
+`LoadsPanel.cpp`, or adding a new editable table row anywhere in
+`gui/`:**
+- **Root cause was `ImGuiSelectableFlags_SpanAllColumns` alone, not a
+  row-height mismatch** — the first hypothesis (tried and shipped before
+  testing) assumed `Selectable()`'s default unframed height being
+  shorter than an `InputFloat` cell's `GetFrameHeight()` left a gap at
+  the bottom of each row where clicks "fell through" to the widget
+  underneath. Testing (synthetic clicks at multiple Y positions per row,
+  every row, then typing and checking whether the field's value changed)
+  showed the height-only fix changed nothing — every click still landed
+  on the Selectable. Root cause was only found by adding direct
+  `ImGui::GetHoveredID()`/`ImGui::GetActiveID()` logging (temporarily,
+  to the app's own `LogPanel`) and, as a controlled diagnostic,
+  temporarily removing `ImGuiSelectableFlags_SpanAllColumns` entirely —
+  that alone fixed click routing to the `InputFloat`, proving
+  `SpanAllColumns` unconditionally claims every click across the whole
+  row regardless of later-column widgets, at any Y. The real, correct
+  fix is `ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap`
+  together (`AllowOverlap` is documented in `imgui.h` as letting
+  subsequent widgets win hit-testing over an earlier overlapping one) —
+  the height fix (`ImVec2(0.f, ImGui::GetFrameHeight())`) is still kept
+  alongside it, but only for the cosmetic row-highlight-covers-the-whole-row
+  effect, not for click routing.
+- **Applied to all four `Selectable()` call sites**: `JointsPanel.cpp`
+  (one, holds the canonical comment other files point back to),
+  `MembersPanel.cpp` (one — currently inert since that table's other
+  cells are still read-only `Text`, not editable widgets, but issue #39
+  adds editable fields to this exact row and must not reintroduce the
+  bug), `LoadsPanel.cpp` (two, member-loads and joint-loads tables).
+- **What was verified**: rebuilt and directly instrumented (the same
+  `GetHoveredID()`/`GetActiveID()` logging, left in only long enough to
+  confirm, then fully removed before commit) against `JointsPanel` —
+  clicking directly on an `InputFloat` cell activates it persistently
+  (`ActiveID` survives multiple post-release frame checks, field shows a
+  live text-selection highlight and accepts typed input), while clicking
+  the non-widget Joint-number column still selects the row transiently
+  (`ActiveID` reverts to 0 immediately on mouse-up, 3D viewport gizmo
+  moves to the clicked joint). `MembersPanel`/`LoadsPanel` received the
+  byte-identical fix (verified by direct code comparison, not
+  independently re-instrumented per-file) and were visually spot-checked
+  in a running build (Loads menu, table rendering) without a regression.
+- **The temporary `ActiveID`/`HoveredID` debug logging (and its
+  `#include <cstdio>`) was fully removed from `Application::OnFrame()`
+  before this fix was committed** — if you need the same diagnostic
+  technique again for a future ImGui click-routing bug, re-add it
+  the same way (log to `LogPanel`, gated behind a `static bool` armed by
+  `ImGui::IsMouseClicked()`) and remove it again before committing,
+  don't leave it in.
+
 **2D plane-locked drawing (issue #22, part of epic #20) — read before
 touching `gui/viewport/Camera.{h,cpp}`, `gui/viewport/Math3D.h`'s
 `Orthographic()`, or `ViewportPanel`'s `add_joint_mode` branch:**
@@ -1915,7 +1966,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #38 | fix(src): move Log tab into right-side Properties/Optimization group; fix Design preset's Properties/Optimization/Log tab order | ready-for-review | 2026-08-12 |
 | #39 | feat(src): editable member type/joint endpoints + Add Member/Add Joint buttons, with joint/member labels in viewport | open | 2026-08-12 |
 | #40 | feat(src): per-DOF joint restraint editing (6 checkboxes + Fixed/Pinned/Roller/Free quick-support buttons) | open | 2026-08-12 |
-| #41 | fix(src): row-selection Selectable overlaps/covers editable input cells in Joints/Members/Loads tables | open | 2026-08-12 |
+| #41 | fix(src): row-selection Selectable overlaps/covers editable input cells in Joints/Members/Loads tables | ready-for-review | 2026-08-12 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

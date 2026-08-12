@@ -26,9 +26,19 @@ void DrawMembersTable(const SceneModel& scene, Selection& selection, EditableStr
         ImGui::PushID(mv.no_batang);
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
+        // Issue #41: AllowOverlap + explicit height, see JointsPanel.cpp's
+        // comment on this exact pattern (AllowOverlap is the fix that
+        // actually matters -- without it SpanAllColumns unconditionally
+        // blocks every later-column widget's clicks, confirmed by direct
+        // ActiveID instrumentation, not assumed). This table has no
+        // InputFloat cells yet (Type/Joint A/B are read-only Text today),
+        // so today this is a preemptive, currently-inert fix; issue #39
+        // adds editable fields to this same row and must not reintroduce
+        // the click-blocking bug.
         if (ImGui::Selectable(std::to_string(mv.no_batang).c_str(), selection.kind == SelectionKind::Member &&
                                                                           selection.id == mv.no_batang,
-                               ImGuiSelectableFlags_SpanAllColumns)) {
+                               ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap,
+                               ImVec2(0.f, ImGui::GetFrameHeight()))) {
             selection = {SelectionKind::Member, mv.no_batang};
         }
         ImGui::TableSetColumnIndex(1);

@@ -27,9 +27,12 @@ void DrawMemberLoadsTable(const SceneModel& scene, Selection& selection, Editabl
         ImGui::PushID(ml.no_batang);
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
+        // Issue #41: AllowOverlap + explicit height -- see JointsPanel.cpp's
+        // comment on this exact pattern.
         if (ImGui::Selectable(std::to_string(ml.no_batang).c_str(), selection.kind == SelectionKind::Member &&
                                                                           selection.id == ml.no_batang,
-                               ImGuiSelectableFlags_SpanAllColumns)) {
+                               ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap,
+                               ImVec2(0.f, ImGui::GetFrameHeight()))) {
             selection = {SelectionKind::Member, ml.no_batang};
         }
         ImGui::TableSetColumnIndex(1);
@@ -76,9 +79,12 @@ void DrawJointLoadsTable(const SceneModel& scene, Selection& selection, Editable
         ImGui::PushID(jl.no_joint);
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
+        // Issue #41: AllowOverlap + explicit height -- see JointsPanel.cpp's
+        // comment on this exact pattern.
         if (ImGui::Selectable(std::to_string(jl.no_joint).c_str(),
                                selection.kind == SelectionKind::Joint && selection.id == jl.no_joint,
-                               ImGuiSelectableFlags_SpanAllColumns)) {
+                               ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap,
+                               ImVec2(0.f, ImGui::GetFrameHeight()))) {
             selection = {SelectionKind::Joint, jl.no_joint};
         }
 

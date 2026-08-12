@@ -40,9 +40,28 @@ void DrawJointsTable(const SceneModel& scene, Selection& selection, EditableStru
         ImGui::PushID(jv.no_joint);
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
+        // Issue #41: two independent fixes needed together, confirmed by
+        // direct instrumentation (checking ImGui::GetActiveID() a few
+        // frames after release -- a Selectable's active state clears
+        // immediately on mouse-up, an InputFloat's stays set once focused),
+        // not assumed from the bug report's wording alone:
+        //  1. ImGuiSelectableFlags_AllowOverlap -- SpanAllColumns alone
+        //     does NOT let later-column widgets (InputFloat here) win a
+        //     click at their own rect; without AllowOverlap the Selectable
+        //     unconditionally consumes every click across the whole row,
+        //     at every Y tested, making the InputFloat cells completely
+        //     unreachable by click, not just "the top portion" as the
+        //     symptom first suggested. This is the actual fix.
+        //  2. An explicit height matching GetFrameHeight() (the InputFloat
+        //     cells' real height, taller than Selectable's default
+        //     unframed text-line height under this theme's nonzero
+        //     FramePadding.y) so the row's highlight visually covers the
+        //     entire row instead of a short band -- cosmetic once (1) is
+        //     in place, but still part of the reported symptom.
         if (ImGui::Selectable(std::to_string(jv.no_joint).c_str(),
                                selection.kind == SelectionKind::Joint && selection.id == jv.no_joint,
-                               ImGuiSelectableFlags_SpanAllColumns)) {
+                               ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap,
+                               ImVec2(0.f, ImGui::GetFrameHeight()))) {
             selection = {SelectionKind::Joint, jv.no_joint};
         }
 
