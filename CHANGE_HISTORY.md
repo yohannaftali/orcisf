@@ -2228,3 +2228,403 @@ automation script, not WinUI3), core objective verified, issue closed
   `src/gui/IconToolbar.{h,cpp}`, `src/gui/IconVisibility.h` (new),
   `src/gui/PanelVisibility.h` (new), `src/gui/RunPanel.cpp`,
   `src/gui/ViewportPanel.cpp`, `AGENTS.md`
+
+## [2026-08-12] — chore(docs): compact AGENTS.md, move debugging narratives here
+
+`AGENTS.md` had grown to ~2400 lines, with many per-issue "read before
+touching" sections mixing durable rules/gotchas with multi-paragraph
+narratives of how a bug was diagnosed, what automation attempts failed,
+and session-by-session "what was verified interactively" writeups. Per
+its own Change Log Policy, condensed each section to current-state rules
+only and moved the process narrative here as dated entries below,
+inferring dates from context. No factual/technical content changed --
+this is a reorganization pass only.
+
+### Issue #8 (reinforcement detailing) — verification narrative, 2026-08-10
+`BuildDetailingDrawing()`'s geometry (bar counts, in-bounds positions,
+tension/compression face per beam region, column bar count formula) was
+unit-tested standalone before GUI wiring. The full rendering pipeline was
+then verified interactively against a real optimization run of
+`Example/Apl1-1` (screenshotted): a column's drawing (12D25 bars, correct
+spacing/cover/stirrup labels) and a beam's drawing (both Tumpuan and
+Lapangan sections, correct tension-face flip, all labels) exactly matched
+the same run's `orcisf_cli`/`MEMBER_RESULTS` numeric output.
+
+### Issue #9 (PDF + text export) — verification narrative, 2026-08-10
+`WriteStructureFile()`/`WriteDiscreteTables()`'s round-trip and
+`WritePdfReport()`/`WriteTextExport()` were exercised standalone against a
+real completed `Example/Apl1-1` run: PDF generated/opened/screenshotted
+page-by-page (cover/input summary, per-member table matching
+`MEMBER_RESULTS` exactly, correct Tumpuan/Lapangan detailing pages); text
+export produced all 12 files at the right sizes. The full GUI path was
+then verified separately through the actual native NFD dialogs (not
+simulated): "Export PDF..." opened a real Save-As dialog and produced a
+byte-identical file to the standalone test; "Export Text..." opened a
+real Select-Folder dialog and produced the same 12-file set. Round-trip
+was checked by re-reading the exported dataset with
+`orcisf_cli info`/`equilibrium` -- identical geometry/topology, perfect
+(0.0) equilibrium residual.
+
+### Issue #6 (interactive 3D editor) — verification narrative, 2026-08-10
+Joint/member picking, numeric position entry live-updating the 3D view,
+the Restrained checkbox, Delete Joint, Add Joint, Undo, and the
+Validation panel were all exercised end-to-end (mouse/keyboard input
+synthesized via Win32 API + `AttachThreadInput` to work around Windows'
+foreground-focus protections, screenshotted to confirm). An actual
+click-drag on the ImGuizmo gizmo's arrows was not attempted (sub-pixel
+axis targeting judged too unreliable to script); the gizmo was confirmed
+to render at the correct position and `Manipulate()`'s output feeds the
+same verified `EditableStructure::MoveJoint()` call, so remaining risk is
+isolated to ImGuizmo's own hit-testing.
+
+### Issue #7 (load input GUI) — verification narrative, 2026-08-10
+The full load-editor workflow was exercised end-to-end against a real
+scratch copy of `Example/Apl1-1` (screenshotted at each step): existing
+`.bbn` loads (35000 N/m on 4 beams) loaded and matched `LoadsPanel`'s
+table exactly; placing a new joint load via Loads > Add Joint Load + a
+viewport click updated Properties/`LoadsPanel` in sync; File > Save Loads
+(.bbn) was actually clicked and the resulting file read back and diffed
+-- byte-for-byte matching the GUI state. `ReadLoadsRaw()`/`WriteLoads()`
+round-trip fidelity and `SetMemberLoad()`'s UDL fixed-end-force formula
+were also unit-tested standalone.
+
+### Issue #11 (New Data/Open Data, title/material form, .inf preview) — verification narrative, 2026-08-11
+Build/launch confirmed via `Get-CimInstance`. `WriteInfPreview()`'s
+output was verified standalone against `Example/Apl1-1`: wrote a fresh
+`.inf` to a scratch path and diffed every section against the checked-in
+`aplikasi.inf` -- numerically identical (only whitespace/column-alignment
+differs). A follow-up interactive pass (synthesized Win32 input +
+screenshots) confirmed `New Data` opening the real native Save-As dialog,
+saving actually writing all 7 files, and the General section rendering
+and being live-editable (typed a title, confirmed it round-tripped
+through `File > Save` to the `.inp` file on disk). This pass hit a
+DPI-awareness pitfall and an unrelated-window-focus hazard along the way,
+and caught a real bug (documented in `AGENTS.md`'s #11 section): `Ctrl+S`
+was display-only because `ImGui::MenuItem`'s shortcut-text parameter
+doesn't bind the key chord by itself.
+
+### Issue #14 (icon toolbar) — verification narrative, 2026-08-11
+Verified interactively (synthesized Win32 input + screenshots): all 8
+icons render with correct disabled/enabled dimming, hover tooltips work
+(confirmed "Connect Joints" appearing on hover), and clicking "Add Joint"
+correctly started a blank structure and added a joint (Properties panel
+updated, Save/Undo icons became enabled immediately after, Redo/Run
+correctly stayed disabled).
+
+### Issue #15 (view layout presets) — verification narrative, 2026-08-11
+Verified interactively: added a joint, switched through all three presets
+and back to Default -- the joint/selection/undo history were all still
+there throughout. All three presets render with the correct panel
+arrangement, the View menu's checkmark correctly tracks the active
+preset, and switching Design -> Optimization -> Default round-trips back
+to the original layout pixel-for-pixel.
+
+### Issue #25 (Run panel dataset-path / timestamped output) — verification narrative, 2026-08-11
+Compiled cleanly (all three targets) and empirically exercised via
+`orcisf_cli optimize` against a scratch copy of `Example/Data01`:
+confirmed a real `<folder>/<timestamp>/` subfolder was created containing
+the run's six output files, and via checksum that the dataset's own
+top-level `.opt` file was byte-identical before and after -- genuinely
+untouched. The built GUI was launched and confirmed running without
+crashing after the `RunPanel` UI changes; the dataset-path-sync/Run-panel
+display itself was not click-tested interactively.
+
+### Issue #26 (app icon set) — verification narrative, 2026-08-11
+Compiled successfully on Windows -- confirmed the `.rc` resource actually
+compiles (`orcisf.rc.res` generated) and links, runtime icon PNGs land
+next to the built `.exe`, and the app launches/runs without crashing with
+`ApplyWindowIcon()` wired in. The icon's actual on-screen appearance
+(Explorer/taskbar/window) was not confirmed via screenshot in this pass
+-- a screenshot attempt captured an unrelated foreground window instead,
+a known focus-stealing hazard in this environment, not worth repeatedly
+retrying for a cosmetic check. macOS bundle packaging and Linux
+`.desktop`/install rules were written against each platform's documented
+CMake convention but have no local toolchain to verify against
+(Windows-only dev environment) -- CI is the first real cross-platform
+check for those two.
+
+### Issue #27 (title bar buttons "not flush") — full investigation narrative, 2026-08-11
+First pass investigated and could not reproduce: the original report
+(filed during the #21-#25 retest pass) was based on a screenshot that
+mixed a DPI-aware `GetWindowRect()` P/Invoke call with .NET's
+`System.Windows.Forms.Screen.Bounds`/`Graphics.CopyFromScreen()` in the
+same PowerShell session -- the latter returned a logical (scaled-down)
+screen size despite `SetProcessDPIAware()` having been called, so the
+screenshot only captured roughly the top-left quarter of the true
+physical screen. The window (genuinely maximized to the full physical
+resolution) rendered its title bar buttons correctly at the true physical
+right edge -- just outside that undersized capture -- which looked
+exactly like "a gap before the window's true edge." Fix for the tooling:
+don't rely on `Screen.Bounds` for capture dimensions; size the capture
+bitmap explicitly from a DPI-aware `GetWindowRect()`/
+`GetSystemMetrics(SM_CXVIRTUALSCREEN)` call. Re-verified this way (a
+4x-zoomed crop of the true physical top-right corner): the button cluster
+appeared flush and evenly spaced. A comment was posted on issue #27
+recommending it be closed as "cannot reproduce"; not closed automatically.
+
+**Correction (2026-08-11, during issue #31's second pass): the bug WAS
+real, and the "not reproducible" conclusion was wrong.** The
+DPI-measurement tooling problem was genuine and did produce a misleading
+screenshot -- but there was also a real right-alignment defect
+underneath it. The original claim "there was never a plausible
+code-level mechanism" missed one: `ImGui::SameLine(offset_x)` measures
+from the content origin and silently adds the enclosing group's
+`GroupOffset.x`, which for a menu bar equals `WindowPadding.x` (14px at
+100%, 28px at 200%) -- so the cluster really was shifted past the
+window's right edge. Fixed under #31 by positioning with absolute screen
+coordinates. Lesson: "the math looks right" is not the same as having
+checked what the API's offset is actually relative to.
+
+### Issue #28 Part 1 (Alt-mnemonics, reverted) — narrative, 2026-08-11
+The original #28 implementation added `&File`/`&Edit`/etc. to
+`Toolbar::Draw()`'s menu labels, assuming Dear ImGui would strip the `&`
+and underline the following letter (the Win32/Qt/wxWidgets convention)
+once `ImGuiConfigFlags_NavEnableKeyboard` was set. It does not --
+confirmed via a real screenshot during issue #29's retest pass: the
+literal `&` character was displayed in the menu bar, completely unparsed.
+Reverted to plain labels and rebuilt/re-screenshotted to confirm the
+revert fixed it. This was found while working issue #29 (the "retest
+#21-#25" follow-up), not #28 itself -- #28 was already closed by the time
+this was discovered; a comment was posted there cross-referencing this
+correction and the new issue #30, per this project's transparency
+conventions.
+
+### Issue #28 Part 2 (panel icon headers) — narrative, 2026-08-11
+Confirmed genuinely working via real screenshots, first for Viewport
+(issue #29's retest pass), then re-confirmed on a fresh build plus two
+more panels (Properties, Log) in a dedicated "build and test #28" pass:
+the small hand-drawn icon rendered correctly before each panel's title
+text in its content area. The remaining four panels weren't individually
+screenshotted, since they call the exact same function -- three-for-three
+confirmations across genuinely different panels was treated as
+sufficient confidence. Superseded by issue #35 (2026-08-11): the user
+clarified the actual ask was an icon on the panel's own dock tab button,
+not a duplicate-title content row.
+
+### Issue #30 (real Alt-mnemonic navigation) — verification narrative, 2026-08-11
+Compiled cleanly via the `builder` skill. Interactive confirmation (Alt
+held -> underlines actually appear in the right place; Alt+letter -> the
+right menu actually opens) was not completed -- attempting to grab
+foreground for screenshotting repeatedly landed on the user's own
+actively-in-use browser window (reading this project's GitHub issue #29
+in real time), not an unrelated background process. Correctly identified
+as the user's live session rather than background interference, so
+automation was stopped and their window state was restored rather than
+continuing to fight for control of their active session.
+
+### Issue #35 (panel icons on dock tab) — verification narrative, 2026-08-11
+Compiled cleanly and confirmed via real screenshots at 100% and 200%
+`ORCISF_UI_SCALE`: all 7 panels' dock tabs show their icon correctly
+positioned immediately before the title text with no overlap, at both
+scales; the three view-layout presets' dock placement is pixel-identical
+to before the change; no panel body shows a duplicate title/header row
+anymore. Tab close buttons were still visually present in every
+screenshot -- whether clicking them actually closed the panel turned out
+to be a separate bug, investigated under issue #37.
+
+### Issue #29 (interactive retest of #25/#22/#24) — full three-attempt narrative, 2026-08-11
+
+**Attempt 1**: Fixed and confirmed the #28 mnemonic regression, and
+confirmed #28's panel-icon-header Part 2 genuinely works via screenshot
+-- both via a corrected, DPI-aware screenshot technique combined with an
+`AttachThreadInput`-based foreground-grab that reliably worked for
+getting the app's main window foregrounded and its menu bar clickable.
+Driving the native "Open Data..." folder-picker dialog to actually load a
+dataset did NOT work: coordinate-based clicking inside the dialog
+repeatedly mis-hit targets (clicked "New Data" instead of "Open Data..."
+once; a "Cancel" click coordinate computed from a previous screenshot's
+displayed/scaled pixel position without re-multiplying by the DPI scale
+factor missed entirely). A new hazard was also hit: an unrelated app
+(Proton Drive, the user's own cloud-sync client) spontaneously opened its
+own window mid-sequence, stealing focus -- left untouched. Lesson:
+always recompute click coordinates from the most recent screenshot taken
+after any UI state change, in the same physical-pixel coordinate space.
+Core objective remained unverified; not closed.
+
+**Attempt 2**: Confirmed the app's own File menu is fully
+keyboard-navigable (Down/Down/Enter reliably moved nav focus from "New
+Data" to "Open Data..." and activated it) and that the native "Select
+Folder" dialog does open correctly in response. Precisely diagnosed
+(incorrectly, as attempt 3 later found) blocker: the "Select Folder"
+dialog on this Windows install is the newer WinUI3/XAML-based Windows 11
+file picker; its "Folder:" text-entry field appeared not to accept
+synthetic input -- neither `SetCursorPos`+`mouse_event` clicks nor
+`SendKeys::SendWait()` typed text ever populated the field across five
+distinct attempts. Hypothesized this was because WinUI3/XAML controls
+require real UI Automation (e.g. the Windows UI Automation COM API, or a
+wrapper like FlaUI) to reliably receive focus and input from external
+automation. Cancelled cleanly via `{ESC}` each time, no orphaned dialogs.
+Core objective still unverified; not closed.
+
+**Attempt 3** (resolved): The real root cause of every prior
+coordinate-mismatch failure was found: the PowerShell process driving
+`SetCursorPos`/`GetWindowRect` was never marked DPI-aware, so Windows
+silently virtualized its coordinate space to logical pixels
+(`GetWindowRect` reported `0,0,2560,1392` on this 200%-scaled monitor)
+while screenshots were still being captured in physical pixels
+(`5120x2784`) -- a 2x mismatch between where clicks actually landed and
+where the screenshots said they should land. This fully explains the
+WinUI3 dialog symptoms blamed in attempt 2 -- it was never really about
+WinUI3/XAML resisting synthetic input, it was ordinary clicks landing at
+literally the wrong pixel. Fix: call `SetProcessDPIAware()` once at the
+start of the automation script, before any `SetCursorPos`/`GetWindowRect`
+call. Confirmed by re-checking `GetWindowRect()` after the fix:
+`0,0,5120,2784`, matching the screenshot dimensions exactly. With that
+fixed, mouse-driven navigation through the WinUI3 dialog worked on the
+very next attempt -- no UI Automation library needed after all. Both of
+#29's acceptance criteria were then directly confirmed with a real
+dataset loaded (`Example/Apl1-1` copied to
+`C:\Users\IT\Documents\orcisf\Apl1-1\aplikasi`, loaded via File > Open
+Data...): RunPanel dataset gating (#25) showed the Dataset field
+populated and Run enabled; the 2D plane-lock offset overlay (#22/#24)
+rendered correctly (View Plane > X-Y showed the "Plane X-Y -- Z offset
+(m)" field and updated UCS icon), contrary to the user's report -- it was
+never broken, just unreached because earlier attempts couldn't get a
+dataset loaded. Actually typing a new numeric Z-offset value and
+confirming it moves a placed joint was attempted but interrupted by a
+WhatsApp desktop notification toast stealing keyboard focus mid-sequence;
+automation was stopped immediately rather than risk interacting with
+that toast, so this specific round-trip remains unconfirmed. Issue #29
+resolved and closed.
+
+### Issue #18 (AutoCAD-style Add Joint guidance) — verification narrative, 2026-08-11
+Verified interactively: toggling Add Joint mode (button highlights,
+tooltip and menu checkmark update, status-bar hint text appears);
+clicking empty viewport space placed a joint exactly at the click
+position (Properties panel showed "Joint 1" with correct
+auto-calculated position); the mode stayed active after placement -- a
+second click placed "Joint 2" without re-opening any menu. Connect
+Joints' new first-click-vs-second-click hint text distinction was
+code-reviewed but not re-verified live in this pass (focus-stealing
+interference from an unrelated process interrupted that specific check).
+
+### Issue #21 (Joints/Members panel) — verification narrative, 2026-08-11
+The code follows `LoadsPanel`'s and `PropertiesPanel`'s already-proven
+patterns (row selection sync, inline edit commit, `math3d::Vec3`
+construction) exactly, and `EditableStructure`'s public API/field names
+were cross-checked against `EditableStructure.h`/`.cpp` directly.
+Compiled successfully in a later session once a build toolchain became
+available (see issue #16's entry). Interactive exercise of the
+cascade-delete modal specifically (does it actually pop up on a real
+multi-member joint delete) was not re-checked.
+
+### Issue #36 (split Joints/Members panel) — verification narrative, 2026-08-11
+Compiled cleanly; real interactive data flow confirmed via a scratch
+blank structure (Add Joint x2, Connect Joints to link them into a
+member) -- `JointsPanel`'s table correctly showed both joints' live
+X/Y/Z, `MembersPanel`'s table correctly showed the resulting member with
+the right Joint A/B, and the tab order matched Joints/Members/Loads/Log
+exactly as required, all via real screenshots. The cascade-delete modal
+was NOT re-verified this pass -- multiple precisely-aimed automated
+clicks on the Joints table's per-row "Delete" button (confirmed via a
+crosshair-annotated screenshot to be landing within the button's visible
+rect, and via `GetCursorPos()`/`GetWindowRect()` to rule out a
+coordinate-space mismatch) produced no hover highlight and no click
+effect at all, for a reason not root-caused in this pass. Given the
+modal's code is byte-for-byte the code #21 already shipped with the same
+unverified caveat, this isn't a new regression risk introduced by the
+split, but remains open follow-up work.
+
+### Issue #37 (close-button bug) — root-cause instrumentation narrative, 2026-08-11
+Root cause was found by direct instrumentation, not by reading Dear ImGui
+source (not available -- this project links a vcpkg-installed,
+headers-only copy of ImGui, no `.cpp` to read). Two temporary debug
+probes (reverted before commit, not left in the codebase) proved the
+`if (open) Begin()` trust was misplaced specifically for docked windows:
+(1) logging `io.MousePos`/`ImGui::GetHoveredID()` on every click confirmed
+clicks landed exactly where intended (no DPI/coordinate mismatch -- an
+early, wrong hypothesis); (2) a before/after snapshot of every panel's
+own open-flag around the `Draw()` calls proved the tab close button's
+click does correctly flip `viewport_open_`/etc. to `false` (confirmed on
+both `Viewport` and `Log`, in two different dock groups) -- yet the tab
+kept rendering on every subsequent frame anyway. This led to the fix
+documented in `AGENTS.md`'s #37 section (gate each `Draw()` call on its
+own open flag). Verification: close-button fix confirmed on two
+different panels in two different dock groups; the full View >
+Subwindows close -> reopen cycle for `Log` (tab disappears, then
+reappears in its correct #36-ordered position with prior content
+intact); View > Menubar's "New Data" toggle hiding/reflowing the icon
+row; View > Layout's three presets still switching correctly; the
+"Optimization" rename showing correctly in both the tab title and the
+Viewport's hint text.
+
+### Issue #22 (2D plane-locked drawing) — verification narrative, 2026-08-10
+The cross-product/up-vector math was hand-derived and re-checked
+(catching the Y-Z sign bug documented in `AGENTS.md`); the code was
+reviewed against `Camera.h`/`.cpp`'s existing patterns
+(`Pan()`/`ScreenRay()`'s `Cross(right,forward)` up-derivation,
+`EyePosition()`'s `target - Forward()*distance`). Compiled successfully
+in a later session. The three plane views' actual on-screen rendering
+and click-to-place-on-the-locked-plane behavior were not interactively
+exercised in a running app.
+
+### Issue #23 (UCS icon overlay) — verification narrative, 2026-08-11
+The dot-product projection math was hand-checked for a few reference
+orientations (default orbit camera: X should point right-ish, Y up, Z
+out-of-screen-ish) and the code reuses already-verified `Camera` methods
+rather than new vector math. Compiled successfully and the app was
+launched and confirmed running without crashing. The icon's live
+rotation-with-camera behavior was not interactively click-tested
+pixel-by-pixel.
+
+### Issue #24 (plane-offset control moved into viewport) — verification narrative, 2026-08-11
+Compiled cleanly and the app was launched and confirmed running (process
+alive, no crash) after the change. Not interactively click-tested --
+specifically, whether dragging the slider/typing in the field actually
+avoids triggering orbit, and whether a placed joint's locked coordinate
+exactly matches a nonzero slider value, are the issue's own stated
+acceptance criteria and still need a real interactive pass.
+
+### Issue #19 (custom borderless window chrome) — verification narrative, 2026-08-11
+Borderless window (no OS title bar/border) confirmed; title text renders
+in the menu bar row; Minimize/Maximize/Close icons render correctly
+including the Maximize<->Restore icon swap; clicking Maximize actually
+maximized the window (screen-filling, confirmed via screenshot) and
+clicking Maximize again restored it; the drag mechanism was confirmed
+working emphatically -- an in-progress click sequence during testing
+produced a real (if unintentionally large) window-position delta that
+moved the live window off-screen, which was then recovered with a plain
+Win32 `SetWindowPos` call (not a code change) to bring it back on
+screen. macOS/Linux were not interactively verified in this environment
+(no access to those platforms).
+
+### Issue #16 (re-optimize from last best result) — verification narrative, 2026-08-11
+Compiled cleanly (both `orcisf_cli` and `orcisf_gui`) and empirically
+exercised via a standalone scratch program linked against
+`orcisf_engine` (not checked in) against a scratch copy of
+`Example/Data01`: a truncated baseline run (`harga=3.02672e+07
+kendala=0`) followed by a seeded re-optimization (`harga=2.46519e+07
+kendala=0`) -- lower cost, confirming the seed took effect and the
+search genuinely continues rather than restarting. Re-running the
+seeded case with `worker_threads=4` produced a bit-identical result to
+`worker_threads=1`, confirming issue #4's determinism guarantee holds
+with seeding active. The GUI checkbox/wiring itself was reviewed but not
+interactively clicked through in a running app this session.
+
+### Issue #31 (DPI awareness) — verification narrative, 2026-08-11
+Compiled cleanly and visually confirmed via real DPI-aware screenshots
+at 100%, 150% and 200%: toolbar/panel icons scale, the title bar buttons
+are fully visible and correctly centred (measured -- the Close glyph
+sits exactly half a button width from the true right edge at both 100%
+and 200%), the title elides instead of colliding with the buttons, and
+no docked panel is clipped under the menu bar/toolbar. Live rescaling
+was exercised through the real per-frame path via a temporary
+key-driven scale toggle (since removed) across four consecutive
+100%<->200% round trips, screenshotted each time: the final 100% state
+is identical to a fresh 100% launch, confirming no compounding. A
+`tester` pass (2026-08-11) confirmed 4 of 5 acceptance criteria with
+direct evidence and closed the issue on the user's explicit call:
+criteria 1-3 were re-verified with fresh screenshots at 100%/150%/200%
+via `ORCISF_UI_SCALE`, plus a pixel-level measurement of the Close
+button's glyph-vs-cell centering (offset -0.5px/0px/0px across the three
+scales -- sub-pixel); criterion 4 was re-exercised through the real
+`ApplyUiScale()`/per-frame-poll path via a temporary F9 test hook
+(reverted with `git checkout` and rebuilt before finishing -- confirmed
+empty diff), two full 100%<->200% round trips, screenshotted: the final
+100% frame is visually identical to a fresh 100% launch. Criterion 5
+(verified on the actual dual-monitor Windows dev environment, live drag
+between two different-DPI monitors) was explicitly reported UNVERIFIED
+-- this environment has one physical monitor (confirmed via
+`Screen.AllScreens`), so the specific hardware test could not run here.
+The user closed the issue anyway, on the strength of criteria 1-4 plus
+the shared mechanism.

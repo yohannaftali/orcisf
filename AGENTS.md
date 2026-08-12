@@ -348,15 +348,10 @@ wholesale, per the Change Log Policy.
   sufficient for "usable as a reference drawing" without the added
   complexity; revisit only if a future issue specifically asks for
   arrowed extension lines.
-- **What was verified:** `BuildDetailingDrawing()`'s geometry (bar counts,
-  in-bounds positions, correct tension/compression face per beam region,
-  column bar count formula) was unit-tested standalone before GUI wiring.
-  The full rendering pipeline was then verified interactively in this
-  environment against a real optimization run of `Example/Apl1-1`
-  (screenshotted): a column's drawing (12D25 bars, correct spacing/cover/
-  stirrup labels) and a beam's drawing (both Tumpuan and Lapangan
-  sections, correct tension-face flip, all labels) were confirmed to
-  exactly match the same run's `orcisf_cli`/`MEMBER_RESULTS` numeric output.
+- **Verification status:** geometry unit-tested standalone; full rendering
+  pipeline interactively confirmed against a real `Example/Apl1-1` run,
+  matching `orcisf_cli`/`MEMBER_RESULTS` exactly (details:
+  `CHANGE_HISTORY.md`, 2026-08-10, issue #8).
 
 **`src/report/` + `engine::WriteStructureFile()`/`WriteDiscreteTables()`
 (issue #9) — read before touching export:**
@@ -407,21 +402,11 @@ wholesale, per the Change Log Policy.
   fires (destructors don't run) -- accepted here as a known, standard
   tradeoff of using a C library's callback-based error model from C++,
   not something to "fix" by rewriting HPDF's API surface.
-- **What was verified:** `WriteStructureFile()`/`WriteDiscreteTables()`'s
-  round-trip (above) and `WritePdfReport()`/`WriteTextExport()` were both
-  exercised standalone (a real completed run of `Example/Apl1-1`: PDF
-  generated, opened, and screenshotted page-by-page -- cover/input
-  summary, the per-member summary table matching `MEMBER_RESULTS` exactly,
-  and a detailing page with correct Tumpuan/Lapangan sections; text export
-  produced all 12 files, `.his`/`.log.txt` included, at the right sizes).
-  The full GUI path was then verified separately, through the *actual*
-  native NFD dialogs (not simulated): "Export PDF..." opened a real "Save
-  As" dialog (pre-filled `report.pdf`, `*.pdf` filter) and produced a
-  byte-identical file to the standalone test; "Export Text..." opened a
-  real "Select Folder" dialog and produced the same 12-file set. The
-  round-trip criterion was checked by re-reading the exported dataset with
-  `orcisf_cli info`/`equilibrium` -- identical geometry/topology, and a
-  perfect (0.0) equilibrium residual.
+- **Verification status:** round-trip and PDF/text export exercised
+  standalone against a real `Example/Apl1-1` run (byte/field-identical),
+  then the full GUI path (real NFD dialogs) reproduced the same output;
+  re-read via `orcisf_cli info`/`equilibrium` gave a perfect (0.0)
+  equilibrium residual (details: `CHANGE_HISTORY.md`, 2026-08-10, issue #9).
 
 **`engine/`'s `ReadLoadsRaw()`/`WriteLoads()` (issue #7) — the load-editor's
 critical invariant:** the legacy `.bbn` file *never* includes self-weight
@@ -473,18 +458,13 @@ than risk showing numbers the user never entered.
   to "run an optimization on it" (no save/export-to-.inp exists either).
   That's natural territory for #7 or a dedicated follow-up, not something
   #6 was required to solve.
-- **What was interactively verified vs. reasoned through (#6):** joint/member
-  picking, numeric position entry live-updating the 3D view, the
-  Restrained checkbox, Delete Joint, Add Joint, Undo, and the Validation
-  panel were all exercised end-to-end in this environment (mouse/keyboard
-  input synthesized via Win32 API + `AttachThreadInput` to work around
-  Windows' foreground-focus protections, screenshotted to confirm). An
-  actual click-drag *on* the ImGuizmo gizmo's arrows was not (sub-pixel
-  axis targeting was judged too unreliable to script); the gizmo was
-  confirmed to render at the correct position and `Manipulate()`'s output
-  feeds the exact same `EditableStructure::MoveJoint()` call the verified
-  numeric-entry path uses, so the remaining risk is specifically in
-  ImGuizmo's own hit-testing, not in this project's code.
+- **Verification status (#6):** joint/member picking, numeric position
+  entry, Restrained checkbox, Delete/Add Joint, Undo, and Validation panel
+  all exercised end-to-end interactively. Actual click-drag on the
+  ImGuizmo gizmo itself was not (sub-pixel targeting too unreliable to
+  script) -- `Manipulate()`'s output feeds the same verified
+  `MoveJoint()` call, so remaining risk is isolated to ImGuizmo's own
+  hit-testing (details: `CHANGE_HISTORY.md`, 2026-08-10, issue #6).
 - **Issue #7's load types match the legacy format exactly, nothing more.**
   `Pembebanan.hpp`'s `.bbn` format only ever supported two load
   categories: a uniform distributed load on a member (`W`, transverse,
@@ -510,19 +490,12 @@ than risk showing numbers the user never entered.
   directional glyph -- see the comment above `SceneRenderer::DrawLoads()`
   for the reasoning (N/m and N values span orders of magnitude across
   real datasets; exact numbers always live in `LoadsPanel`/Properties).
-- **What was interactively verified for #7:** the full load-editor
-  workflow was exercised end-to-end against a real scratch copy of
-  `Example/Apl1-1` in this environment (screenshotted at each step): the
-  existing `.bbn` loads (35000 N/m on 4 beams) loaded and rendered
-  correctly and matched `LoadsPanel`'s table exactly; placing a new joint
-  load via Loads > Add Joint Load + a viewport click updated
-  Properties/`LoadsPanel` in sync; **File > Save Loads (.bbn) was
-  actually clicked and the resulting file on disk was read back and
-  diffed** -- it contained both the original 4 member loads and the new
-  joint load, byte-for-byte matching what the GUI showed. `ReadLoadsRaw()`
-  ↔ `WriteLoads()` numeric round-trip fidelity (every `W`/`AML`/`AJ` value
-  bit-identical after a write+re-read) and `SetMemberLoad()`'s UDL
-  fixed-end-force formula were also unit-tested standalone beforehand.
+- **Verification status (#7):** full load-editor workflow exercised
+  end-to-end against a real `Example/Apl1-1` scratch copy, including an
+  actual File > Save Loads (.bbn) click whose output was diffed
+  byte-for-byte against the GUI state; `ReadLoadsRaw()`/`WriteLoads()`
+  round-trip and `SetMemberLoad()`'s UDL formula also unit-tested
+  standalone (details: `CHANGE_HISTORY.md`, 2026-08-10, issue #7).
 
 **Issue #11 additions (File > New Data/Open Data..., title/material form,
 `.inf` preview) — read before touching this area:**
@@ -571,31 +544,17 @@ than risk showing numbers the user never entered.
   Akibat Beban`, `Beban Titik`) -- issue #11 didn't ask for them; add
   them the same way if a future issue wants full `.inf` parity. Wired to
   `File > Export INF Preview...` via an NFD save dialog.
-- **What was verified:** the full GUI build succeeds and the app launches/
-  runs without crashing with all of the above wired in (confirmed via
-  `Get-CimInstance`, same technique as issue #12's verification).
-  `WriteInfPreview()`'s output was verified standalone (not through the
-  GUI) against a real dataset: read `Example/Apl1-1`, wrote a fresh
-  `.inf` to a scratch path, and diffed every one of the six sections
-  against the checked-in `aplikasi.inf` -- numerically identical (only
-  whitespace/column-alignment differs, since the new writer uses
-  tab-separated output rather than `CETAK.HPP`'s `setw()` column
-  formatting).
-- **Interactively verified in a follow-up pass** (synthesized Win32
-  mouse/keyboard input + screenshots, same technique issue #6 used --
-  see `CHANGE_HISTORY.md`'s 2026-08-11 "Interactive verification" entry
-  for the full account, including a DPI-awareness pitfall and an
-  unrelated-window-focus hazard hit along the way): `New Data` opening
-  the real native Save-As dialog, saving actually writing all 7 files,
-  the General section rendering and being live-editable (typed a title,
-  confirmed it round-tripped through `File > Save` to the `.inp` file on
-  disk). This also caught a real bug: **`Ctrl+S` was display-only** --
-  `ImGui::MenuItem`'s shortcut-text parameter doesn't bind the key
-  chord by itself. Fixed with an explicit
+- **Real bug caught and fixed:** `ImGui::MenuItem`'s shortcut-text
+  parameter does not bind the key chord by itself -- `Ctrl+S` was
+  display-only. Fixed with an explicit
   `ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S)` check in
-  `Application::OnFrame()`, gated on the same `can_export_text`
-  condition the menu item uses, and re-verified with the actual key
-  chord (not a menu click).
+  `Application::OnFrame()`, gated on the same `can_export_text` condition
+  the menu item uses.
+- **Verification status:** build/launch confirmed; `WriteInfPreview()`
+  diffed numerically identical to the checked-in `aplikasi.inf` (only
+  whitespace/column formatting differs); full interactive pass (New Data,
+  Save, General section, Ctrl+S) confirmed via synthesized input +
+  screenshots (details: `CHANGE_HISTORY.md`, 2026-08-11, issue #11).
 
 **`gui/IconToolbar.{h,cpp}` (issue #14, part of epic #13) — read before
 touching:**
@@ -628,13 +587,10 @@ touching:**
   logic or exposing `dataset_path_` -- both just call the exact same
   private `StartRun()` the panel's own button already used, gated the
   same way (`!IsRunning() && dataset_path_[0] != '\0'`).
-- **What was verified:** interactively, in this environment (synthesized
-  Win32 input + screenshots, same technique as #11's follow-up pass) --
-  all 8 icons render with correct disabled/enabled dimming, hover
-  tooltips work (confirmed "Connect Joints" appearing on hover), and
-  clicking "Add Joint" correctly started a blank structure and added a
-  joint (Properties panel updated, Save/Undo icons became enabled
-  immediately after, Redo/Run correctly stayed disabled).
+- **Verification status:** all 8 icons confirmed interactively (dimming,
+  tooltips, Add Joint correctly bootstrapping a structure and cascading
+  enabled-state to Save/Undo) (details: `CHANGE_HISTORY.md`, 2026-08-11,
+  issue #14).
 
 **View layout presets (issue #15, part of epic #13) — read before
 touching `Application::BuildDockspace()`/`Toolbar`'s View menu:**
@@ -664,15 +620,12 @@ touching `Application::BuildDockspace()`/`Toolbar`'s View menu:**
 - **Switching presets is purely a layout change** -- `current_layout_`
   is the only new state, and `BuildDockspace()`'s rebuild only calls
   `ImGuiDockBuilder*` functions, never touches `loaded_sd_`/`editable_`/
-  selection/undo state. Verified interactively: added a joint, switched
-  through all three presets and back to Default, the joint/selection/
-  undo history were all still there throughout.
-- **What was verified:** interactively, in this environment (same
-  synthesized-input technique as #11/#14's passes) -- all three presets
-  render with the exact panel arrangement described above, the View
-  menu's checkmark correctly tracks the active preset, and switching
-  Design -> Optimization -> Default round-trips back to the original
-  layout exactly (pixel-for-pixel arrangement, not just "close enough").
+  selection/undo state.
+- **Verification status:** all three presets confirmed interactively --
+  correct panel arrangement, View menu checkmark tracking, and a
+  Design -> Optimization -> Default round-trip landing pixel-identical to
+  the original layout, geometry/selection/undo state untouched throughout
+  (details: `CHANGE_HISTORY.md`, 2026-08-11, issue #15).
 
 **`RunPanel`'s "Regenerate Seed" button (issue #17) — a real bug was
 found and fixed here, worth knowing if you touch `rng_seed_` again:**
@@ -739,17 +692,13 @@ handling or `engine::RunFullOptimization()`'s output paths:**
   reuse the same output subfolder** (last one wins) -- an accepted minor
   edge case per the issue's own acceptance criteria, not otherwise
   handled.
-- **What was verified:** compiled cleanly (MSVC/Ninja, `windows-release`
-  preset, all three targets: `orcisf_engine`, `orcisf_cli`, `orcisf_gui`)
-  and empirically exercised via `orcisf_cli optimize` against a scratch
-  copy of `Example/Data01`: confirmed a real `<folder>/<timestamp>/`
-  subfolder was created containing the run's six output files, and (via
-  checksum, not just mtime) that the dataset's own top-level `.opt` file
-  was byte-identical before and after -- genuinely untouched. The built
-  GUI was launched and confirmed running without crashing after the
-  `RunPanel` UI changes, but the dataset-path-sync/Run-panel-display
-  itself was not click-tested interactively; that's still a good next
-  step for full confidence.
+- **Verification status:** compiled cleanly; `orcisf_cli optimize`
+  against a scratch `Example/Data01` confirmed a real
+  `<folder>/<timestamp>/` output subfolder and (via checksum) the
+  dataset's own top-level `.opt` genuinely untouched. GUI launch
+  confirmed; dataset-path-sync/Run-panel display itself not
+  click-tested interactively (details: `CHANGE_HISTORY.md`, 2026-08-11,
+  issue #25).
 
 **App icon set wired into the build (issue #26) — read before touching
 `src/app/AppIcon.{h,cpp}`, `src/app/orcisf.rc`, `src/packaging/
@@ -799,146 +748,48 @@ orcisf.desktop`, or the icon-related blocks in `src/CMakeLists.txt`:**
   (`if(UNIX AND NOT APPLE)`) were reviewed against XDG conventions but
   **not exercised on a real Linux machine** (none available in this
   environment).
-- **What was verified vs. not:** compiled successfully on Windows
-  (MSVC/Ninja, `windows-release` preset) -- confirmed the `.rc` resource
-  actually compiles (`orcisf.rc.res` generated) and links, the runtime
-  icon PNGs land next to the built `.exe`, and the app launches/runs
-  without crashing with `ApplyWindowIcon()` wired in. **The icon's
-  actual on-screen appearance (Explorer/taskbar/window) was not
-  confirmed via screenshot** in this pass (a screenshot attempt captured
-  an unrelated foreground window instead, a known hazard in this
-  environment -- see the focus-stealing note elsewhere in this file; not
-  worth repeatedly retrying for a cosmetic check). macOS bundle
-  packaging and Linux `.desktop`/install rules were written against each
-  platform's documented CMake convention but have **no local toolchain
-  to verify against** (Windows-only dev environment) -- CI
-  (`build-src.yml`, matrix over all three OSes) is the first real
-  cross-platform check for those two.
+- **Verification status:** compiled successfully on Windows (`.rc`
+  resource compiles and links, runtime icon PNGs land next to the built
+  `.exe`, app launches without crashing). Icon's actual on-screen
+  appearance not confirmed via screenshot this pass. macOS bundle
+  packaging and Linux `.desktop`/install rules have no local toolchain to
+  verify against -- CI is the first real cross-platform check for those
+  two (details: `CHANGE_HISTORY.md`, 2026-08-11, issue #26).
 
-**Issue #27 (title bar buttons "not flush to window edge") — investigated,
-could not reproduce; read this before trusting a screenshot-based UI bug
-report in this environment again:**
-- **This was a false positive caused by a DPI-measurement-tooling bug,
-  not a real product defect.** The original report (filed during the
-  #21-#25 retest pass) was based on a screenshot that mixed a
-  DPI-aware `GetWindowRect()` P/Invoke call with .NET's
-  `System.Windows.Forms.Screen.Bounds`/`Graphics.CopyFromScreen()` in
-  the same PowerShell session -- the latter returned a *logical*
-  (scaled-down) screen size despite `SetProcessDPIAware()` having been
-  called, so the screenshot only captured roughly the top-left quarter
-  of the true physical screen. The window (genuinely maximized to the
-  full physical resolution) rendered its title bar buttons correctly at
-  the true physical right edge -- just outside that undersized capture
-  -- which looked exactly like "a gap before the window's true edge."
-- **The fix for the tooling, if you hit this again**: don't rely on
-  `System.Windows.Forms.Screen.Bounds` for capture dimensions in this
-  environment. Instead, size the capture bitmap explicitly from a
-  DPI-aware `GetWindowRect()`/`GetSystemMetrics(SM_CXVIRTUALSCREEN)`
-  P/Invoke call, and pass that same explicit size to
-  `Graphics.CopyFromScreen()` rather than trusting `Screen.Bounds` to
-  already be in the right coordinate space. Re-verified this way (a
-  4x-zoomed crop of the true physical top-right corner): the button
-  cluster **is** flush and evenly spaced, no gap, no code change needed.
-- **`CustomTitleBar.cpp`'s existing right-alignment math is correct as
-  written** -- `ImGui::SameLine(drag_zone_end_x, 0.0f)` using
-  `ImGui::GetWindowWidth()` operates entirely within ImGui's own
-  internal logical coordinate system (not affected by the OS-level DPI
-  API inconsistency above), so there was never a plausible code-level
-  mechanism for the reported gap once the measurement was corrected.
-  Don't "fix" this code without a *real* (physical-pixel-accurate)
-  screenshot showing an actual gap first.
-- A comment explaining this was posted on issue #27 recommending it be
-  closed as "cannot reproduce"; not closed automatically (per this
-  project's usual caution around closing issues without confirmation).
-- **Correction (2026-08-11, during issue #31's second pass): the bug WAS
-  real, and this "not reproducible" conclusion was wrong.** The
-  DPI-measurement tooling problem described above was genuine and did
-  produce a misleading screenshot -- but there was also a real
-  right-alignment defect underneath it, of exactly the reported kind. The
-  claim above that "there was never a plausible code-level mechanism"
-  missed one: `ImGui::SameLine(offset_x)` measures from the *content*
-  origin and silently adds the enclosing group's `GroupOffset.x`, which
-  for a menu bar equals `WindowPadding.x` (14px at 100%, 28px at 200%) --
-  so the cluster really was shifted past the window's right edge. Fixed
-  under #31 by positioning with absolute screen coordinates; see that
-  section for the full explanation. Lesson worth keeping: "the math looks
-  right" is not the same as having checked what the API's offset is
-  actually relative to.
+**Issue #27 (title bar buttons "not flush to window edge") — resolved
+under #31, correcting an earlier wrong "cannot reproduce" verdict:**
+`ImGui::SameLine(offset_x)` measures from the *content* origin and
+silently adds the enclosing group's `GroupOffset.x` (== `WindowPadding.x`
+for a menu bar), so the button cluster really was shifted past the
+window's right edge (14px at 100%, 28px at 200%). Fixed under #31 by
+positioning `CustomTitleBar`'s button cluster with absolute screen
+coordinates (`SetCursorScreenPos()`) instead of `SameLine(offset_x)` --
+see the #31 section below. A separate DPI-measurement-tooling bug in the
+original bug-report screenshot (mixing DPI-aware `GetWindowRect()` with
+non-DPI-aware `.NET Screen.Bounds`) made the first investigation
+conclude "not reproducible"; that conclusion was wrong (details:
+`CHANGE_HISTORY.md`, 2026-08-11, issue #27).
 
-**Panel icon headers (issue #28 Part 2) — read before touching
-`gui/PanelIcons.{h,cpp}`; Alt-mnemonics (Part 1) were reverted, see below
-and issue #30:**
-- **Panel icons could NOT be "an icon inside the native dock-tab label
-  text"** -- Dear ImGui has no public API to embed an arbitrary glyph
-  inside a window's title/tab-bar string without either an icon font (a
-  new asset/dependency this project doesn't otherwise need) or reaching
-  into `imgui_internal.h` to hook the *shared* dock-node tab bar
-  (fragile, version-coupled, and not a pattern used elsewhere in this
-  codebase). **Decided instead**: each panel calls
-  `gui::DrawPanelIconHeader(PanelIcon::X, "Label")`
-  (`gui/PanelIcons.{h,cpp}`, new) as the very first thing after
-  `ImGui::Begin()` -- draws a small hand-drawn icon (same
-  `ImDrawList`-primitives-in-a-`P()`-helper style as `IconToolbar.cpp`
-  and `ViewportPanel.cpp`'s UCS icon, no icon font) plus the label text
-  and a separator, inside the panel's own content area -- a header *row
-  inside the content*, not literally inside the OS-drawn tab strip, a
-  deliberate documented tradeoff.
-- **`ViewportPanel::Draw()`'s icon header consumes a little of
-  `ImGui::GetContentRegionAvail()`** before the 3D render texture size
-  is computed -- intentional and harmless, not a bug.
-- **Confirmed genuinely working via real screenshots**, first for
-  Viewport (issue #29's retest pass), then re-confirmed on a fresh build
-  plus two more panels (Properties, Log) in a dedicated "build and test
-  #28" pass: the small hand-drawn icon renders correctly before each
-  panel's title text in its content area, exactly as designed. The
-  remaining four panels (`RunPanel`, `LoadsPanel`, `JointsMembersPanel`,
-  `DetailingPanel`) weren't individually screenshotted -- they call the
-  exact same `DrawPanelIconHeader()` function, so three-for-three
-  confirmations across genuinely different panels is treated as
-  sufficient confidence for the rest rather than clicking through every
-  remaining tab for marginal additional certainty.
-- **Superseded by issue #35 (2026-08-11): this was not what was
-  requested, and the technical rejection above turned out to be
-  incomplete.** The user clarified the actual ask was an icon on the
-  panel's own dock **tab button**, not a duplicate-title content row --
-  the tab already shows the title. `DrawPanelIconHeader()` and its
-  content-row call sites (all 7 panels) were removed entirely; see the
-  `gui/PanelTitles.{h,cpp}` / `app/DockTabIcons.{h,cpp}` section below
-  for what replaced it, and for the technique this section's own
-  "no public API, would need imgui_internal.h (fragile)" reasoning
-  missed: `imgui_internal.h` access for dock-tab-bar geometry
-  (`ImGuiDockNode`/`ImGuiTabBar`/`ImGuiTabItem`) is no more fragile than
-  what `Application.cpp`'s `DockBuilder*` calls (issue #15) already
-  depend on -- both are the same semi-public "Docking Builder" section
-  of `imgui_internal.h`, not a deeper internal hack.
+**Panel icon headers (issue #28 Part 2) — superseded by issue #35, see
+below; kept here only for the historical reasoning:** the original
+approach (`gui::DrawPanelIconHeader()`, a hand-drawn icon + label row
+drawn as the first thing inside each panel's content area, since Dear
+ImGui has no public API to embed a glyph inside a dock tab's own label)
+was confirmed working via screenshots, but the user clarified the actual
+ask was an icon on the dock **tab button** itself, not a duplicate-title
+content row. `DrawPanelIconHeader()` and its 7 call sites were removed
+entirely and replaced by the `gui/PanelTitles.{h,cpp}` +
+`app/DockTabIcons.{h,cpp}` mechanism described below (details:
+`CHANGE_HISTORY.md`, 2026-08-11, issues #28/#35).
 
 **Part 1 (Alt-mnemonics) was reverted -- Dear ImGui does NOT parse
-`&`-prefixed labels; this was a wrong assumption, caught by actually
-running a build, not by code review:**
-- The original #28 implementation added `&File`/`&Edit`/etc. to
-  `Toolbar::Draw()`'s menu labels, assuming Dear ImGui would strip the
-  `&` and underline the following letter (the Win32/Qt/wxWidgets
-  convention) once `ImGuiConfigFlags_NavEnableKeyboard` was set. **It
-  does not** -- confirmed via a real screenshot during issue #29's
-  retest pass: the literal `&` character was displayed in the menu bar
-  ("&File", "&Edit", ...), completely unparsed. Dear ImGui has no
-  built-in equivalent to this mnemonic system for regular menu labels.
-- **Reverted to plain labels** (`File`, `Edit`, `View Plane`, `Loads`,
-  `Run`, `View`) rather than ship the visibly-broken `&`-prefixed text.
-  Rebuilt and re-screenshotted to confirm the revert actually fixed it.
-- **Real Alt+letter mnemonic support needs to be hand-rolled** if wanted
-  (parse a mnemonic marker yourself, draw an underline only while Alt is
-  held, detect Alt+letter yourself and open the menu) -- scoped as a
-  fresh issue, **#30**, rather than attempted again under time pressure
-  within the same pass that just found the bug. Don't re-add bare `&`
-  prefixes to these labels without implementing that machinery first.
-- **This was found while working issue #29** (the "retest #21-#25"
-  follow-up), not #28 itself -- #28 was already closed by the time this
-  was discovered; a comment was posted there cross-referencing this
-  correction and #30, per this project's transparency conventions
-  (see the #13/epic-13 closure-correction precedent earlier in this file
-  for the established pattern of correcting past claims openly rather
-  than silently).
+`&`-prefixed labels.** The original #28 implementation added
+`&File`/`&Edit`/etc. assuming Dear ImGui would strip the `&` and
+underline the following letter once `ImGuiConfigFlags_NavEnableKeyboard`
+was set; it does not -- the literal `&` rendered unparsed. Reverted to
+plain labels (`File`, `Edit`, `View Plane`, `Loads`, `Run`, `View`). Real
+Alt+letter mnemonic support needed to be hand-rolled -- scoped as issue
+**#30** (details: `CHANGE_HISTORY.md`, 2026-08-11, issue #28 Part 1).
 
 **Issue #30 (real Alt-mnemonic menu navigation) — implemented; read before
 touching `Toolbar.cpp`'s `BeginMnemonicMenu()`:**
@@ -970,25 +821,14 @@ touching `Toolbar.cpp`'s `BeginMnemonicMenu()`:**
   claimed by the separate `"View"` layout-preset menu. Letters: File=F,
   Edit=E, View Plane=P, Loads=L, Run=R, View=V (same assignment #28
   originally picked, before the "&" attempt was found broken).
-- **What was verified vs. not:** compiled cleanly (MSVC/Ninja,
-  `windows-release`) via the `builder` skill. **Interactive
-  confirmation (Alt held -> underlines actually appear in the right
-  place; Alt+letter -> the right menu actually opens) was not
-  completed** -- attempting to grab foreground for screenshotting
-  repeatedly landed on the user's own actively-in-use browser window
-  (reading this project's GitHub issue #29 in real time), not an
-  unrelated background process. Correctly identified as the user's live
-  session rather than background interference, so automation was
-  stopped and their window state was restored rather than continuing to
-  fight for control of their active session. The underline-position math
-  and the `OpenPopup`-before-`BeginMenu` idiom are both standard,
-  well-understood Dear ImGui techniques (not the kind of "assumed but
-  wrong" mistake #28's `&`-prefix attempt was, which assumed a
-  *library* feature that plain research/testing would have caught
-  immediately) -- but given #28's own lesson that assumptions about this
-  exact library should be verified empirically before trusting them,
-  don't treat this as fully confirmed until a real interactive pass
-  (Alt held + screenshot, Alt+letter + screenshot) succeeds.
+- **Verification status:** compiled cleanly. Interactive confirmation
+  (Alt held -> underlines appear; Alt+letter -> menu opens) was not
+  completed -- automation repeatedly landed on the user's own active
+  browser window and was stopped rather than fight for control of their
+  session. The underline-position math and `OpenPopup`-before-`BeginMenu`
+  idiom are standard Dear ImGui techniques, but per #28's lesson, treat
+  as unconfirmed until a real interactive pass succeeds (details:
+  `CHANGE_HISTORY.md`, 2026-08-11, issue #30).
 
 **`gui/PanelTitles.{h,cpp}` + `app/DockTabIcons.{h,cpp}` (issue #35,
 correcting #28 Part 2) — read before touching any panel's `ImGui::Begin()`
@@ -1052,169 +892,37 @@ call, any `DockBuilderDockWindow()` call, or the dock-tab icon mechanism:**
   `DrawPanelIcon()` primitive, parameterized on `size` instead of a
   fixed 16px constant) and `PanelTitles.{h,cpp}` stay under `gui/` since
   they don't touch dock internals themselves.
-- **What was verified:** compiled cleanly (MSVC/Ninja, `windows-release`)
-  and confirmed via real screenshots at 100% and 200% `ORCISF_UI_SCALE`:
-  all 7 panels' dock tabs show their icon correctly positioned
-  immediately before the title text with no overlap, at both scales; the
-  three view-layout presets' dock placement is pixel-identical to before
-  this change (confirming the `"###stable_id"`-only `DockBuilderDockWindow()`/
-  `FindWindowByName()` lookups resolve to the same windows as the old
-  plain-string names did); no panel body shows a duplicate title/header
-  row anymore. Tab close buttons are still visually present in every
-  screenshot -- whether clicking them actually closes the panel is
-  issue #37's own bug to investigate, not verified here.
+- **Verification status:** compiled cleanly; confirmed via real
+  screenshots at 100% and 200% `ORCISF_UI_SCALE` -- all 7 panels' dock
+  tabs show correctly positioned icons, dock placement pixel-identical to
+  before, no duplicate title row (details: `CHANGE_HISTORY.md`,
+  2026-08-11, issue #35). Tab close-button *functionality* was found
+  broken separately -- see issue #37 below.
 
 **Issue #29 (interactive retest of RunPanel dataset gating + plane-offset
-overlay) — still blocked, not resolved this pass; read before attempting
-this again:**
-- **What this pass DID accomplish**: fixed and confirmed the #28
-  mnemonic regression above (a real, concrete finding), and confirmed
-  #28's panel-icon-header Part 2 genuinely works via screenshot -- both
-  via a corrected, DPI-aware screenshot technique (explicit physical-pixel
-  bitmap size, not `.NET`'s `Screen.Bounds`, per issue #27's finding)
-  combined with an `AttachThreadInput`-based foreground-grab (see #11's
-  original interactive-verification notes) that *did* reliably work this
-  time for getting the app's main window foregrounded and its menu bar
-  clickable.
-- **What still did NOT work: driving the native "Open Data..."
-  folder-picker dialog to actually load a dataset.** Coordinate-based
-  clicking inside the dialog repeatedly mis-hit targets (clicked "New
-  Data" instead of "Open Data..." once; a "Cancel" click coordinate
-  computed from a *previous* screenshot's displayed/scaled pixel
-  position without re-multiplying by the DPI scale factor missed
-  entirely). **A new hazard was also hit**: an unrelated app (Proton
-  Drive, this user's own cloud-sync client) spontaneously opened its own
-  window mid-sequence, stealing focus -- not triggered by anything this
-  session did, just an environment where background apps can grab
-  foreground focus unpredictably at any time, independent of the
-  already-documented "another Claude/browser session steals focus"
-  hazard. Left untouched (did not force-close another app's window).
-- **Lesson for next attempt**: always recompute click coordinates from
-  the *most recent* screenshot taken *after* any UI state change, in the
-  same physical-pixel coordinate space that screenshot was captured in
-  -- never reuse a coordinate read from an earlier screenshot's displayed
-  (scaled-for-viewing) dimensions without re-deriving it fresh. Consider
-  keyboard-only navigation (arrow keys + Enter within the folder picker,
-  or typing a path directly into the address bar and confirming with a
-  single unambiguous key) over mouse coordinates for native dialogs,
-  since a single missed click can silently land on the wrong control
-  with no error.
-- **Issue #29's core objective (confirm RunPanel enables Run and the
-  plane-offset overlay appears once a real dataset is loaded) remains
-  unverified.** Code review (from the previous pass, still valid) found
-  no defect in either code path. Don't close #29 until a real load
-  succeeds and both behaviors are actually observed.
-
-**Second attempt at #29 -- root cause of the automation failure
-precisely diagnosed this time (a specific dialog control resists
-synthetic input, not a coordinate-math mistake); still not resolved:**
-- **Progress made**: this pass confirmed the app's own File menu is
-  fully keyboard-navigable (Down/Down/Enter reliably moved nav focus
-  from "New Data" to "Open Data..." and activated it, confirmed via
-  screenshots showing the nav-focus highlight box moving correctly) and
-  that the native "Select Folder" dialog does open correctly in
-  response. Foreground-grabbing via `AttachThreadInput` also worked
-  reliably again once confirmed the *actual* current foreground window
-  wasn't the user's own active session (checked `GetForegroundWindow()`
-  first, out of caution, before grabbing anything).
-- **Precisely diagnosed blocker**: the "Select Folder" dialog on this
-  Windows install is the **newer WinUI3/XAML-based Windows 11 file
-  picker** (visible from its "Home"/"Gallery" sidebar entries and rounded
-  scrollbar styling, not the classic Win32 common-item-dialog look).
-  Its "Folder:" text-entry field **does not accept synthetic input** in
-  this environment -- neither `SetCursorPos`+`mouse_event` clicks
-  (single or double-click, at coordinates re-verified correct via a
-  screenshot taken immediately before each attempt) nor
-  `SendKeys::SendWait()` typed text ever populated the field; it stayed
-  visibly empty across five distinct attempts (direct click+type,
-  `Ctrl+A`-then-type, `Ctrl+L`-then-`Ctrl+A`-then-type, double-click,
-  each re-screenshotted to confirm). One `Ctrl+A` attempt visibly
-  expanded/navigated the left sidebar's tree view instead, indicating
-  keyboard focus was landing somewhere else in the dialog entirely, not
-  the text field, regardless of where the mouse had just clicked.
-- **Why this is a plausible, not just a "kept failing" explanation**:
-  WinUI3/XAML controls are known to require real UI Automation (e.g. the
-  Windows UI Automation COM API, or a wrapper like FlaUI) to reliably
-  receive focus and input from external automation -- raw `SendInput`
-  mouse/keyboard events that work fine against classic Win32 controls
-  (confirmed working against this *app's own* ImGui-rendered menu, and
-  against the *older-style* "Save As" dialog seen in an earlier #29
-  attempt, which behaved differently) are known to be unreliable against
-  this specific newer dialog family. This is a testable, falsifiable
-  claim -- not a shrug.
-- **What this means for the next attempt**: don't repeat plain
-  `SetCursorPos`/`SendKeys` against this dialog's text field expecting a
-  different result. Either (a) use a real UI Automation library/API
-  instead of raw input synthesis for this specific dialog, (b) drive
-  the dialog via mouse-only navigation through the folder tree/file list
-  (which *did* visually respond to clicks, e.g. the sidebar tree
-  expanded) rather than the text field, clicking down into the target
-  folder and then clicking "Select Folder", or (c) ask the user to load
-  the dataset manually and hand off from there. Cancelled cleanly via
-  `{ESC}` (which *did* reach the dialog -- window-level accelerators
-  seem to work even when the text field doesn't) each time, leaving no
-  orphaned dialogs or corrupted app state.
-- **Issue #29's core objective is still unverified.** Not closed.
-
-**Third attempt at #29 -- root cause of automation failures found (not the
-dialog, a DPI-virtualization bug in the automation script itself), core
-objective finally verified, issue resolved:**
-- **Real root cause of every prior coordinate-mismatch failure**: the
-  PowerShell process driving `SetCursorPos`/`GetWindowRect` was never
-  marked DPI-aware, so Windows silently virtualized its coordinate space
-  to *logical* pixels (`GetWindowRect` reported `0,0,2560,1392` on this
-  200%-scaled monitor) while screenshots were still being captured in
-  *physical* pixels (`5120x2784`, via an explicitly-sized
-  `Bitmap`/`CopyFromScreen`) -- a 2x mismatch between where clicks
-  actually landed and where the screenshots said they should land. This
-  fully explains the WinUI3 dialog symptoms blamed in the second attempt
-  (sidebar clicks consistently landing one row group off, "Ctrl+A"
-  appearing to hit the tree view instead of the text field) -- it was
-  never really about WinUI3/XAML resisting synthetic input, it was
-  ordinary clicks landing at literally the wrong pixel. **Fix**: call
-  `SetProcessDPIAware()` once at the start of the automation script,
-  before any `SetCursorPos`/`GetWindowRect` call, so both operate in the
-  same physical-pixel space the screenshots already used. Confirmed by
-  re-checking `GetWindowRect()` after the fix: `0,0,5120,2784`, matching
-  the screenshot dimensions exactly.
-- **With that fixed, mouse-driven navigation through the WinUI3 "Select
-  Folder" dialog worked on the very next attempt** -- no UI Automation
-  library needed after all; the second attempt's diagnosis of "this
-  dialog's text field resists synthetic input" was itself a
-  DPI-coordinate-mismatch artifact, not a real WinUI3 limitation. Revise
-  future automation in this environment accordingly: always call
-  `SetProcessDPIAware()` first, don't reach for UI Automation/FlaUI as a
-  first resort for a misbehaving native dialog on a high-DPI machine --
-  check the coordinate space first.
-- **Both of #29's acceptance criteria were then directly confirmed**
-  with a real dataset loaded (`Example/Apl1-1` copied to
-  `C:\Users\IT\Documents\orcisf\Apl1-1\aplikasi`, loaded via File > Open
-  Data...): (1) **RunPanel dataset gating (#25)** -- the Dataset field
-  showed the loaded path, all cost/design parameter fields were
-  populated, and the **Run** button rendered enabled (not the "Enter a
-  dataset path to enable Run" placeholder the user had reported still
-  seeing). (2) **2D plane-lock offset overlay (#22/#24)** -- selecting
-  View Plane > "X-Y plane (locks Z)" correctly switched the viewport to
-  an orthographic top-down projection and revealed a
-  "Plane X-Y -- Z offset (m)" label with an editable `0.000` numeric
-  field plus an updated UCS icon in the viewport's bottom-left corner,
-  confirmed via a close-up crop -- this was **not** broken, contrary to
-  the user's report; it was rendering correctly, just never reached
-  because #29's earlier attempts couldn't get a dataset loaded to fully
-  exercise the interactive view-locking path.
-- **Not independently re-verified this pass**: actually typing a new
-  numeric Z-offset value and confirming it moves a placed joint (the
-  interaction was attempted, but a WhatsApp desktop notification toast
-  spontaneously popped up and stole keyboard focus mid-sequence --
-  another instance of this environment's background-app focus-stealing
-  hazard, same category as the second attempt's Proton Drive incident.
-  Automation was stopped immediately rather than risk interacting with
-  that toast). The overlay's presence and its being a live `ImGui`
-  numeric input (not a static label) is strong evidence the underlying
-  binding works, consistent with #22/#24's original code review, but the
-  specific "typing a value moves geometry" round-trip is unconfirmed.
-- **Issue #29 resolved and closed** -- both criteria the user explicitly
-  asked to have re-verified are now interactively confirmed.
+overlay) — resolved and closed after three attempts:**
+- Both acceptance criteria confirmed with a real dataset loaded via File
+  > Open Data...: **RunPanel dataset gating (#25)** — Dataset field
+  populated and Run button renders enabled once a real dataset is loaded.
+  **2D plane-lock offset overlay (#22/#24)** — View Plane > X-Y correctly
+  shows an orthographic top-down projection with an editable
+  "Z offset (m)" field and updated UCS icon; this was never actually
+  broken, just unreached in earlier attempts.
+- **Durable automation lesson**: on this high-DPI dev machine, always
+  call `SetProcessDPIAware()` in any PowerShell/automation script *before*
+  any `SetCursorPos`/`GetWindowRect` call, and size screenshot capture
+  bitmaps explicitly (not via `.NET`'s `Screen.Bounds`) — a DPI-unaware
+  automation script silently operates in virtualized logical-pixel
+  coordinates while screenshots are physical-pixel, a 2x mismatch on a
+  200%-scaled monitor that produces misleading, hard-to-diagnose click
+  failures. Two earlier attempts misdiagnosed this exact mismatch as a
+  WinUI3/XAML dialog resisting synthetic input; it wasn't.
+- Actually typing a new numeric Z-offset value and confirming it moves a
+  placed joint was not independently re-verified (interrupted by a
+  focus-stealing notification toast) — the overlay's presence as a live
+  ImGui input is strong but not conclusive evidence.
+- Full three-attempt debugging narrative: `CHANGE_HISTORY.md`, 2026-08-11,
+  issue #29.
 
 **AutoCAD-style Add Joint + editing guidance (issue #18, part of epic
 #13) — read before touching `EditorOptions::add_joint_mode`/
@@ -1249,18 +957,11 @@ objective finally verified, issue resolved:**
   (even a blank in-memory structure) is loaded, see
   `Application::LoadStructure()` -- so a blank-but-editable dataset now
   renders its (empty) interactive viewport correctly.
-- **What was verified interactively:** toggling Add Joint mode
-  (button highlights, tooltip and menu checkmark update, status-bar
-  hint text appears); clicking empty viewport space placed a joint
-  exactly at the click position (Properties panel showed "Joint 1" with
-  correct auto-calculated position); the mode stayed active after
-  placement -- a second click placed "Joint 2" without re-opening any
-  menu. Connect Joints' new first-click-vs-second-click hint text
-  distinction was code-reviewed but not re-verified live in this pass
-  (focus-stealing interference from an unrelated process in this
-  environment interrupted that specific check; the code mirrors the
-  exact `connect_first_joint` state check already proven correct
-  elsewhere in this file).
+- **Verification status:** toggling Add Joint mode and click-to-place
+  (including staying active across repeated placements) confirmed
+  interactively. Connect Joints' first-click-vs-second-click hint text
+  was code-reviewed but not re-verified live (interrupted by unrelated
+  focus-stealing; details: `CHANGE_HISTORY.md`, 2026-08-11, issue #18).
 
 **`gui/JointsMembersPanel.{h,cpp}` (issue #21, part of epic #20) — read
 before touching this panel or `EditableStructure::DeleteJoint()`'s
@@ -1307,18 +1008,10 @@ callers:**
   toolchain available in this environment this session, see Validation
   below); re-verify the modal actually opens on a real cascade-delete
   before treating #21 as fully done.
-- **What was verified:** the code follows `LoadsPanel`'s and
-  `PropertiesPanel`'s already-proven patterns (row selection sync,
-  inline edit commit, `math3d::Vec3` construction) exactly, and
-  `EditableStructure`'s public API/field names (`JJ`/`JK`/`M`/`SdForUndo()`)
-  were cross-checked against `EditableStructure.h`/`.cpp` directly.
-  **Compiled successfully** in a later session (MSVC/Ninja,
-  `windows-release` preset, both `orcisf_cli` and `orcisf_gui` targets) --
-  see the #16 entry below for how a build toolchain became available.
-  Interactive exercise of the cascade-delete modal specifically (does it
-  actually pop up on a real multi-member joint delete) was not re-checked
-  -- CI plus a real interactive pass are still the next steps for full
-  confidence.
+- **Verification status:** code follows `LoadsPanel`/`PropertiesPanel`'s
+  proven patterns and cross-checked API; compiled successfully. Interactive
+  exercise of the cascade-delete modal specifically was not re-checked
+  (details: `CHANGE_HISTORY.md`, 2026-08-11, issue #21).
 
 **Superseded by issue #36 (2026-08-11): `JointsMembersPanel` was split
 into `gui/JointsPanel.{h,cpp}` and `gui/MembersPanel.{h,cpp}`, two
@@ -1336,60 +1029,31 @@ reordered the shared dock group's tab order to Joints, Members, Loads
 comment on *why* that reorder had to happen via `Draw()` call order, not
 via `DockBuilderDockWindow()` call order (a wrong assumption caught by
 screenshotting a mismatch, not by reading Dear ImGui's source).
-**What was verified for #36 specifically:** compiled cleanly; real
-interactive data flow confirmed via a scratch blank structure (Add Joint
-x2, Connect Joints to link them into a member) -- `JointsPanel`'s table
-correctly showed both joints' live X/Y/Z, `MembersPanel`'s table
-correctly showed the resulting member with the right Joint A/B, and the
-tab order matched Joints/Members/Loads/Log exactly as required, all via
-real screenshots. **The cascade-delete modal was NOT re-verified this
-pass** -- multiple precisely-aimed automated clicks on the Joints
-table's per-row "Delete" button (confirmed via a crosshair-annotated
-screenshot to be landing within the button's visible rect, and via
-`GetCursorPos()`/`GetWindowRect()` to rule out a coordinate-space
-mismatch) produced no hover highlight and no click effect at all,
-for a reason not root-caused in this pass. Given the modal's code is
-byte-for-byte the code #21 already shipped with the same "not yet
-interactively verified" caveat above, this isn't a new regression risk
-introduced by the split -- but it remains open work for a future
-interactive pass, ideally one that root-causes why this specific
-`SmallButton` inside a `SpanAllColumns`-selectable table row didn't
-respond to synthesized clicks that worked fine everywhere else in the
-same session (tabs, toolbar icons, viewport clicks).
+**Verification status for #36:** compiled cleanly; real interactive data
+flow confirmed (`JointsPanel`/`MembersPanel` tables correctly reflecting
+a scratch structure, tab order correct). The cascade-delete modal was
+NOT re-verified this pass -- precisely-aimed synthetic clicks on the
+Joints table's per-row "Delete" button produced no effect, for a reason
+not root-caused (same unverified status #21 already had, not a new
+regression from the split; details: `CHANGE_HISTORY.md`, 2026-08-11,
+issue #36).
 
 **Docked-panel close-button bug + View menu Menubar/Subwindows/Layout
 sections + "Run Optimization" -> "Optimization" rename (issue #37) — read
 before touching `Application::OnFrame()`'s per-panel `Draw()` calls,
 `Toolbar.cpp`'s View menu, or `IconToolbar.cpp`'s per-button visibility:**
-- **Root cause of the close-button bug, found by direct instrumentation,
-  not by reading Dear ImGui source (not available -- this project links
-  a vcpkg-installed, headers-only copy of ImGui, no `.cpp` to read):**
-  `Application::OnFrame()` called every panel's `Draw(&panel_open_, ...)`
-  unconditionally, every frame, trusting `ImGui::Begin(name, open)` to
-  no-op once `*open` went false -- the standard, usually-correct idiom.
-  Two temporary debug probes (reverted before commit, not left in the
-  codebase) proved this trust was misplaced specifically for *docked*
-  windows: (1) logging `io.MousePos`/`ImGui::GetHoveredID()` on every
-  click confirmed clicks landed exactly where intended (no DPI/coordinate
-  mismatch -- an early, wrong hypothesis); (2) a before/after snapshot of
-  every panel's own open-flag around the `Draw()` calls proved the tab
-  close button's click **does** correctly flip `viewport_open_`/etc. to
-  `false` (confirmed on both `Viewport` and `Log`, in two different dock
-  groups) -- yet the tab kept rendering on every subsequent frame anyway.
-  Dear ImGui's docked-tab-bar bookkeeping does not remove a window from
-  its dock node purely because `*p_open` went false while `Begin()` for
-  that window keeps getting called; the tab lingers until the caller
-  actually stops calling `Begin()` for it. **Fix**: every panel's
-  `Draw()` call in `OnFrame()` is now wrapped in `if (panel_open_) { ... }`
-  -- skip the call entirely once closed, which is what actually lets
-  Dear ImGui drop the tab. Confirmed via real screenshots, for both
-  `Viewport` and `Log`, both closing correctly.
-- **This bug almost certainly predates #35/#36 and was not caused by
-  either** -- confirmed directly: it reproduced identically with
-  `ViewportPanel`'s title reverted to a plain, fully-static
-  `"Viewport###Viewport"` string (no dynamic leading-space reservation
-  at all), ruling out issue #35's dynamic-title mechanism as the cause
-  before landing on the real fix above.
+- **Root cause of the close-button bug**: `Application::OnFrame()` called
+  every panel's `Draw(&panel_open_, ...)` unconditionally every frame,
+  trusting `ImGui::Begin(name, open)` to no-op once `*open` went false --
+  true for floating windows, but Dear ImGui's docked-tab-bar bookkeeping
+  does not remove a window from its dock node purely because `*p_open`
+  went false while `Begin()` keeps getting called each frame; the tab
+  lingers until the caller stops calling `Begin()` for it. **Fix**: every
+  panel's `Draw()` call in `OnFrame()` is now wrapped in
+  `if (panel_open_) { ... }` -- skip the call entirely once closed. This
+  bug predates #35/#36 (confirmed to reproduce even with a fully static
+  window title, ruling out #35's dynamic-title mechanism as the cause).
+  Root-cause hunt details: `CHANGE_HISTORY.md`, 2026-08-11, issue #37.
 - **`gui/IconVisibility.h`** (new): a plain 8-bool struct, one per
   `IconToolbar` button (`new_data`/`open_data`/`save`/`undo`/`redo`/
   `add_joint`/`connect_joints`/`run`), all defaulting to visible. Owned
@@ -1438,21 +1102,13 @@ before touching `Application::OnFrame()`'s per-panel `Draw()` calls,
   **layout preset** (Layout) -- both call themselves that on purpose (a
   panel and a preset are different kinds of things a user picks from
   different submenus), not a naming bug.
-- **What was verified interactively (real screenshots throughout, not
-  code review):** the close-button fix, confirmed on two different
-  panels in two different dock groups; the full View > Subwindows close
-  -> reopen cycle for `Log` (tab disappears, then reappears in its
-  correct #36-ordered position with its prior content intact, since the
-  panel object itself is never destroyed -- only skipped from drawing);
-  View > Menubar's "New Data" toggle hiding/reflowing the icon row; View
-  > Layout's three presets still switching correctly; the "Optimization"
-  rename showing correctly in both the tab title and the Viewport's hint
-  text.
-- **Not independently re-verified**: the remaining 6 panels' close
-  buttons (Properties/Detailing/Optimization/Joints/Members/Loads) --
-  all now go through the exact same `if (panel_open_) { Draw(...) }`
-  gating fix as `Viewport`/`Log`, so this is low risk, but a future pass
-  clicking through all 8 would remove all doubt.
+- **Verification status:** close-button fix, View > Subwindows
+  close/reopen cycle, View > Menubar toggle reflow, View > Layout
+  presets, and the "Optimization" rename all confirmed via real
+  screenshots for `Viewport`/`Log`. The remaining 6 panels' close
+  buttons go through the identical gating fix but weren't individually
+  re-clicked (low risk; details: `CHANGE_HISTORY.md`, 2026-08-11,
+  issue #37).
 
 **2D plane-locked drawing (issue #22, part of epic #20) — read before
 touching `gui/viewport/Camera.{h,cpp}`, `gui/viewport/Math3D.h`'s
@@ -1474,15 +1130,13 @@ touching `gui/viewport/Camera.{h,cpp}`, `gui/viewport/Math3D.h`'s
   hypothetical one, since a top-down structural view is exactly what
   issue #22 asks for. `ViewMatrix()`'s up-vector hint has the matching
   fix (`Cross(Right(), Forward())` instead of `WorldUp()` once locked).
-- **A real sign bug was caught by hand-deriving the cross product, not by
-  running it** (no build toolchain was available this session -- see
-  Validation below): the Y-Z (elevation) plane's `ortho_right_` was
-  initially `{0,0,1}`, which makes `Cross(right,forward)` (the up vector
-  every Camera method derives, matching `Pan()`/`ScreenRay()`'s existing
-  pattern) work out to world **-Y** -- since Y is this project's vertical
-  axis, that would have rendered the elevation view upside-down. Fixed to
-  `{0,0,-1}`. The X-Y and X-Z planes' basis vectors were hand-verified
-  the same way and are correct as written.
+- **Real sign bug found and fixed**: the Y-Z (elevation) plane's
+  `ortho_right_` was initially `{0,0,1}`, which makes `Cross(right,forward)`
+  (the up vector every `Camera` method derives) work out to world **-Y**
+  -- since Y is this project's vertical axis, that would render the
+  elevation view upside-down. Fixed to `{0,0,-1}` (caught by hand-deriving
+  the cross product, no build toolchain available that session; details:
+  `CHANGE_HISTORY.md`, 2026-08-10, issue #22).
 - **Orthographic projection reuses `Camera::distance`** (the same field
   `Zoom()` already scales via scroll) as the ortho frustum's half-height,
   so zooming feels consistent switching between perspective and a locked
@@ -1512,16 +1166,10 @@ touching `gui/viewport/Camera.{h,cpp}`, `gui/viewport/Math3D.h`'s
   story). Originally (as first implemented here) the viewport only drew a
   read-only text readout; that's now a real interactive control docked
   under the UCS icon (issue #23).
-- **What was verified:** the cross-product/up-vector math was
-  hand-derived and re-checked (catching the Y-Z sign bug above); the
-  code was reviewed against `Camera.h`/`.cpp`'s existing patterns
-  (`Pan()`/`ScreenRay()`'s `Cross(right,forward)` up-derivation,
-  `EyePosition()`'s `target - Forward()*distance`). **Compiled
-  successfully** in a later session (MSVC/Ninja, `windows-release`
-  preset) -- see the #16 entry below. The three plane views' actual
-  on-screen rendering and click-to-place-on-the-locked-plane behavior
-  were not interactively exercised in a running app; that's still the
-  next step for full confidence (CI plus a real interactive pass).
+- **Verification status:** cross-product/up-vector math hand-derived and
+  re-checked; compiled successfully in a later session. The three plane
+  views' actual on-screen rendering and click-to-place-on-locked-plane
+  behavior were not interactively exercised in a running app.
 
 **"Re-optimize from last best result" (issue #16, part of epic #13) — read
 before touching `engine::OptimizationOptions`'s `seed_*` fields,
@@ -1561,22 +1209,14 @@ before touching `engine::OptimizationOptions`'s `seed_*` fields,
   runs *before* any worker threads exist -- `worker_threads` still only
   changes wall-clock time, never the numeric result, with or without
   seeding.
-- **What was verified:** compiled cleanly (both `orcisf_cli` and
-  `orcisf_gui`, MSVC/Ninja, `windows-release` preset) and empirically
-  exercised via a standalone scratch program linked against
-  `orcisf_engine` (not checked in) against a scratch copy of
-  `Example/Data01`: a truncated baseline run
-  (`harga=3.02672e+07 kendala=0`) followed by a seeded re-optimization
-  (`harga=2.46519e+07 kendala=0`) -- lower cost, confirming the seed took
-  effect and the search genuinely continues rather than restarting.
-  Re-running the seeded case with `worker_threads=4` produced a
-  bit-identical result to `worker_threads=1`, confirming issue #4's
-  determinism guarantee holds with seeding active. Full details and exact
-  numbers in `engine/README.md`'s "Re-optimize from last best" section.
-  The GUI checkbox/wiring itself (`RunPanel`'s `has_result_`/
-  `reoptimize_from_last_`) was reviewed but not interactively clicked
-  through in a running app this session -- the underlying engine
-  mechanism it drives is what was directly verified.
+- **Verification status:** compiled cleanly; empirically exercised via a
+  standalone scratch program against `Example/Data01` -- a seeded
+  re-optimization produced lower cost than the baseline (confirming the
+  seed takes effect) and `worker_threads=4` reproduced a bit-identical
+  result to `worker_threads=1` (confirming #4's determinism guarantee
+  holds with seeding active). Full numbers: `engine/README.md`'s
+  "Re-optimize from last best" section. The GUI checkbox itself was
+  reviewed but not interactively clicked through.
 
 **UCS icon overlay (issue #23, part of epic #20) — read before touching
 `ViewportPanel.cpp`'s `DrawUcsIcon()`:**
@@ -1607,15 +1247,10 @@ before touching `engine::OptimizationOptions`'s `seed_*` fields,
   (issue #23) it shared the corner with a read-only text readout to its
   *right* instead -- #24 replaced that readout with an interactive
   control docked *below* the icon; see #24's own section for why.
-- **What was verified:** the dot-product projection math was
-  hand-checked for a few reference orientations (default orbit camera:
-  X should point right-ish, Y up, Z out-of-screen-ish) and the code
-  reuses already-verified `Camera` methods rather than new vector math.
-  **Compiled successfully** (MSVC/Ninja, `windows-release` preset) and
-  the app was launched and confirmed running without crashing (see #24's
-  entry below for the same check after that issue's changes). The icon's
-  live rotation-with-camera behavior was not interactively click-tested
-  pixel-by-pixel; still a good next step for full confidence.
+- **Verification status:** dot-product projection math hand-checked for
+  reference orientations; compiled successfully and app launched without
+  crashing. Live rotation-with-camera behavior not pixel-tested
+  interactively.
 
 **Plane-offset control moved into the viewport (issue #24, follow-up to
 #22/#23) — read before touching `ViewportPanel.cpp`'s plane-offset
@@ -1649,14 +1284,11 @@ overlay or `Toolbar.cpp`'s "View Plane" menu:**
   already gates those same lines for ImGuizmo) -- caught by reasoning
   through ImGui's submission-order hover model while writing this, not
   by interactive testing.
-- **What was verified:** compiled cleanly (MSVC/Ninja, `windows-release`
-  preset) and the app was launched and confirmed running (process alive,
-  no crash) after the change. **Not interactively click-tested** --
-  specifically, whether dragging the slider/typing in the field actually
-  avoids triggering orbit, and whether a placed joint's locked coordinate
-  exactly matches a nonzero slider value, are the issue's own stated
-  acceptance criteria and still need a real interactive pass (or a
-  screenshot-based check) before treating #24 as fully done.
+- **Verification status:** compiled cleanly, app launched without
+  crashing. Not interactively click-tested -- whether dragging the
+  slider avoids triggering orbit, and whether a placed joint's locked
+  coordinate matches a nonzero slider value, are the issue's own
+  acceptance criteria and still need a real interactive/screenshot pass.
 
 **Custom borderless window chrome (issue #19, Phase 0) — read before
 touching `app/CustomTitleBar.{h,cpp}`/`app/Theme.{h,cpp}`/`main.cpp`'s
@@ -1695,41 +1327,28 @@ window setup:**
   function themselves.
 - **Dragging is anchored to an absolute screen-cursor position captured
   once at drag start (`ImGui::IsItemActivated()`), not accumulated
-  per-frame `ImGui::GetIO().MouseDelta`.** This is not a native OS drag
-  either way (that's Phase 1+, see below) -- but the delta-based version
-  was tried first and **visibly jittered/shook while dragging**, caught
-  interactively. Root cause: `glfwSetWindowPos()` moves the window but
-  not the physical cursor, so the cursor's *window-relative* position
-  (what GLFW's mouse callback, and therefore ImGui's `MouseDelta`,
-  reports) silently shifts by the exact opposite of the move on the very
-  next frame -- a self-inflicted feedback oscillation. The fix
+  per-frame `ImGui::GetIO().MouseDelta`.** A delta-based version was
+  tried first and visibly jittered: `glfwSetWindowPos()` moves the window
+  but not the physical cursor, so the cursor's window-relative position
+  (what GLFW's mouse callback and ImGui's `MouseDelta` report) silently
+  shifts by the exact opposite of the move on the next frame -- a
+  self-inflicted feedback oscillation. The fix
   (`dragging_`/`drag_start_cursor_screen_*_`/`drag_start_window_*_`
   members) recomputes `glfwGetWindowPos() + glfwGetCursorPos()` fresh
-  every frame (both always-current, not event-cached) and references
-  everything back to the drag-start anchor, which has no feedback path.
-  Verified with a scripted small-step drag logging window position after
-  each step: perfectly linear/monotonic movement, zero oscillation, in
-  both directions and through negative (partially off-screen) X.
-  Don't revert to the delta-based version without re-testing this.
+  every frame and references everything back to the drag-start anchor,
+  which has no feedback path. Don't revert to the delta-based version
+  without re-testing this (details: `CHANGE_HISTORY.md`, 2026-08-11,
+  issue #19).
 - This whole mechanism (whichever version) is deliberate Phase 0 scope
   (see the issue's platform-agnostic-baseline rationale) -- Phase 1+
   replaces it with real native dragging per platform. It's a no-op on
   Wayland (`glfwGetPlatform() == GLFW_PLATFORM_WAYLAND`), surfaced via a
   disabled-looking drag zone + tooltip rather than failing silently.
-- **What was verified interactively:** borderless window (no OS title
-  bar/border) confirmed; title text renders in the menu bar row;
-  Minimize/Maximize/Close icons render correctly including the
-  Maximize<->Restore icon swap; clicking Maximize actually maximized the
-  window (screen-filling, confirmed via screenshot) and clicking
-  Maximize again restored it; the drag mechanism was confirmed working
-  emphatically -- an in-progress click sequence during testing produced
-  a real (if unintentionally large) window-position delta that moved the
-  live window off-screen, which was then recovered with a plain Win32
-  `SetWindowPos` call (not a code change) to bring it back on screen.
-  macOS/Linux were not interactively verified in this environment (no
-  access to those platforms); verify via a real build on each before
-  treating Phase 0 as fully done there, per the issue's acceptance
-  criteria.
+- **Verification status:** borderless window, title text, Minimize/
+  Maximize/Close icons (including the Maximize<->Restore swap), and the
+  drag mechanism all confirmed interactively. macOS/Linux not verified in
+  this environment (no access) -- verify via a real build there before
+  treating Phase 0 as fully done on those platforms.
 
 **DPI awareness (issue #31) — read before touching `main.cpp`'s startup
 sequence or its `EnableWindowsDpiAwareness()`/font/style-scaling code:**
@@ -1824,42 +1443,17 @@ sequence or its `EnableWindowsDpiAwareness()`/font/style-scaling code:**
   testable on a machine with only a 100% monitor attached -- which is how
   these symptoms went unreproduced for several passes. Use it before
   claiming a DPI-related layout bug can't be reproduced locally.
-- **What was verified:** compiled cleanly (MSVC/Ninja, `windows-release`)
-  and **visually confirmed via real DPI-aware screenshots** at 100%,
-  150% and 200%: toolbar/panel icons scale, the title bar buttons are
-  fully visible and correctly centred (measured -- the Close glyph sits
-  exactly half a button width from the true right edge at both 100% and
-  200%), the title elides instead of colliding with the buttons, and no
-  docked panel is clipped under the menu bar/toolbar. Live rescaling was
-  exercised through the real per-frame path via a temporary key-driven
-  scale toggle (since removed) across four consecutive
-  100%<->200% round trips, screenshotted each time: the final 100% state
-  is identical to a fresh 100% launch, confirming no compounding.
-  **Not verified**: an actual two-physical-monitor drag (only one
-  monitor is available in this environment) and macOS/Linux -- the
-  mechanism is the same `glfwGetWindowContentScale()` poll either way,
-  but the specific drag gesture is still the user's own office-machine
-  test.
-- **`tester` pass (2026-08-11) confirmed 4 of 5 acceptance criteria with
-  direct evidence and closed the issue on the user's explicit call.**
-  Criteria 1-3 (chrome scaling, title-bar button visibility/alignment,
-  no panel clipping) were re-verified with fresh screenshots at 100%/
-  150%/200% via `ORCISF_UI_SCALE`, plus a pixel-level measurement of the
-  Close button's glyph-vs-cell centering (offset -0.5px/0px/0px across
-  the three scales -- sub-pixel). Criterion 4 (live rescale, no
-  compounding) was re-exercised through the real `ApplyUiScale()`/
-  per-frame-poll path via a temporary F9 test hook (reverted with `git
-  checkout` and rebuilt before finishing -- confirmed empty diff), two
-  full 100%<->200% round trips, screenshotted: the final 100% frame is
-  visually identical to a fresh 100% launch. **Criterion 5 (verified on
-  the actual dual-monitor Windows dev environment, live drag between two
-  different-DPI monitors) was explicitly reported UNVERIFIED** -- this
-  environment has one physical monitor (confirmed via
-  `Screen.AllScreens`), so the specific hardware test could not run
-  here. The user closed the issue anyway, on the strength of criteria
-  1-4 plus the shared mechanism; if a real dual-monitor drag is ever
-  found to misbehave, treat it as a new report rather than assuming #31
-  covers it.
+- **Verification status:** compiled cleanly; visually confirmed via
+  real DPI-aware screenshots at 100%/150%/200% (chrome scaling,
+  title-bar button visibility/centering, no panel clipping); live
+  rescaling exercised through the real per-frame path across multiple
+  100%<->200% round trips with no compounding. A later `tester` pass
+  re-confirmed criteria 1-4 with fresh evidence and closed the issue on
+  the user's call; **criterion 5 (an actual two-physical-monitor drag)
+  was explicitly left UNVERIFIED** -- only one physical monitor is
+  available in this environment. If a real dual-monitor drag is ever
+  found to misbehave, treat it as a new report (details:
+  `CHANGE_HISTORY.md`, 2026-08-11, issue #31).
 
 **`gui/viewport/` (issue #5) — three things worth knowing before touching it:**
 - **Member cross-section thickness/orientation is a schematic
@@ -2413,4 +2007,6 @@ icon overlay — see each issue's own "read before touching" section above.
 - Every agent that makes a structural/architectural change **must** update both
   files in the same change.
 
-_Last architecture/state compaction: 2026-08-09 (initial AGENTS.md authored)._
+_Last architecture/state compaction: 2026-08-12 (moved narrative/debugging
+history for issues #16-#37 into CHANGE_HISTORY.md, condensed per-issue
+sections to current rules/gotchas only)._
