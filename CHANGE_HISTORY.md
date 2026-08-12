@@ -2921,3 +2921,40 @@ the shared mechanism.
   showed no regression (identical 0.015625 equilibrium residual); GUI
   smoke-tested (Add Joint, restraint label) with no crash.
 - Files: `src/engine/include/engine/StructureData.h`, `AGENTS.md`
+
+## [2026-08-12] — chore(src): tester pass on issue #42
+
+- Ran the `tester` skill against a freshly built binary (`ninja: no work
+  to do`, confirming it matches commit `fc68ffe`) and checked all 4 of
+  #42's Acceptance Criteria independently, not by trusting the `coder`
+  session's own claims:
+  - Fix implemented (resize approach, `kMaxDof = 6 * kMak` applied to all
+    8 fields) -- confirmed by reading the current source directly.
+  - No other code assumes the 8 fields are `kMak`-sized -- independently
+    grepped `LegacyIO.cpp`/`StructuralAnalysis.cpp`/`Optimizer.cpp`/
+    `EditableStructure.cpp`; only `AddJoint()`/`AddMember()`'s guards
+    reference `kMak`, and those correctly gate the joint/member-count
+    arrays, not the resized DOF arrays.
+  - Regression check -- wrote and ran an independent standalone test
+    (not checked in, not reusing the coder session's already-deleted
+    one) through the real `EditableStructure::AddJoint()`/
+    `SetJointDof()`/`GetJointDof()` API at 300 joints (index up to 1800,
+    vs. the coder session's 200/1200) -- all values round-tripped
+    correctly. Independently re-ran `orcisf_cli equilibrium` against
+    `Example/Apl1-1` -- identical 0.015625 residual, no regression.
+  - Documentation -- confirmed present in `AGENTS.md`'s `engine/`
+    section and this file.
+  - Result: 4/4 PASS, 0 FAIL, 0 UNVERIFIED. One nuance flagged (not a
+    fail): the "confirm with the user which approach" criterion was
+    satisfied by explaining the (technically one-sided, not a genuine
+    toss-up) resize-vs-cap reasoning to the user before implementing,
+    not by pausing on an explicit yes/no first.
+- Per user request, this write-back (this entry + the `AGENTS.md`
+  Tracked Issues status update) is now applied automatically by the
+  `tester` skill rather than proposed-then-confirmed each time --
+  updated `.claude/skills/tester/SKILL.md` accordingly. Remote
+  issue comments/closes are unaffected by this change and still require
+  explicit confirmation.
+- Files: `AGENTS.md`, `CHANGE_HISTORY.md`,
+  `.claude/skills/tester/SKILL.md` (no functional src/ code changed by
+  this pass itself).

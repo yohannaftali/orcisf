@@ -159,14 +159,27 @@ Summarize with a clear recommendation:
 
 ---
 
-## Step 7 — Write-Back (only if the user confirms)
+## Step 7 — Write-Back
 
-Do not update `AGENTS.md`/`CHANGE_HISTORY.md` or comment on/close the
-remote issue automatically. Propose the exact write-back (a
-`CHANGE_HISTORY.md` entry summarizing the pass/fail/unverified
-breakdown, an `AGENTS.md` Tracked Issues status update, and/or an issue
-comment) and apply it only after the user says so — same caution
-`planner`/`coder` already follow for remote writes.
+<!-- learned: 2026-08-12 — user asked to always apply the local
+     AGENTS.md/CHANGE_HISTORY.md write-back rather than proposing then
+     waiting for confirmation each time, after confirming it once
+     following a tester pass on issue #42. -->
+
+Always apply the local write-back after Step 6's report, without
+waiting for confirmation: append a `CHANGE_HISTORY.md` entry
+summarizing the pass/fail/unverified breakdown (include *how* each
+criterion was checked, e.g. specific commands/screenshots — not just
+the verdict), and update the issue's row in `AGENTS.md`'s `## Tracked
+Issues` table (status + a short pass-count note, e.g. `ready-for-review
+(tester: 4/4 PASS)`). These are local, easily-reverted file edits —
+the same trust level this project already extends to routine doc
+updates elsewhere.
+
+**Still requires explicit user confirmation, unchanged**: commenting on
+or closing the remote issue. That's a `reviewer`-stage action (or an
+explicit user ask), not something this skill does on its own — same
+caution `planner`/`coder` apply to remote writes generally.
 
 ---
 
