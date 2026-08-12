@@ -1031,12 +1031,16 @@ via `DockBuilderDockWindow()` call order (a wrong assumption caught by
 screenshotting a mismatch, not by reading Dear ImGui's source).
 **Verification status for #36:** compiled cleanly; real interactive data
 flow confirmed (`JointsPanel`/`MembersPanel` tables correctly reflecting
-a scratch structure, tab order correct). The cascade-delete modal was
-NOT re-verified this pass -- precisely-aimed synthetic clicks on the
-Joints table's per-row "Delete" button produced no effect, for a reason
-not root-caused (same unverified status #21 already had, not a new
-regression from the split; details: `CHANGE_HISTORY.md`, 2026-08-11,
-issue #36).
+a scratch structure, tab order correct). The cascade-delete modal's
+earlier unverified/apparently-broken status (Delete-button clicks
+producing no effect, root cause unknown at the time) is now resolved:
+a `tester` pass on 2026-08-12, run *after* issue #41 landed, confirmed
+the modal fires correctly and cascades/compacts indices as designed --
+almost certainly a side effect of #41's `ImGuiSelectableFlags_
+AllowOverlap` fix (the Delete `SmallButton` sits in a column
+`SpanAllColumns` would have blocked the same way it blocked `InputFloat`
+cells), not a separately-applied fix. Details: `CHANGE_HISTORY.md`,
+2026-08-11 (issue #36) and 2026-08-12 (tester pass).
 
 **Docked-panel close-button bug + View menu Menubar/Subwindows/Layout
 sections + "Run Optimization" -> "Optimization" rename (issue #37) — read
@@ -2099,13 +2103,13 @@ later, different one (e.g. closing an issue or cutting a release).
 | #30 | feat(src): implement real Alt-mnemonic menu navigation (Dear ImGui has no built-in "&" parsing) | ready-for-review | 2026-08-11 |
 | #31 | fix(src): application is not DPI-aware -- UI too small on high-DPI monitors in multi-monitor setups | closed | 2026-08-11 |
 | #32 | chore(src): add one-shot build scripts (build.ps1 for Windows, build.sh for macOS/Linux) | ready-for-review | 2026-08-11 |
-| #35 | fix(src): move panel icons onto the dock tab button, remove the in-content icon+title header row (#28 correction) | ready-for-review | 2026-08-11 |
-| #36 | feat(src): split Joints/Members panel into separate Joints and Members panels; order Loads tab immediately after them | ready-for-review | 2026-08-11 |
-| #37 | feat(src): View menu Menubar/Subwindows/Layout sections + fix tab close button + rename "Run Optimization" panel | ready-for-review | 2026-08-11 |
-| #38 | fix(src): move Log tab into right-side Properties/Optimization group; fix Design preset's Properties/Optimization/Log tab order | ready-for-review | 2026-08-12 |
-| #39 | feat(src): editable member type/joint endpoints + Add Member/Add Joint buttons, with joint/member labels in viewport | ready-for-review | 2026-08-12 |
-| #40 | feat(src): per-DOF joint restraint editing (6 checkboxes + Fixed/Pinned/Roller/Free quick-support buttons) | ready-for-review | 2026-08-12 |
-| #41 | fix(src): row-selection Selectable overlaps/covers editable input cells in Joints/Members/Loads tables | ready-for-review | 2026-08-12 |
+| #35 | fix(src): move panel icons onto the dock tab button, remove the in-content icon+title header row (#28 correction) | ready-for-review (tester: 35/37 PASS) | 2026-08-12 |
+| #36 | feat(src): split Joints/Members panel into separate Joints and Members panels; order Loads tab immediately after them | ready-for-review (tester: 35/37 PASS) | 2026-08-12 |
+| #37 | feat(src): View menu Menubar/Subwindows/Layout sections + fix tab close button + rename "Run Optimization" panel | ready-for-review (tester: 35/37 PASS) | 2026-08-12 |
+| #38 | fix(src): move Log tab into right-side Properties/Optimization group; fix Design preset's Properties/Optimization/Log tab order | ready-for-review (tester: 35/37 PASS) | 2026-08-12 |
+| #39 | feat(src): editable member type/joint endpoints + Add Member/Add Joint buttons, with joint/member labels in viewport | ready-for-review (tester: 35/37 PASS) | 2026-08-12 |
+| #40 | feat(src): per-DOF joint restraint editing (6 checkboxes + Fixed/Pinned/Roller/Free quick-support buttons) | ready-for-review (tester: 35/37 PASS) | 2026-08-12 |
+| #41 | fix(src): row-selection Selectable overlaps/covers editable input cells in Joints/Members/Loads tables | ready-for-review (tester: 35/37 PASS) | 2026-08-12 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

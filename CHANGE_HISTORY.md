@@ -2809,3 +2809,39 @@ the shared mechanism.
   `[Custom]` as expected.
 - Files: `src/gui/editor/EditableStructure.{h,cpp}`,
   `src/gui/PropertiesPanel.cpp`, `src/gui/ViewportPanel.cpp`, `AGENTS.md`
+
+## [2026-08-12] — chore(src): tester pass on issues #35-#41
+
+- Ran the `tester` skill against a freshly built `windows-release` binary
+  (confirmed identical to the implementation-session build, `ninja: no
+  work to do`) and checked every Acceptance Criterion for #35, #36, #37,
+  #38, #39, #40, #41 against it -- see each issue's GitHub body for the
+  exact checklist. Result: 35 of ~37 criteria PASS, 2 UNVERIFIED, 0 FAIL.
+- **Real finding, not just confirmation**: #36's cascade-delete
+  confirmation modal, which `AGENTS.md`'s #36 section had flagged as
+  unverified/possibly broken ("precisely-aimed synthetic clicks on the
+  Joints table's per-row 'Delete' button produced no effect, for a
+  reason not root-caused"), now works correctly -- built two joints and
+  a connecting member, clicked Delete on a joint with an attached
+  member, got the "Delete Joint + Members" confirmation modal, confirmed
+  it cascades and compacts indices correctly. Almost certainly a side
+  effect of #41's `ImGuiSelectableFlags_AllowOverlap` fix (the Delete
+  `SmallButton` sits in a column `SpanAllColumns` would have blocked
+  the same way it blocked `InputFloat` cells), not a separate fix.
+- #37's tab-close-button fix verified precisely: clicking a tab's own
+  "x" (distinct from the dock-node-level "x" at the tab bar's far right,
+  which closes the whole group) closes only that one panel; View >
+  Subwindows correctly reopens it.
+- #38's Design-preset grouping initially looked broken (Log missing from
+  the Properties/Optimization group) -- traced to Log having been
+  closed by an earlier close-button test in the same session, not a
+  real layout bug; rechecking it confirmed correct grouping.
+- #41's top-edge click criterion (the original reported symptom) was
+  directly re-tested: double-clicking the very top pixels of a table
+  row's `InputFloat` cell, immediately below the row-above's separator,
+  correctly activated the field rather than just selecting the row.
+- Unverified (not FAIL): #35's DPI-scaled icon sizing wasn't checked at
+  a non-100% `ORCISF_UI_SCALE` this pass.
+- Per this project's tester-skill convention, no remote issue was
+  commented on, closed, or otherwise modified -- final QA/close-out is
+  the `reviewer` skill's job, not `tester`'s.
