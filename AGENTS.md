@@ -2147,12 +2147,12 @@ later, different one (e.g. closing an issue or cutting a release).
 | #40 | feat(src): per-DOF joint restraint editing (6 checkboxes + Fixed/Pinned/Roller/Free quick-support buttons) | closed | 2026-08-12 |
 | #41 | fix(src): row-selection Selectable overlaps/covers editable input cells in Joints/Members/Loads tables | closed | 2026-08-12 |
 | #42 | fix(src): JRL/AJ arrays sized kMak but indexed 6x-per-joint -- latent OOB past ~137 joints | closed | 2026-08-12 |
-| #43 | epic(docs): document all algorithms/formulas used in the application | ready-for-review | 2026-08-12 |
-| #44 | docs(loads): document load input, self-weight calculation, and load vector assembly | ready-for-review | 2026-08-12 |
-| #45 | docs(structural-analysis): document inertia/kemiringan, matrix assembly, modified Choleski, and result recovery | ready-for-review | 2026-08-12 |
-| #46 | docs(beam): document beam flexural, shear, and deflection design | ready-for-review | 2026-08-12 |
-| #47 | docs(column): document column slenderness, biaxial interaction, and stirrup design | ready-for-review | 2026-08-12 |
-| #48 | docs(optimization): document the Flexible Polyhedron (Nelder-Mead family) algorithm | ready-for-review | 2026-08-12 |
+| #43 | epic(docs): document all algorithms/formulas used in the application | closed | 2026-08-12 |
+| #44 | docs(loads): document load input, self-weight calculation, and load vector assembly | closed | 2026-08-12 |
+| #45 | docs(structural-analysis): document inertia/kemiringan, matrix assembly, modified Choleski, and result recovery | closed | 2026-08-12 |
+| #46 | docs(beam): document beam flexural, shear, and deflection design | closed | 2026-08-12 |
+| #47 | docs(column): document column slenderness, biaxial interaction, and stirrup design | closed | 2026-08-12 |
+| #48 | docs(optimization): document the Flexible Polyhedron (Nelder-Mead family) algorithm | closed | 2026-08-12 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

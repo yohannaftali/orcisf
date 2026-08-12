@@ -3050,3 +3050,10 @@ the shared mechanism.
   `documentation/structural-analysis.md`, `documentation/beam.md`,
   `documentation/column.md`, `documentation/optimization.md`,
   `AGENTS.md`
+
+## [2026-08-12] — chore: close epic #43 and sub-issues #44-#48
+
+- User reviewed the algorithm-documentation epic (`documentation/`
+  folder, all five pages) and confirmed it's done -- commented on and
+  closed #44, #45, #46, #47, #48, then the epic #43 itself.
+- Files: `AGENTS.md`
