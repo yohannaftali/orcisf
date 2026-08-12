@@ -2776,3 +2776,36 @@ the shared mechanism.
   `src/gui/viewport/SceneModel.{h,cpp}`, `src/gui/MembersPanel.cpp`,
   `src/gui/JointsPanel.cpp`, `src/gui/ViewportPanel.cpp`,
   `src/app/Application.cpp`, `AGENTS.md`
+
+## [2026-08-12] — feat(src): implement issue #40 -- per-DOF joint restraint editing
+
+- `EditableStructure::SetJointDof()`/`GetJointDof()` (new): set/read a
+  single `JRL` flag by DOF index (0..5 = UX,UY,UZ,RX,RY,RZ, matching
+  `SetJointLoad()`'s `actions[6]` ordering). The old all-6-at-once
+  `SetJointRestrained()` is unchanged and still backs `JointsPanel`'s
+  existing single "Restrained" summary checkbox and `AddJoint()`'s
+  free-by-default bootstrap.
+- `PropertiesPanel.cpp`: the single "Restrained (fixed support)"
+  checkbox is replaced with 6 independent UX/UY/UZ/RX/RY/RZ checkboxes
+  plus four quick-support preset buttons (Fixed/Pinned/Roller/Free),
+  both reading/writing the same `JRL` state so they can't drift out of
+  sync.
+- Deliberate correction from the issue's literal text: Roller restrains
+  **UY** (vertical translation), not UZ -- this codebase's vertical axis
+  is Y everywhere else (`Camera::WorldUp()`, `orcisf_cli`'s "arah 2 =
+  Y"), and the issue's "Z assumed vertical" wording would only be
+  correct under a Z-up convention this project doesn't use. Documented
+  in AGENTS.md so it isn't "corrected" back by a future agent trusting
+  the original issue text over the actual codebase convention.
+- `ViewportPanel.cpp`: new `ClassifyRestraintPreset()` labels the
+  selected joint's restraint state (`Fixed`/`Pinned`/`Roller`/`Free`/
+  `Custom`) appended to its existing `J#` label from issue #39, reusing
+  the same world-to-screen projection.
+- Verified interactively end-to-end (screenshots): a fresh joint showed
+  `[Free]`; clicking Pinned checked UX/UY/UZ and updated the label to
+  `[Pinned]`, with `JointsPanel`'s old summary checkbox correctly
+  becoming checked too; clicking Roller checked only UY (not UZ) with
+  the label showing `[Roller]`; manually adding RX on top produced
+  `[Custom]` as expected.
+- Files: `src/gui/editor/EditableStructure.{h,cpp}`,
+  `src/gui/PropertiesPanel.cpp`, `src/gui/ViewportPanel.cpp`, `AGENTS.md`

@@ -78,8 +78,22 @@ void DrawUcsIcon(ImDrawList* dl, ImVec2 center, float radius, const Camera& came
 // a real clip-space projection (proj * view * point, perspective divide)
 // -- the same view/projection matrices SceneRenderer already renders with,
 // just evaluated on the CPU for these few label anchors instead of the GPU.
+// Issue #40: classifies a joint's 6 JRL flags into one of the four
+// quick-support presets (matching PropertiesPanel.cpp's kPreset* arrays
+// exactly, including the UY-not-UZ Roller correction -- see that file's
+// comment on why), or "Custom" for any other combination.
+const char* ClassifyRestraintPreset(EditableStructure& editable, int joint_id) {
+    bool dof[6];
+    for (int i = 0; i < 6; ++i) dof[i] = editable.GetJointDof(joint_id, i);
+    if (!dof[0] && !dof[1] && !dof[2] && !dof[3] && !dof[4] && !dof[5]) return "Free";
+    if (dof[0] && dof[1] && dof[2] && dof[3] && dof[4] && dof[5]) return "Fixed";
+    if (dof[0] && dof[1] && dof[2] && !dof[3] && !dof[4] && !dof[5]) return "Pinned";
+    if (!dof[0] && dof[1] && !dof[2] && !dof[3] && !dof[4] && !dof[5]) return "Roller";
+    return "Custom";
+}
+
 void DrawEntityLabels(ImDrawList* dl, const SceneModel& scene, const Camera& camera, float aspect, ImVec2 image_min,
-                       ImVec2 image_size) {
+                       ImVec2 image_size, const Selection& selection, EditableStructure* editable) {
     Mat4 view = camera.ViewMatrix();
     Mat4 proj = camera.ProjectionMatrix(aspect);
     Mat4 vp = Mat4::Multiply(proj, view);
@@ -110,6 +124,14 @@ void DrawEntityLabels(ImDrawList* dl, const SceneModel& scene, const Camera& cam
         ImVec2 screen;
         if (!project(j.pos, screen)) continue;
         std::string label = "J" + std::to_string(j.no_joint);
+        // Issue #40: append the selected joint's restraint preset (e.g.
+        // "J3 [Pinned]") so clicking a joint shows its support type
+        // directly in the viewport, not just in the Properties panel.
+        if (editable && selection.kind == SelectionKind::Joint && selection.id == j.no_joint) {
+            label += " [";
+            label += ClassifyRestraintPreset(*editable, j.no_joint);
+            label += "]";
+        }
         dl->AddText(ImVec2(screen.x + dx, screen.y - dy), joint_color, label.c_str());
     }
     for (const MemberVisual& m : scene.members) {
@@ -365,10 +387,11 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
     ImVec2 ucs_center(image_min.x + ucs_margin, image_min.y + image_size.y - ucs_bottom_gap);
     DrawUcsIcon(ImGui::GetForegroundDrawList(), ucs_center, ucs_radius, camera_);
 
-    // Issue #39: joint/member number labels, drawn after the UCS icon so
-    // they layer on top of it if one ever happens to land nearby.
+    // Issue #39/#40: joint/member number labels (+ the selected joint's
+    // restraint preset), drawn after the UCS icon so they layer on top of
+    // it if one ever happens to land nearby.
     DrawEntityLabels(ImGui::GetForegroundDrawList(), scene, camera_, image_size.x / image_size.y, image_min,
-                      image_size);
+                      image_size, selection, editable);
 
     // Issue #24: the plane-offset control used to live only in Toolbar's
     // "View Plane" menu, which had to be reopened for every adjustment --

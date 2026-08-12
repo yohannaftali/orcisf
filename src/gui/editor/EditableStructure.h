@@ -50,9 +50,18 @@ public:
     bool MoveJoint(int joint_id, const math3d::Vec3& new_pos);
 
     // Sets whether every one of the joint's 6 DOF is restrained (a single
-    // pin/fixed toggle -- per-DOF restraint editing is out of scope here,
-    // see AGENTS.md). Returns false if joint_id is out of [1, NJ].
+    // pin/fixed toggle -- kept for JointsPanel's existing summary checkbox
+    // and Add Joint's "free by default" bootstrap). Returns false if
+    // joint_id is out of [1, NJ].
     bool SetJointRestrained(int joint_id, bool restrained);
+
+    // Issue #40: per-DOF restraint editing. dof_index is 0..5 in the
+    // legacy "arah 1..6" order (UX, UY, UZ, RX, RY, RZ -- translation
+    // X/Y/Z then rotation X/Y/Z), the same order SetJointLoad()'s
+    // actions[6] already uses. Returns false (JRL untouched) if joint_id
+    // is out of [1, NJ] or dof_index is out of [0, 5].
+    bool SetJointDof(int joint_id, int dof_index, bool restrained);
+    bool GetJointDof(int joint_id, int dof_index) const;
 
     // Deletes the joint and every member touching it, then compacts joint
     // indices (and remaps JJ/JK on the remaining members) so NJ/indices

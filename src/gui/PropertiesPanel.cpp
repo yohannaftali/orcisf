@@ -13,6 +13,33 @@ namespace orcisf::gui {
 
 namespace {
 
+// Issue #40: per-DOF restraint editing, legacy "arah 1..6" order (matches
+// SetJointLoad()'s actions[6] ordering exactly: translation X/Y/Z, then
+// rotation X/Y/Z).
+constexpr const char* kDofLabels[6] = {"UX", "UY", "UZ", "RX", "RY", "RZ"};
+
+// Roller Support's single restrained DOF is the *vertical* translation --
+// UY, not UZ, since Y is this project's vertical/up axis throughout (see
+// Camera.h/WorldUp(), orcisf_cli's equilibrium check "arah 2 = Y"). Issue
+// #40's own acceptance-criteria text says "UZ (Z assumed vertical)", which
+// would be correct in a Z-up convention but is inconsistent with every
+// other part of this codebase -- implementing it literally would produce a
+// support type that silently contradicts how "up" works everywhere else in
+// the GUI (camera, gizmo, viewport labels). Corrected here deliberately,
+// documented in AGENTS.md.
+constexpr bool kPresetFixed[6] = {true, true, true, true, true, true};
+constexpr bool kPresetPinned[6] = {true, true, true, false, false, false};
+constexpr bool kPresetRoller[6] = {false, true, false, false, false, false};
+constexpr bool kPresetFree[6] = {false, false, false, false, false, false};
+
+void ApplyRestraintPreset(EditableStructure* editable, UndoStack* undo, int joint_id, const bool preset[6],
+                           const std::function<void()>& on_geometry_changed) {
+    if (!editable) return;
+    if (undo) undo->PushUndo(editable->SdForUndo());
+    for (int i = 0; i < 6; ++i) editable->SetJointDof(joint_id, i, preset[i]);
+    if (on_geometry_changed) on_geometry_changed();
+}
+
 // Issue #11: title + material property inputs and read-only auto-calculated
 // structural parameters, shown when nothing is selected. All fields already
 // exist on engine::StructureData (ISN/E/G/FC/FY/FYS, M/NJ) -- this is
@@ -89,12 +116,43 @@ void DrawJointProperties(const SceneModel& scene, Selection& selection, Editable
         if (on_geometry_changed) on_geometry_changed();
     }
 
-    bool restrained = jv.restrained;
-    if (ImGui::Checkbox("Restrained (fixed support)", &restrained) && can_edit) {
-        if (undo) undo->PushUndo(editable->SdForUndo());
-        editable->SetJointRestrained(jv.no_joint, restrained);
-        if (on_geometry_changed) on_geometry_changed();
+    // Issue #40: full per-DOF restraint editing, replacing the old
+    // single fixed/free toggle. Checkboxes are the source of truth (read
+    // fresh from JRL every frame via GetJointDof()); the four preset
+    // buttons below are just a shortcut that sets all 6 at once, so both
+    // views can never drift out of sync with each other.
+    ImGui::Spacing();
+    ImGui::Text("Restraints:");
+    for (int i = 0; i < 6; ++i) {
+        bool v = editable && editable->GetJointDof(jv.no_joint, i);
+        if (ImGui::Checkbox(kDofLabels[i], &v) && can_edit) {
+            if (undo) undo->PushUndo(editable->SdForUndo());
+            editable->SetJointDof(jv.no_joint, i, v);
+            if (on_geometry_changed) on_geometry_changed();
+        }
+        if (i != 2 && i != 5) ImGui::SameLine();
     }
+
+    ImGui::Spacing();
+    if (ImGui::Button("Fixed") && can_edit) {
+        ApplyRestraintPreset(editable, undo, jv.no_joint, kPresetFixed, on_geometry_changed);
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Fixed Support: all 6 DOF restrained");
+    ImGui::SameLine();
+    if (ImGui::Button("Pinned") && can_edit) {
+        ApplyRestraintPreset(editable, undo, jv.no_joint, kPresetPinned, on_geometry_changed);
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Pinned Support: translation restrained, free to rotate");
+    ImGui::SameLine();
+    if (ImGui::Button("Roller") && can_edit) {
+        ApplyRestraintPreset(editable, undo, jv.no_joint, kPresetRoller, on_geometry_changed);
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Roller Support: vertical (UY) translation restrained only");
+    ImGui::SameLine();
+    if (ImGui::Button("Free") && can_edit) {
+        ApplyRestraintPreset(editable, undo, jv.no_joint, kPresetFree, on_geometry_changed);
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Free Joint: no restraint");
 
     ImGui::Spacing();
     if (ImGui::Button("Delete Joint") && can_edit) {

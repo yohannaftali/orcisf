@@ -43,6 +43,19 @@ bool EditableStructure::SetJointRestrained(int joint_id, bool restrained) {
     return true;
 }
 
+bool EditableStructure::SetJointDof(int joint_id, int dof_index, bool restrained) {
+    if (joint_id < 1 || joint_id > sd_.NJ) return false;
+    if (dof_index < 0 || dof_index > 5) return false;
+    sd_.JRL[6 * joint_id - 5 + dof_index] = restrained ? 1 : 0;
+    return true;
+}
+
+bool EditableStructure::GetJointDof(int joint_id, int dof_index) const {
+    if (joint_id < 1 || joint_id > sd_.NJ) return false;
+    if (dof_index < 0 || dof_index > 5) return false;
+    return sd_.JRL[6 * joint_id - 5 + dof_index] == 1;
+}
+
 bool EditableStructure::DeleteMember(int member_id) {
     if (member_id < 1 || member_id > sd_.M) return false;
     for (int i = member_id; i < sd_.M; ++i) {

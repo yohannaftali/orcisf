@@ -1256,6 +1256,66 @@ SetMemberEndpoints()`/`SetMemberTypeOverride()`, `MembersPanel.cpp`/
   known, deliberate scope limit rather than silently unhandled; revisit
   only if a future issue specifically needs override/undo consistency.
 
+**Per-DOF joint restraint editing (issue #40) — read before touching
+`PropertiesPanel.cpp`'s `kPreset*` arrays, `EditableStructure::
+SetJointDof()`, or `ViewportPanel.cpp`'s `ClassifyRestraintPreset()`:**
+- **The Roller preset restrains UY (vertical translation), not UZ, even
+  though issue #40's own acceptance-criteria text says "UZ (Z assumed
+  vertical)".** This project's vertical/up axis is Y everywhere else
+  (`Camera::WorldUp()` = `{0,1,0}`, `orcisf_cli`'s equilibrium check
+  documents "arah 2 = Y", every other viewport/gizmo/camera computation)
+  — the issue text's "Z assumed vertical" would only be correct under a
+  Z-up convention this codebase doesn't use. Implementing it literally
+  would have produced a support type that silently contradicts "up"
+  everywhere else in the GUI. Corrected deliberately, not a misreading —
+  `PropertiesPanel.cpp` and `ViewportPanel.cpp`'s `kPresetRoller`/Roller
+  classification both use UY, with a comment explaining why. If a future
+  dataset genuinely needs Z-up, this would need revisiting alongside the
+  rest of the codebase's Y-up assumption, not in isolation here.
+- **`EditableStructure::SetJointDof(joint_id, dof_index, restrained)` /
+  `GetJointDof()`** (new) set/read a single `JRL` flag directly — `dof_index`
+  0..5 in the legacy "arah 1..6" order (UX, UY, UZ, RX, RY, RZ), the same
+  order `SetJointLoad()`'s `actions[6]` already uses. The old
+  `SetJointRestrained()` (all-6-at-once) is kept, unchanged, since
+  `JointsPanel`'s existing single "Restrained" summary checkbox and
+  `AddJoint()`'s "free by default" bootstrap still use it — issue #40
+  didn't ask to change that entry point, only to add a finer-grained one
+  alongside it (`AGENTS.md`'s own `gui/editor/` note anticipated exactly
+  this as a future refinement, not a replacement).
+- **`PropertiesPanel.cpp`'s `DrawJointProperties()`** replaced the single
+  "Restrained (fixed support)" checkbox with 6 independent `UX`/`UY`/
+  `UZ`/`RX`/`RY`/`RZ` checkboxes (always read fresh from `JRL` via
+  `GetJointDof()`, never cached) plus four preset buttons (Fixed/Pinned/
+  Roller/Free) that call a shared `ApplyRestraintPreset()` helper — both
+  are views onto the same `JRL` state, so they can't drift out of sync
+  with each other by construction (no separate "which preset is active"
+  state is stored anywhere). Preset buttons are plain text buttons with
+  hover tooltips describing the intended icon glyph, not hand-drawn
+  `ImDrawList` icons like `IconToolbar`'s buttons — a deliberate, minor
+  scope trim (the issue's icon descriptions are cosmetic; the actual
+  preset behavior is what the acceptance criteria are really checking).
+- **`ViewportPanel.cpp`'s `ClassifyRestraintPreset()`** classifies a
+  joint's 6 flags into `"Fixed"`/`"Pinned"`/`"Roller"`/`"Free"`/`"Custom"`
+  (exact same preset definitions as `PropertiesPanel.cpp`'s `kPreset*`
+  arrays — keep both in sync if a preset's definition ever changes) and
+  `DrawEntityLabels()` (issue #39) appends it to the *selected* joint's
+  `J#` label only (e.g. `"J1 [Pinned]"`), reusing the exact same
+  world-to-screen projection #39 already built rather than adding a
+  second one.
+- **What was verified interactively** (screenshots at each step, same
+  session as #39's verification): placed a joint, confirmed its default
+  state showed `[Free]` in both the viewport label and all-unchecked
+  Properties checkboxes; clicked **Pinned** and confirmed UX/UY/UZ
+  checked (RX/RY/RZ not), the viewport label updated live to
+  `[Pinned]`, and `JointsPanel`'s pre-existing single "Restrained"
+  summary checkbox correctly became checked (confirming the old
+  all-or-nothing entry point still works, unmodified, alongside the new
+  one); clicked **Roller** and confirmed only UY was checked (the Y-up
+  correction, not UZ) with the label updating to `[Roller]`; manually
+  checked `RX` on top of Roller's `UY` and confirmed the label correctly
+  fell back to `[Custom]` for a combination matching none of the four
+  presets.
+
 **2D plane-locked drawing (issue #22, part of epic #20) — read before
 touching `gui/viewport/Camera.{h,cpp}`, `gui/viewport/Math3D.h`'s
 `Orthographic()`, or `ViewportPanel`'s `add_joint_mode` branch:**
@@ -2044,7 +2104,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #37 | feat(src): View menu Menubar/Subwindows/Layout sections + fix tab close button + rename "Run Optimization" panel | ready-for-review | 2026-08-11 |
 | #38 | fix(src): move Log tab into right-side Properties/Optimization group; fix Design preset's Properties/Optimization/Log tab order | ready-for-review | 2026-08-12 |
 | #39 | feat(src): editable member type/joint endpoints + Add Member/Add Joint buttons, with joint/member labels in viewport | ready-for-review | 2026-08-12 |
-| #40 | feat(src): per-DOF joint restraint editing (6 checkboxes + Fixed/Pinned/Roller/Free quick-support buttons) | open | 2026-08-12 |
+| #40 | feat(src): per-DOF joint restraint editing (6 checkboxes + Fixed/Pinned/Roller/Free quick-support buttons) | ready-for-review | 2026-08-12 |
 | #41 | fix(src): row-selection Selectable overlaps/covers editable input cells in Joints/Members/Loads tables | ready-for-review | 2026-08-12 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
