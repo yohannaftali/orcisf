@@ -2628,3 +2628,53 @@ between two different-DPI monitors) was explicitly reported UNVERIFIED
 `Screen.AllScreens`), so the specific hardware test could not run here.
 The user closed the issue anyway, on the strength of criteria 1-4 plus
 the shared mechanism.
+
+## 2026-08-12 — Log tab regrouped with Properties/Optimization (Default/Design presets)
+
+- Issue #38 created on GitHub
+- Scope: `src/app/Application.cpp` (`BuildDefaultLayout()`/`BuildDesignLayout()`)
+- Labels: enhancement, gui
+- Requested: in the **Default** preset, tab `Log` into the right-side
+  `Properties`/`Optimization` group (after Optimization) instead of the
+  bottom `Joints`/`Members`/`Loads` strip; in the **Design** preset, tab
+  `Properties`, `Optimization`, `Log` together in that order (Optimization
+  right after Properties, Log right after Optimization), replacing the
+  current split where Optimization+Log sit in a separate `dock_bottom_right`
+  node from Properties.
+
+## 2026-08-12 — Editable member type/joint endpoints + Add Member/Add Joint buttons + viewport labels
+
+- Issue #39 created on GitHub
+- Scope: `src/gui/MembersPanel.cpp`, `src/gui/JointsPanel.cpp`, `src/gui/editor/EditableStructure.cpp`, `src/gui/viewport/`
+- Labels: enhancement, gui
+- Requested: Members panel gets a per-row member-type dropdown and editable
+  Joint A/Joint B fields, plus a `+` Add Member button (top-right, above the
+  header) that inserts an empty editable row; Joints panel gets the same `+`
+  Add Joint button pattern for typing new joint coordinates directly into a
+  new row; both joint numbers and member numbers should render as labels in
+  the 3D viewport for cross-referencing against the tables.
+
+## 2026-08-12 — Per-DOF joint restraint editing (6 checkboxes + quick-support buttons)
+
+- Issue #40 created on GitHub
+- Scope: `src/gui/PropertiesPanel.cpp`, `src/gui/editor/EditableStructure.cpp`, `src/gui/viewport/`
+- Labels: enhancement, gui
+- Requested: replace the Properties panel's single fixed/free restraint
+  checkbox with 6 independent per-DOF checkboxes (UX/UY/UZ/RX/RY/RZ) plus
+  4 quick-support preset buttons (Fixed, Pinned, Roller, Free), and show a
+  joint's restraint type in the viewport when clicked. This is the
+  per-DOF refinement `AGENTS.md`'s issue #6 notes explicitly anticipated
+  as a future follow-up (the single-toggle behavior was a deliberate
+  scope cut, not an oversight).
+
+## 2026-08-12 — Row-selection Selectable covers editable input cells in Joints/Members/Loads tables
+
+- Issue #41 created on GitHub
+- Scope: `src/gui/JointsPanel.cpp`, `src/gui/MembersPanel.cpp`, `src/gui/LoadsPanel.cpp`
+- Labels: bug, gui
+- Reported: the per-row `Selectable(SpanAllColumns)` row-selection highlight
+  looks undersized versus the actual row height, and clicking near the top
+  of a row only selects the row instead of activating the `InputFloat`/
+  `InputText` cell underneath -- the user has to click further down before
+  the input becomes editable. Affects all three panels sharing this pattern
+  (#21/#36).
