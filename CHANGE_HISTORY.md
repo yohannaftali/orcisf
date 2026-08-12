@@ -2985,3 +2985,18 @@ the shared mechanism.
 - Files: `AGENTS.md`, `CHANGE_HISTORY.md`,
   `.claude/skills/reviewer/SKILL.md` (no other src/ code changed by
   this pass itself).
+
+## [2026-08-12] — epic(docs): file algorithm-documentation epic + 5 sub-issues
+
+- Filed epic #43 ("document all algorithms/formulas used in the
+  application") plus five sub-issues, following this project's existing
+  epic pattern (#1, #13, #20): #44 (Loads), #45 (Structural Analysis),
+  #46 (Beam), #47 (Column), #48 (Optimization). Each requires citing
+  both the legacy `Optimasi Beton/Source/*.hpp` implementation and the
+  modern `src/engine/` port, per the epic's own acceptance criteria and
+  the user's explicit confirmation that content should be code-cited
+  rather than theory-only.
+- Also synced 6 stale `Tracked Issues` rows found during the routine
+  Step 1B check: #24, #25, #26, #28, #30, #32 were all already `closed`
+  on GitHub but still showed `ready-for-review` in `AGENTS.md`.
+- Files: `AGENTS.md`, `CHANGE_HISTORY.md`

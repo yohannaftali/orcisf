@@ -2125,15 +2125,15 @@ later, different one (e.g. closing an issue or cutting a release).
 | #21 | feat(src): add a Joints/Members list panel (editable, delete-with-cascade-warning) | closed | 2026-08-11 |
 | #22 | feat(src): 2D plane-locked drawing (X-Y/X-Z/Y-Z orthographic views + adjustable offset) | closed | 2026-08-11 |
 | #23 | feat(src): UCS icon overlay in the viewport | closed | 2026-08-11 |
-| #24 | fix(src): 2D plane offset control unreachable from the viewport (move it under the UCS icon) | ready-for-review | 2026-08-11 |
-| #25 | fix(src): Run panel dataset-path field is redundant; write each run into a timestamped output subfolder | ready-for-review | 2026-08-11 |
-| #26 | feat(src): wire up the app icon set (icons/) for Windows/macOS/Linux builds | ready-for-review | 2026-08-11 |
+| #24 | fix(src): 2D plane offset control unreachable from the viewport (move it under the UCS icon) | closed | 2026-08-12 |
+| #25 | fix(src): Run panel dataset-path field is redundant; write each run into a timestamped output subfolder | closed | 2026-08-12 |
+| #26 | feat(src): wire up the app icon set (icons/) for Windows/macOS/Linux builds | closed | 2026-08-12 |
 | #27 | fix(src): title bar Minimize/Maximize/Close buttons not flush to window right edge | closed (not reproducible) | 2026-08-11 |
-| #28 | feat(src): Alt-mnemonic menu navigation + icon before each panel title | ready-for-review | 2026-08-11 |
+| #28 | feat(src): Alt-mnemonic menu navigation + icon before each panel title | closed | 2026-08-12 |
 | #29 | chore(src): interactively re-verify RunPanel dataset gating (#25) and 2D plane offset control (#22/#24) with a real loaded dataset | closed | 2026-08-11 |
-| #30 | feat(src): implement real Alt-mnemonic menu navigation (Dear ImGui has no built-in "&" parsing) | ready-for-review | 2026-08-11 |
+| #30 | feat(src): implement real Alt-mnemonic menu navigation (Dear ImGui has no built-in "&" parsing) | closed | 2026-08-12 |
 | #31 | fix(src): application is not DPI-aware -- UI too small on high-DPI monitors in multi-monitor setups | closed | 2026-08-11 |
-| #32 | chore(src): add one-shot build scripts (build.ps1 for Windows, build.sh for macOS/Linux) | ready-for-review | 2026-08-11 |
+| #32 | chore(src): add one-shot build scripts (build.ps1 for Windows, build.sh for macOS/Linux) | closed | 2026-08-12 |
 | #35 | fix(src): move panel icons onto the dock tab button, remove the in-content icon+title header row (#28 correction) | closed | 2026-08-12 |
 | #36 | feat(src): split Joints/Members panel into separate Joints and Members panels; order Loads tab immediately after them | closed | 2026-08-12 |
 | #37 | feat(src): View menu Menubar/Subwindows/Layout sections + fix tab close button + rename "Run Optimization" panel | closed | 2026-08-12 |
@@ -2142,6 +2142,12 @@ later, different one (e.g. closing an issue or cutting a release).
 | #40 | feat(src): per-DOF joint restraint editing (6 checkboxes + Fixed/Pinned/Roller/Free quick-support buttons) | closed | 2026-08-12 |
 | #41 | fix(src): row-selection Selectable overlaps/covers editable input cells in Joints/Members/Loads tables | closed | 2026-08-12 |
 | #42 | fix(src): JRL/AJ arrays sized kMak but indexed 6x-per-joint -- latent OOB past ~137 joints | closed | 2026-08-12 |
+| #43 | epic(docs): document all algorithms/formulas used in the application | open | 2026-08-12 |
+| #44 | docs(loads): document load input, self-weight calculation, and load vector assembly | open | 2026-08-12 |
+| #45 | docs(structural-analysis): document inertia/kemiringan, matrix assembly, modified Choleski, and result recovery | open | 2026-08-12 |
+| #46 | docs(beam): document beam flexural, shear, and deflection design | open | 2026-08-12 |
+| #47 | docs(column): document column slenderness, biaxial interaction, and stirrup design | open | 2026-08-12 |
+| #48 | docs(optimization): document the Flexible Polyhedron (Nelder-Mead family) algorithm | open | 2026-08-12 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
