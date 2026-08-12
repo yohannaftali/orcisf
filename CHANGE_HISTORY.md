@@ -2958,3 +2958,30 @@ the shared mechanism.
 - Files: `AGENTS.md`, `CHANGE_HISTORY.md`,
   `.claude/skills/tester/SKILL.md` (no functional src/ code changed by
   this pass itself).
+
+## [2026-08-12] — chore: reviewer pass on #42, closed, v0.0.5-alpha released; reviewer skill now always releases
+
+- Ran the `reviewer` skill against issue #42's real code change
+  (`fc68ffe`). Architecture/design audit: clean, minimal, surgical diff,
+  no scope creep. Bug/security audit: specifically re-checked the one
+  workaround the fix's own commit flagged (dropping `explicit` from
+  `LegacyArray`'s constructor to work around an MSVC aggregate-init
+  quirk) -- grepped the whole codebase for any place that could exploit
+  the now-implicit conversion (none found), and traced
+  `Optimizer.cpp`'s worker-thread clone path (`workers.assign(...,
+  sd)`, `SyncSearchState()`) to confirm issue #4's determinism guarantee
+  is unaffected (the change only added a constructor parameter, never
+  touched copy/move semantics). No findings. Verdict: **PASS**.
+- Issue #42 was already closed (per direct user instruction, before
+  this reviewer pass ran) -- no reopen/close action needed here.
+- Released **v0.0.5-alpha** (GitHub Release + prebuilt Windows binary),
+  the first release to include #42's fix.
+- Per user request ("yes always", after confirming the release once),
+  `reviewer`'s Step 8 no longer proposes-then-waits for release
+  creation on a PASS/PASS WITH NOTES verdict -- it cuts the release
+  automatically now. Issue close/reopen/comment actions are unaffected
+  and still require explicit confirmation; updated
+  `.claude/skills/reviewer/SKILL.md` accordingly.
+- Files: `AGENTS.md`, `CHANGE_HISTORY.md`,
+  `.claude/skills/reviewer/SKILL.md` (no other src/ code changed by
+  this pass itself).
