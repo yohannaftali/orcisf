@@ -3226,3 +3226,37 @@ the shared mechanism.
 - User confirmed closing #49; posted a summary comment recapping all 6
   verified acceptance criteria and closed the issue on GitHub.
 - Files: `AGENTS.md` (Tracked Issues table)
+
+## [2026-08-13] — reviewer: #49 PASS, cut release v0.0.6-alpha
+
+- Independently audited commit `b509606` (architecture/design,
+  bug/security) beyond `tester`'s per-criterion checklist: hand-traced
+  every `static_cast<float>(...)` site in `BeamDesign.cpp`/
+  `ColumnDesign.cpp`/`StructuralAnalysis.cpp` against the pre-fix diff
+  to confirm each one wraps the *entire* original expression (matching
+  C++'s implicit double-promotion-then-single-narrowing semantics
+  exactly), including the two `+=`-to-explicit-assignment rewrites in
+  `BeratSendiri()`. Reviewed `main.cpp`'s `fopen_s`/`_dupenv_s` error
+  handling and memory ownership (`_dupenv_s`-allocated buffer correctly
+  freed on every path) and `PdfExport.cpp`'s scoped C4611 suppression.
+  No architecture, security, or correctness findings.
+- End-to-end: rebuilt via `builder` (zero warnings, current at
+  `d43d8c8`), launched `orcisf_gui.exe` twice interactively -- once
+  with default env (confirmed no spurious `orcisf_gui_startup.log`,
+  i.e. the new `fopen_s` error path never spuriously fires) and once
+  with `ORCISF_UI_SCALE=1.5` set (specifically exercises the new
+  `_dupenv_s` code path) -- both launches stayed responsive, no crash.
+  Re-ran `orcisf_cli equilibrium` against a scratch `Example/Apl1-1`
+  copy: residual `0.015625`, matching the documented baseline.
+- **Verdict: PASS.** Issue #49 was already closed in a prior session;
+  no further remote issue action needed.
+- **Release**: warranted (real `src/` code change since `v0.0.5-alpha`,
+  PASS verdict) -- built and cut **v0.0.6-alpha**
+  (https://github.com/yohannaftali/orcisf/releases/tag/v0.0.6-alpha),
+  packaged identically to the prior release's asset layout
+  (`orcisf_gui.exe` + 6 runtime DLLs + `icons/*.png`, zipped as
+  `orcisf_gui-v0.0.6-alpha-windows-x64.zip`). The initial attempt to
+  create the release via the API was blocked by this session's
+  auto-mode permission classifier; completed after the user explicitly
+  confirmed "go ahead and create v0.0.6-alpha".
+- Files: `AGENTS.md` (Tracked Issues table)
