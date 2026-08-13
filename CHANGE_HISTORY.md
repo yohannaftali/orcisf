@@ -3418,6 +3418,44 @@ the shared mechanism.
   `src/gui/viewport/SceneRenderer.{h,cpp}` (#50, uncommitted until now),
   `README.md` (#50), `AGENTS.md`
 
+## [2026-08-13] — feat(src): shared resizable/responsive table component (#52)
+
+- **New `src/gui/TableView.h`** (header-only, no `.cpp`/CMake change
+  needed): `BeginTableView()` wraps `ImGui::BeginTable` with a shared
+  `kTableViewFlags` (`Resizable | SizingStretchProp | RowBg | Borders`),
+  and `TableRowSelectable()` factors out issue #41's exact
+  `SpanAllColumns | AllowOverlap` + `GetFrameHeight()`-height fix so
+  every table-row selectable in the project shares one hard-won-correct
+  implementation instead of three copy-pasted ones.
+- **Root cause of the original bug confirmed while implementing**: the
+  pre-#52 `BeginTable` calls set no sizing policy at all, so ImGui
+  defaulted every column to fixed/content-based width -- `Resizable |
+  SizingStretchProp` is what actually makes non-`WidthFixed` columns
+  reflow proportionally with the panel width.
+- **Real bug caught during implementation**: `MembersPanel.cpp`'s table
+  originally had *every* column set to `WidthFixed` (including Joint A/
+  Joint B), so `SizingStretchProp` had nothing left to stretch -- the
+  table would have compiled and looked identical to before, silently
+  failing this issue's whole point. Fixed by dropping `WidthFixed` from
+  Joint A/Joint B, matching every other migrated table (which already
+  had at least one stretch column and needed no such change).
+- **`JointsPanel`/`MembersPanel`/`LoadsPanel` (both its member-loads and
+  joint-loads tables)** all migrated to `BeginTableView()`/
+  `TableRowSelectable()` -- no other per-row logic touched.
+- **Verification**: `build.ps1` clean (zero warnings). Interactively
+  resized the actual OS window from a wide (3200px physical) to a much
+  narrower (1400px physical) size and screenshotted the Joints table
+  both times -- columns reflowed proportionally with no cutoff and no
+  unwanted horizontal scrollbar at the narrow size. Clicked directly
+  into a reflowed `InputFloat` cell at the narrow size and confirmed it
+  became active (live text-selection highlight), proving issue #41's
+  click-routing fix survived the refactor intact. Manual column-border
+  drag-resize relies on the standard `ImGuiTableFlags_Resizable` flag
+  (present in `kTableViewFlags`) and was not independently
+  screenshotted.
+- Files: `src/gui/TableView.h` (new), `src/gui/JointsPanel.cpp`,
+  `src/gui/MembersPanel.cpp`, `src/gui/LoadsPanel.cpp`, `AGENTS.md`
+
 ## [2026-08-13] — reviewer: #49 PASS, cut release v0.0.6-alpha
 
 - Independently audited commit `b509606` (architecture/design,

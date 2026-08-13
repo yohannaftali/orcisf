@@ -1140,6 +1140,47 @@ screenshots of all three presets: Default (Properties/Optimization/Log
 grouped, bottom strip is Joints/Members/Loads only), Design (same
 right-side grouping, no leftover empty node), Optimization (unchanged).
 
+**`gui/TableView.h` (issue #52) — shared table component, use this
+instead of `ImGui::BeginTable(...)` for any new editable list table:**
+- **Two thin, header-only wrappers, not a framework**: `BeginTableView(str_id,
+  column_count)` calls `ImGui::BeginTable` with a fixed shared flag set
+  (`kTableViewFlags` = `Resizable | SizingStretchProp | RowBg | Borders`),
+  and `TableRowSelectable(label, selected)` is issue #41's exact fix
+  (`SpanAllColumns | AllowOverlap` + `GetFrameHeight()` height, see that
+  issue's own section below) factored into one call. Per-row cell
+  content (which columns, which editable widgets) is deliberately left
+  to each panel -- abstracting further would cost more than it saves
+  for tables this different from each other.
+- **`SizingStretchProp` is the actual fix for the original bug report**
+  (columns not reflowing on a high-resolution display, table cut off on
+  the right) -- the pre-#52 `BeginTable` calls set no sizing policy at
+  all, so ImGui defaulted to fixed/content-based column widths that
+  never grew to fill the panel. Any `TableSetupColumn(...)` call with no
+  explicit `ImGuiTableColumnFlags_WidthFixed` now stretches
+  proportionally by default; keep `WidthFixed` only on genuinely
+  fixed-size columns (row-number columns, checkboxes, action buttons) --
+  see `JointsPanel.cpp`/`LoadsPanel.cpp` for the pattern. **Every table
+  needs at least one non-`WidthFixed` column or it won't reflow at
+  all** -- this was a real bug caught during implementation:
+  `MembersPanel.cpp`'s table originally had every column
+  `WidthFixed` (including Joint A/Joint B), so `SizingStretchProp` had
+  nothing to stretch; fixed by dropping `WidthFixed` from Joint A/Joint B.
+- **`JointsPanel`/`MembersPanel`/`LoadsPanel` (both its tables) all
+  migrated** -- `ImGui::BeginTable(...)` → `BeginTableView(...)`, each
+  row's `ImGui::Selectable(...)` → `TableRowSelectable(...)`. No other
+  per-row logic changed.
+- **Verification status:** compiled cleanly (zero warnings). Interactive
+  screenshot confirmed both required behaviors: resizing the actual OS
+  window from wide to a much narrower size reflowed the Joints table's
+  columns proportionally with no cutoff and no unwanted horizontal
+  scrollbar; clicking directly into a reflowed `InputFloat` cell showed
+  it become active with a live text-selection highlight (confirming
+  issue #41's click-routing fix survived the refactor). Manual
+  column-border drag-resize was not independently screenshotted (relies
+  on `ImGuiTableFlags_Resizable`, a standard, well-established ImGui
+  feature) -- low risk given the flag is directly present in
+  `kTableViewFlags` and every column is correctly configured.
+
 **Row `Selectable` click-blocking fix (issue #41) — read before touching
 any `ImGui::Selectable(...)` row in `JointsPanel.cpp`/`MembersPanel.cpp`/
 `LoadsPanel.cpp`, or adding a new editable table row anywhere in
@@ -2282,7 +2323,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #49 | chore(src): fix MSVC build warnings (C4244 narrowing, C4996 deprecated CRT, C4611 setjmp/dtor) | closed | 2026-08-13 |
 | #50 | feat(src): dark-cobalt ground-plane grid with X/Z axis labels + document coordinate system in README | closed | 2026-08-13 |
 | #51 | fix(src): foreground-drawlist overlays (dock tab icons, joint/member/grid labels) bleed over the menu bar and neighboring panels | ready-for-review | 2026-08-13 |
-| #52 | feat(src): responsive, resizable-column table component for Joints/Members/Loads panels | open | 2026-08-13 |
+| #52 | feat(src): responsive, resizable-column table component for Joints/Members/Loads panels | ready-for-review | 2026-08-13 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

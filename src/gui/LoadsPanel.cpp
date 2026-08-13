@@ -5,6 +5,7 @@
 #include <imgui.h>
 
 #include "gui/PanelTitles.h"
+#include "gui/TableView.h"
 
 namespace orcisf::gui {
 
@@ -17,7 +18,7 @@ void DrawMemberLoadsTable(const SceneModel& scene, Selection& selection, Editabl
         ImGui::TextDisabled("None. Use Loads > Add Member Load, then click a member in the Viewport.");
         return;
     }
-    if (!ImGui::BeginTable("member_loads", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)) return;
+    if (!BeginTableView("member_loads", 3)) return;
     ImGui::TableSetupColumn("Batang", ImGuiTableColumnFlags_WidthFixed, 60.f);
     ImGui::TableSetupColumn("W (N/m)");
     ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 60.f);
@@ -27,12 +28,9 @@ void DrawMemberLoadsTable(const SceneModel& scene, Selection& selection, Editabl
         ImGui::PushID(ml.no_batang);
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        // Issue #41: AllowOverlap + explicit height -- see JointsPanel.cpp's
-        // comment on this exact pattern.
-        if (ImGui::Selectable(std::to_string(ml.no_batang).c_str(), selection.kind == SelectionKind::Member &&
-                                                                          selection.id == ml.no_batang,
-                               ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap,
-                               ImVec2(0.f, ImGui::GetFrameHeight()))) {
+        // Issue #41/#52: TableRowSelectable(), see gui/TableView.h.
+        if (TableRowSelectable(std::to_string(ml.no_batang).c_str(),
+                                selection.kind == SelectionKind::Member && selection.id == ml.no_batang)) {
             selection = {SelectionKind::Member, ml.no_batang};
         }
         ImGui::TableSetColumnIndex(1);
@@ -62,7 +60,7 @@ void DrawJointLoadsTable(const SceneModel& scene, Selection& selection, Editable
         ImGui::TextDisabled("None. Use Loads > Add Joint Load, then click a joint in the Viewport.");
         return;
     }
-    if (!ImGui::BeginTable("joint_loads", 8, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)) return;
+    if (!BeginTableView("joint_loads", 8)) return;
     ImGui::TableSetupColumn("Joint", ImGuiTableColumnFlags_WidthFixed, 50.f);
     ImGui::TableSetupColumn("Fx");
     ImGui::TableSetupColumn("Fy");
@@ -79,12 +77,9 @@ void DrawJointLoadsTable(const SceneModel& scene, Selection& selection, Editable
         ImGui::PushID(jl.no_joint);
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        // Issue #41: AllowOverlap + explicit height -- see JointsPanel.cpp's
-        // comment on this exact pattern.
-        if (ImGui::Selectable(std::to_string(jl.no_joint).c_str(),
-                               selection.kind == SelectionKind::Joint && selection.id == jl.no_joint,
-                               ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap,
-                               ImVec2(0.f, ImGui::GetFrameHeight()))) {
+        // Issue #41/#52: TableRowSelectable(), see gui/TableView.h.
+        if (TableRowSelectable(std::to_string(jl.no_joint).c_str(),
+                                selection.kind == SelectionKind::Joint && selection.id == jl.no_joint)) {
             selection = {SelectionKind::Joint, jl.no_joint};
         }
 

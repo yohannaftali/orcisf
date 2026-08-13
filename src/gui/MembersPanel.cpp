@@ -5,6 +5,7 @@
 #include <imgui.h>
 
 #include "gui/PanelTitles.h"
+#include "gui/TableView.h"
 
 namespace orcisf::gui {
 
@@ -18,11 +19,11 @@ constexpr const char* kTypeModeItems[3] = {"Auto", "Beam", "Column"};
 
 void DrawMembersTable(const SceneModel& scene, Selection& selection, EditableStructure* editable, UndoStack* undo,
                        const std::function<void()>& on_geometry_changed) {
-    if (!ImGui::BeginTable("members_list", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)) return;
+    if (!BeginTableView("members_list", 5)) return;
     ImGui::TableSetupColumn("Batang", ImGuiTableColumnFlags_WidthFixed, 60.f);
     ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 110.f);
-    ImGui::TableSetupColumn("Joint A", ImGuiTableColumnFlags_WidthFixed, 70.f);
-    ImGui::TableSetupColumn("Joint B", ImGuiTableColumnFlags_WidthFixed, 70.f);
+    ImGui::TableSetupColumn("Joint A");
+    ImGui::TableSetupColumn("Joint B");
     ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 60.f);
     ImGui::TableHeadersRow();
 
@@ -30,17 +31,11 @@ void DrawMembersTable(const SceneModel& scene, Selection& selection, EditableStr
         ImGui::PushID(mv.no_batang);
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        // Issue #41: AllowOverlap + explicit height, see JointsPanel.cpp's
-        // comment on this exact pattern (AllowOverlap is the fix that
-        // actually matters -- without it SpanAllColumns unconditionally
-        // blocks every later-column widget's clicks, confirmed by direct
-        // ActiveID instrumentation, not assumed). Issue #39 made this
-        // table's Type/Joint A/B cells real editable widgets, so this
-        // preemptive fix is no longer inert.
-        if (ImGui::Selectable(std::to_string(mv.no_batang).c_str(), selection.kind == SelectionKind::Member &&
-                                                                          selection.id == mv.no_batang,
-                               ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap,
-                               ImVec2(0.f, ImGui::GetFrameHeight()))) {
+        // Issue #41/#52: TableRowSelectable() carries forward the
+        // AllowOverlap + explicit-height fix (see gui/TableView.h) so
+        // this table's editable Type/Joint A/B cells stay clickable.
+        if (TableRowSelectable(std::to_string(mv.no_batang).c_str(),
+                                selection.kind == SelectionKind::Member && selection.id == mv.no_batang)) {
             selection = {SelectionKind::Member, mv.no_batang};
         }
 
