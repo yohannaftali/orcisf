@@ -2551,7 +2551,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #53 | fix(src): borderless application window cannot be resized by dragging its edges | closed (tester: source-verified, no FAILs; live edge-drag UNVERIFIED this pass -- see AGENTS.md #53 note) | 2026-08-13 |
 | #54 | feat(src): trash-icon delete/clear buttons (light-red background) with a fixed, non-resizable action column | closed (tester: source-verified, no FAILs; DPI-override screenshot UNVERIFIED this pass -- see AGENTS.md #54 note) | 2026-08-13 |
 | #55 | feat(src): show all 6 per-DOF restraint checkboxes in the Joints table, not one summary checkbox | closed (tester: source-verified, no FAILs; live sync UNVERIFIED this pass -- see AGENTS.md #55 note) | 2026-08-13 |
-| #56 | chore(ci): Linux build-src job fails intermittently on flaky ninja download (ECONNRESET) | ready-for-review (tester: 5/5 PASS) | 2026-08-13 |
+| #56 | chore(ci): Linux build-src job fails intermittently on flaky ninja download (ECONNRESET) | closed | 2026-08-13 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
