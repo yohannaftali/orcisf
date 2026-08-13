@@ -37,7 +37,8 @@ jobs:
           sudo apt-get install -y \
             libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev \
             libxcursor-dev libxi-dev libxext-dev \
-            autoconf autoconf-archive automake libtool libltdl-dev
+            autoconf autoconf-archive automake libtool libltdl-dev \
+            ninja-build
 
       - name: Setup MSVC dev environment
         if: runner.os == 'Windows'
@@ -51,6 +52,7 @@ jobs:
           echo "CXX=cl" >> "$GITHUB_ENV"
 
       - name: Setup Ninja
+        if: runner.os != 'Linux'
         uses: seanmiddleditch/gha-setup-ninja@v4
 
       - name: Setup vcpkg

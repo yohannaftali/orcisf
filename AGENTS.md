@@ -2443,6 +2443,26 @@ later, different one (e.g. closing an issue or cutting a release).
   windows-latest/macos-latest/ubuntu-latest for every push/PR touching
   `src/**`. Nothing else in the repo has CI (no build step applies to the
   legacy archive or the docs).
+  - **Ninja on the Linux leg comes from `apt-get install ninja-build`
+    (folded into the existing `Install Linux GL/X11 dev packages` step),
+    not `seanmiddleditch/gha-setup-ninja`** (issue #56) — that action
+    downloads a `ninja-linux.zip` release asset over the network on every
+    run with no retry, and was observed failing the whole job with an
+    uncaught `ECONNRESET` ("socket hang up"). `apt-get` is far more
+    reliable for a package already mirrored by the distro. The `Setup
+    Ninja` step (still `gha-setup-ninja@v4`) is gated `if: runner.os !=
+    'Linux'` and continues to cover Windows/macOS, which were never
+    observed failing this way. Confirmed no version regression:
+    Ubuntu 24.04 (noble, the `ubuntu-latest` base as of this fix)
+    packages `ninja-build` at **1.11.1-2**, matching the version
+    `gha-setup-ninja@v4` was already resolving to — if `ubuntu-latest`
+    ever moves to a newer Ubuntu release, re-check that apt's ninja
+    version hasn't dropped below what Windows/macOS use. As a side
+    effect, the Linux leg no longer invokes `gha-setup-ninja`'s bundled
+    Node runtime at all, which also clears that leg's "Node 20 is being
+    deprecated" warning (Windows/macOS legs still use the action and may
+    still show it — not in scope here since only the Linux leg was
+    failing).
 - **Releases:** GitHub Releases publish prebuilt GUI binaries. The project
   is currently in **alpha** — tags/releases use a `v0.0.x-alpha` scheme
   (first one: `v0.0.1-alpha`). Bump the patch number for each subsequent
@@ -2510,7 +2530,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #53 | fix(src): borderless application window cannot be resized by dragging its edges | closed (tester: source-verified, no FAILs; live edge-drag UNVERIFIED this pass -- see AGENTS.md #53 note) | 2026-08-13 |
 | #54 | feat(src): trash-icon delete/clear buttons (light-red background) with a fixed, non-resizable action column | closed (tester: source-verified, no FAILs; DPI-override screenshot UNVERIFIED this pass -- see AGENTS.md #54 note) | 2026-08-13 |
 | #55 | feat(src): show all 6 per-DOF restraint checkboxes in the Joints table, not one summary checkbox | closed (tester: source-verified, no FAILs; live sync UNVERIFIED this pass -- see AGENTS.md #55 note) | 2026-08-13 |
-| #56 | chore(ci): Linux build-src job fails intermittently on flaky ninja download (ECONNRESET) | open | 2026-08-13 |
+| #56 | chore(ci): Linux build-src job fails intermittently on flaky ninja download (ECONNRESET) | ready-for-review | 2026-08-13 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

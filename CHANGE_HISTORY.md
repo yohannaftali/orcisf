@@ -3740,3 +3740,34 @@ the shared mechanism.
   the features were implemented.
 - Verdict: no FAILs. All PASS or UNVERIFIED-due-to-environment-hazard
   (not a defect). Issues remain closed; no remote action taken.
+
+## [2026-08-13] — chore(ci): #56 -- Linux build-src leg gets ninja from apt instead of gha-setup-ninja
+- Issue #56 addressed: the Linux leg of `.github/workflows/build-src.yml`
+  intermittently failed the whole job with an uncaught `ECONNRESET`
+  ("socket hang up") from `seanmiddleditch/gha-setup-ninja@v4` fetching
+  `ninja-linux.zip` from GitHub Releases -- a single unretried network
+  download with no fallback.
+- Fix: `ninja-build` added to the existing `Install Linux GL/X11 dev
+  packages` step's `apt-get install -y` list (the same pattern already
+  used for every other Linux dev dependency in this workflow); the
+  `Setup Ninja` step (still `gha-setup-ninja@v4`) gated `if: runner.os
+  != 'Linux'` so it continues to cover Windows/macOS unchanged -- those
+  legs were never observed failing this way.
+- Verified no version regression before committing to this approach:
+  looked up `packages.ubuntu.com/noble/ninja-build` -- Ubuntu 24.04
+  (the current `ubuntu-latest` base) packages ninja at **1.11.1-2**,
+  matching the version `gha-setup-ninja@v4` was already resolving to
+  (per the issue's own text). No downgrade.
+- Node.js 20 deprecation warning: as a side effect, the Linux leg no
+  longer invokes `gha-setup-ninja`'s bundled JS action runtime at all,
+  which clears that leg's instance of the warning. Windows/macOS legs
+  still use the action and may still show it -- out of scope here since
+  only the Linux leg was actually failing.
+- Not independently re-verified with a real CI run this session (no
+  push/PR was made as part of this pass) -- the next push/PR touching
+  `src/**` or `.github/workflows/build-src.yml` is the first real test;
+  flag this as the one unverified acceptance criterion until that
+  happens.
+- Files: `.github/workflows/build-src.yml`, `AGENTS.md` (GitHub
+  Workflow section: new bullet documenting how/why Linux gets ninja via
+  apt; Tracked Issues row for #56 -> `ready-for-review`).
