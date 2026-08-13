@@ -3708,3 +3708,35 @@ the shared mechanism.
   of the same table).
 - Files: `src/gui/TableView.h`, `src/gui/JointsPanel.cpp`, `AGENTS.md`
   (#54 section)
+
+## [2026-08-13] — tester pass on #52-#55 (already closed) against commit c5e9abe
+- Ran the `tester` skill's checklist against a fresh `builder` rebuild
+  (`ninja: no work to do`, binary already current for `c5e9abe`).
+- Fetched all four issues' Acceptance Criteria from GitHub (all already
+  `closed`). Verified each criterion by direct source inspection against
+  the exact tested commit: `gui/TableView.h` (kTableViewFlags,
+  TableRowSelectable's AllowOverlap, CenterNextTableItem,
+  TableTrashButton/TableTrashColumnWidth), `gui/JointsPanel.cpp`
+  (11-column table, kDofLabels/kDofIds, GetJointDof/SetJointDof wiring),
+  `gui/MembersPanel.cpp`/`gui/LoadsPanel.cpp` (all reuse the same shared
+  helpers), `app/WindowResize.{h,cpp}` (HitTest/Update logic matches its
+  own documented design), `app/main.cpp` (BorderResizer::Update() called
+  right after glfwPollEvents(), before ImGui::NewFrame()),
+  `src/CMakeLists.txt` (WindowResize.cpp registered), `gui/PanelIcons.
+  {h,cpp}` (DrawTrashIcon present, used by all 4 trash-button call
+  sites). No discrepancies or regressions found against any criterion's
+  documented intent.
+- Attempted fresh live GUI re-verification (bootstrapped joints via +Add
+  Joint) but VS Code repeatedly stole foreground focus mid-sequence even
+  after explicit SetForegroundWindow + GetForegroundWindow confirmation
+  -- a focus-stealing hazard, not a code defect. Per this project's
+  automation-safety convention, stopped rather than forcing through; no
+  destructive input reached the wrong window (mouse clicks only, no
+  typing). Criteria requiring fresh interactive confirmation (column
+  reflow/drag-resize, window edge-drag, DPI-override trash icon
+  rendering, live DOF-checkbox <-> Properties/viewport sync) are marked
+  UNVERIFIED this session -- AGENTS.md's own per-issue sections already
+  record genuine interactive verification for each of these from when
+  the features were implemented.
+- Verdict: no FAILs. All PASS or UNVERIFIED-due-to-environment-hazard
+  (not a defect). Issues remain closed; no remote action taken.

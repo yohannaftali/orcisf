@@ -2506,10 +2506,10 @@ later, different one (e.g. closing an issue or cutting a release).
 | #49 | chore(src): fix MSVC build warnings (C4244 narrowing, C4996 deprecated CRT, C4611 setjmp/dtor) | closed | 2026-08-13 |
 | #50 | feat(src): dark-cobalt ground-plane grid with X/Z axis labels + document coordinate system in README | closed | 2026-08-13 |
 | #51 | fix(src): foreground-drawlist overlays (dock tab icons, joint/member/grid labels) bleed over the menu bar and neighboring panels | ready-for-review (3rd pass: window->DrawList, confirmed against exact repro) | 2026-08-13 |
-| #52 | feat(src): responsive, resizable-column table component for Joints/Members/Loads panels | ready-for-review | 2026-08-13 |
-| #53 | fix(src): borderless application window cannot be resized by dragging its edges | ready-for-review | 2026-08-13 |
-| #54 | feat(src): trash-icon delete/clear buttons (light-red background) with a fixed, non-resizable action column | ready-for-review | 2026-08-13 |
-| #55 | feat(src): show all 6 per-DOF restraint checkboxes in the Joints table, not one summary checkbox | ready-for-review | 2026-08-13 |
+| #52 | feat(src): responsive, resizable-column table component for Joints/Members/Loads panels | closed (tester: source-verified, no FAILs; GUI reflow/drag UNVERIFIED this pass -- see AGENTS.md #52 note) | 2026-08-13 |
+| #53 | fix(src): borderless application window cannot be resized by dragging its edges | closed (tester: source-verified, no FAILs; live edge-drag UNVERIFIED this pass -- see AGENTS.md #53 note) | 2026-08-13 |
+| #54 | feat(src): trash-icon delete/clear buttons (light-red background) with a fixed, non-resizable action column | closed (tester: source-verified, no FAILs; DPI-override screenshot UNVERIFIED this pass -- see AGENTS.md #54 note) | 2026-08-13 |
+| #55 | feat(src): show all 6 per-DOF restraint checkboxes in the Joints table, not one summary checkbox | closed (tester: source-verified, no FAILs; live sync UNVERIFIED this pass -- see AGENTS.md #55 note) | 2026-08-13 |
 | #56 | chore(ci): Linux build-src job fails intermittently on flaky ninja download (ECONNRESET) | open | 2026-08-13 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
