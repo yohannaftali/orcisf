@@ -2153,7 +2153,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #46 | docs(beam): document beam flexural, shear, and deflection design | closed | 2026-08-12 |
 | #47 | docs(column): document column slenderness, biaxial interaction, and stirrup design | closed | 2026-08-12 |
 | #48 | docs(optimization): document the Flexible Polyhedron (Nelder-Mead family) algorithm | closed | 2026-08-12 |
-| #49 | chore(src): fix MSVC build warnings (C4244 narrowing, C4996 deprecated CRT, C4611 setjmp/dtor) | ready-for-review (tester: 6/6 PASS) | 2026-08-13 |
+| #49 | chore(src): fix MSVC build warnings (C4244 narrowing, C4996 deprecated CRT, C4611 setjmp/dtor) | closed | 2026-08-13 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

@@ -3219,3 +3219,10 @@ the shared mechanism.
   confirmation before any remote comment/close action, per this
   project's standing convention.
 - Files: `AGENTS.md` (Tracked Issues table)
+
+## [2026-08-13] — chore: close issue #49
+
+- Committed the fix (commit `b509606`) and pushed to `origin/main`.
+- User confirmed closing #49; posted a summary comment recapping all 6
+  verified acceptance criteria and closed the issue on GitHub.
+- Files: `AGENTS.md` (Tracked Issues table)
