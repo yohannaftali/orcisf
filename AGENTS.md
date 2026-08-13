@@ -2457,12 +2457,33 @@ later, different one (e.g. closing an issue or cutting a release).
     packages `ninja-build` at **1.11.1-2**, matching the version
     `gha-setup-ninja@v4` was already resolving to — if `ubuntu-latest`
     ever moves to a newer Ubuntu release, re-check that apt's ninja
-    version hasn't dropped below what Windows/macOS use. As a side
-    effect, the Linux leg no longer invokes `gha-setup-ninja`'s bundled
-    Node runtime at all, which also clears that leg's "Node 20 is being
-    deprecated" warning (Windows/macOS legs still use the action and may
-    still show it — not in scope here since only the Linux leg was
-    failing).
+    version hasn't dropped below what Windows/macOS use. **The "Node 20
+    is being deprecated" warning was investigated against a real run's
+    log before being addressed — don't assume any single action bump
+    "clears" it without re-checking a live run.** GitHub Actions prints
+    this warning per-job whenever *any* action used in that job still
+    declares `using: node20` in its manifest, and names the offending
+    actions explicitly in a final `##[warning]` line. A first fix pass
+    (apt-only, still on `actions/checkout@v4`) showed via that line:
+    Windows blamed `actions/checkout@v4, ilammy/msvc-dev-cmd@v1,
+    seanmiddleditch/gha-setup-ninja@v4`; macOS blamed `actions/
+    checkout@v4, seanmiddleditch/gha-setup-ninja@v4`; Linux blamed only
+    `actions/checkout@v4` (confirming `gha-setup-ninja`'s own
+    contribution was gone there, but `checkout` alone still triggered
+    the same warning on every leg, since it's unconditional in every
+    job). Checked each action's actual manifest for a node24-capable
+    release: `actions/checkout` has one (`v7.0.0+`, confirmed via its
+    raw `action.yml`); `ilammy/msvc-dev-cmd` does not (`v1.13.0` is its
+    latest, still `node20`, no `v2` exists); `seanmiddleditch/gha-setup-
+    ninja` does not either (`v6`, its latest tag, is still `node20`).
+    **Fix: bumped `actions/checkout@v4` -> `@v7`** (verified safe for
+    this workflow's plain default usage — `v7`'s only breaking change is
+    to `pull_request_target` fork-checkout behavior, and this workflow
+    only triggers on `push`/`pull_request`) — this clears `checkout`'s
+    contribution to the warning on all three legs. **Windows will still
+    show the warning** as long as `ilammy/msvc-dev-cmd` has no node24
+    release to pin to — nothing this workflow can do about that until
+    upstream ships one.
 - **Releases:** GitHub Releases publish prebuilt GUI binaries. The project
   is currently in **alpha** — tags/releases use a `v0.0.x-alpha` scheme
   (first one: `v0.0.1-alpha`). Bump the patch number for each subsequent
