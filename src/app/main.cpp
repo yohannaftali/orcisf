@@ -78,7 +78,13 @@ void LogStartupError(const char* format, ...) {
     std::vfprintf(stderr, format, args);
     va_end(args);
 
-    if (std::FILE* f = std::fopen("orcisf_gui_startup.log", "a")) {
+    std::FILE* f = nullptr;
+#if defined(_WIN32)
+    fopen_s(&f, "orcisf_gui_startup.log", "a");
+#else
+    f = std::fopen("orcisf_gui_startup.log", "a");
+#endif
+    if (f) {
         va_start(args, format);
         std::vfprintf(f, format, args);
         va_end(args);
@@ -153,12 +159,27 @@ void ApplyUiScale(float scale) {
 // unreproduced for so long. Returns <= 0 when unset/unparseable, meaning
 // "use the monitor's own scale".
 float UiScaleOverride() {
+#if defined(_WIN32)
+    char* env = nullptr;
+    size_t env_len = 0;
+    _dupenv_s(&env, &env_len, "ORCISF_UI_SCALE");
+    if (env == nullptr) return 0.f;
+    float result = 0.f;
+    if (*env != '\0') {
+        char* end = nullptr;
+        float value = std::strtof(env, &end);
+        if (end != env && value > 0.f) result = value;
+    }
+    std::free(env);
+    return result;
+#else
     const char* env = std::getenv("ORCISF_UI_SCALE");
     if (env == nullptr || *env == '\0') return 0.f;
     char* end = nullptr;
     float value = std::strtof(env, &end);
     if (end == env || value <= 0.f) return 0.f;
     return value;
+#endif
 }
 
 } // namespace

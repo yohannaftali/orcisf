@@ -28,9 +28,9 @@ float HitungKolom(const StructureData& sd, float BT1, float DS, float eks, float
 
         float ASdi;
         if (ikl == 1 || ikl == static_cast<int>(sd.N_DIA)) {
-            ASdi = sd.N_DIA * (kPi / 4.f) * std::pow(sd.DIA, 2);
+            ASdi = static_cast<float>(sd.N_DIA * (kPi / 4.f) * std::pow(sd.DIA, 2));
         } else {
-            ASdi = 2.f * (kPi / 4.f) * std::pow(sd.DIA, 2);
+            ASdi = static_cast<float>(2.f * (kPi / 4.f) * std::pow(sd.DIA, 2));
         }
 
         float fsi = 600.f * (Ccoba - di) / Ccoba;
@@ -60,8 +60,8 @@ float HitungKolom(const StructureData& sd, float BT1, float DS, float eks, float
 
 // Port of kolom::rho(). Returns ASTOT (needed later for berat_besi).
 float Rho(StructureData& sd) {
-    float ASTOT = (4.f * sd.N_DIA - 4.f) * (kPi / 4.f) * std::pow(sd.DIA, 2);
-    float RHO = ASTOT / std::pow(sd.sisi, 2);
+    float ASTOT = static_cast<float>((4.f * sd.N_DIA - 4.f) * (kPi / 4.f) * std::pow(sd.DIA, 2));
+    float RHO = static_cast<float>(ASTOT / std::pow(sd.sisi, 2));
 
     sd.kendala_r_min = 0.01f / RHO - 1.f;
     if (sd.kendala_r_min < 0.f) {
@@ -117,7 +117,7 @@ void Analisa(StructureData& sd, float ASTOT) {
         PN = kLimitNol;
     }
 
-    float PO = kTeta * (0.85f * sd.FC * std::pow(sd.sisi, 2) + ASTOT * sd.FY);
+    float PO = static_cast<float>(kTeta * (0.85f * sd.FC * std::pow(sd.sisi, 2) + ASTOT * sd.FY));
 
     sd.kendala_po = PN / PO - 1.f;
     if (sd.kendala_po <= 0.f) {

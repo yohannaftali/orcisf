@@ -3057,3 +3057,165 @@ the shared mechanism.
   folder, all five pages) and confirmed it's done -- commented on and
   closed #44, #45, #46, #47, #48, then the epic #43 itself.
 - Files: `AGENTS.md`
+
+## [2026-08-13] — chore: file build-warning cleanup issue #49
+
+- User reported a real `build.ps1` run of `src/` succeeding but emitting
+  compiler warnings: MSVC C4244 (double->float narrowing) across
+  `engine/src/BeamDesign.cpp`, `ColumnDesign.cpp`, and
+  `StructuralAnalysis.cpp`; C4996 (deprecated `fopen`/`getenv`) in
+  `app/main.cpp`; and C4611 (`_setjmp` vs. C++ object destruction) in
+  `report/PdfExport.cpp` (the latter already has a documented rationale
+  in `AGENTS.md` as an accepted libharu tradeoff).
+- Filed as issue #49 rather than fixed inline, since the C4244 sites sit
+  inside the ported RC design/structural-analysis engine -- per
+  `AGENTS.md`'s own caution, any change there needs numeric-output
+  verification (`orcisf_cli optimize`/`equilibrium` against a real
+  `Example/` dataset) before it can be trusted not to have altered
+  results, so this is scoped as a `coder`-stage task with explicit
+  acceptance criteria rather than a quick blanket fix/suppression.
+- Files: `AGENTS.md` (Tracked Issues table)
+
+## [2026-08-13] — chore(src): fix MSVC build warnings (#49)
+
+- **C4244 (double->float narrowing) in the engine** --
+  `engine/src/BeamDesign.cpp`, `ColumnDesign.cpp`, `StructuralAnalysis.cpp`:
+  every flagged site is a `std::pow`/`std::sqrt` result (always `double`,
+  since these overloads promote mixed-type/int-exponent arguments)
+  narrowing into an existing `float sd.*` field. Fixed with an explicit
+  `static_cast<float>(...)` around each `pow`/`sqrt` call -- this is a
+  no-op for behavior (identical to the implicit narrowing conversion the
+  code already relied on), just makes the intent explicit and silences
+  the warning. One site in `BeamDesign.cpp::Lendutan()` additionally
+  factored a repeated `std::pow(sd.Mcr / mlap_term, 3)` call (computed
+  twice with identical inputs) into a single local `rasio_cube` --
+  deterministic, so this cannot change the result, and avoids computing
+  the same `pow` twice.
+- **C4996 (deprecated CRT: `fopen`/`getenv`) in `app/main.cpp`** -- fixed
+  with `#ifdef _WIN32` branches using `fopen_s`/`_dupenv_s` on Windows,
+  keeping the original portable `std::fopen`/`std::getenv` path for
+  macOS/Linux (this file builds on all three via CI) -- not a blanket
+  `_CRT_SECURE_NO_WARNINGS`, which would have silenced future real
+  CRT-safety warnings project-wide.
+- **C4611 (`_setjmp` vs. C++ object destruction) in `report/PdfExport.cpp`**
+  -- kept (it's the standard libharu error-handling pattern, already
+  documented as an accepted tradeoff in `AGENTS.md`'s `report/` section),
+  but now explicitly scoped with `#pragma warning(push/pop, disable: 4611)`
+  around just the `setjmp()` call instead of appearing as unexplained
+  build noise.
+- **Verification:** `build.ps1` now reports zero warnings from
+  `orcisf_engine`/`orcisf_gui` (all sites above resolved). Re-ran
+  `orcisf_cli equilibrium`/`info` against a scratch copy of
+  `Example/Apl1-1` (never pointed directly at `Example/`, per `AGENTS.md`)
+  -- equilibrium residual came back `0.015625`, bit-identical to the
+  value already documented elsewhere in `AGENTS.md` for this exact
+  dataset, confirming the C4244 fixes did not change engine numerics.
+- Files: `src/engine/src/BeamDesign.cpp`, `src/engine/src/ColumnDesign.cpp`,
+  `src/engine/src/StructuralAnalysis.cpp`, `src/app/main.cpp`,
+  `src/report/PdfExport.cpp`, `AGENTS.md`
+
+## [2026-08-13] — tester: #49 -- 4/6 PASS, 2 FAIL (bit-identical claim was wrong)
+
+- Ran `builder`, then forced a genuinely clean recompile (`touch` on all
+  5 changed files) to confirm zero warnings from a real rebuild, not a
+  cached no-op -- **criterion 4 PASS**, output showed no C4244/C4996/C4611
+  warnings for any of the fixed sites.
+- Reviewed `main.cpp`'s `fopen_s`/`_dupenv_s` `#ifdef _WIN32` branches
+  and `PdfExport.cpp`'s scoped `#pragma warning(push/disable 4611/pop)`
+  -- **criteria 2, 3, 6 PASS** (criterion 2's non-Windows branch is
+  unchanged code, so low regression risk, but not locally compilable in
+  this environment -- flagged UNVERIFIED-on-other-platforms, consistent
+  with `AGENTS.md`'s "CI is the authoritative cross-platform check" rule).
+- **Criteria 1 and 5 FAIL**: built a real pre-fix baseline binary via
+  `git stash` of the 5 changed files + rebuild + copy binary out +
+  restore + rebuild fixed binary, then ran the identical
+  `orcisf_cli optimize` command (fixed seed 12345, worker_threads=1,
+  50 iterations) against separate scratch copies of `Example/Apl1-1`
+  for both binaries. 149/151 output lines matched exactly, including
+  the final `MEMBER_RESULTS` (same dimensions/reinforcement/cost for
+  every member) -- but generation 32's `kdl` value differed in its last
+  digit (`8.18784` baseline vs. `8.18783` fixed). Root cause: the
+  `coder` stage's `BeamDesign.cpp::Lendutan()` refactor cached a
+  repeated `std::pow(sd.Mcr/mlap_term, 3)` call (originally invoked
+  twice with identical arguments) into a single `rasio_cube` local --
+  mathematically equivalent, but the compiler's rounding path shifted
+  slightly, breaking the issue's explicit "bit-identical to baseline"
+  requirement even though it never reaches the final design in this
+  dataset.
+- **Recommendation**: send back to `coder` -- revert the `rasio_cube`
+  caching in `Lendutan()` to two independently-cast `std::pow(...)`
+  calls (matching every other C4244 fix in this same change) and
+  re-verify bit-identical `optimize` output before re-testing. Issue
+  #49 not closed.
+- Files: `AGENTS.md` (Tracked Issues table)
+
+## [2026-08-13] — chore(src): #49 re-fix -- cast whole expressions, not pow() sub-terms
+
+- First fixed the `rasio_cube` caching the tester flagged, then
+  re-diffed against a freshly-built pre-fix baseline (`git stash` of the
+  5 changed files + rebuild) and the **same single-digit `kdl` drift at
+  generation 32 was still there** -- proving the caching was never the
+  real cause.
+- **Actual root cause**: every C4244 fix in the original pass wrapped
+  only the `std::pow(...)` sub-expression in `static_cast<float>(...)`,
+  e.g. `0.25f * kPi * static_cast<float>(std::pow(sd.DIA1, 2)) * sd.NL1`.
+  That silences the warning but changes *where* the double->float
+  narrowing happens: the original code computed the **entire**
+  right-hand side in `double` (once any operand is `double`, C++'s usual
+  arithmetic conversions promote the whole expression) and narrowed to
+  `float` exactly once, at the assignment. Casting the `pow()` result to
+  `float` mid-expression instead forces every multiplication/addition
+  after it back down to `float`-precision arithmetic -- a different,
+  lower-precision computation, not merely a differently-spelled cast.
+- **Fix**: re-did every site so the `static_cast<float>(...)` wraps the
+  *entire* original expression, narrowing exactly once at the same point
+  the implicit conversion used to -- e.g.
+  `sd.AS = static_cast<float>(0.25f * kPi * std::pow(sd.DIA1, 2) * sd.NL1);`.
+  Two `+=` sites in `StructuralAnalysis.cpp::BeratSendiri()`
+  (`sd.AML[6][ibs]`/`sd.AML[12][ibs]`) needed rewriting as explicit
+  `x = static_cast<float>(x + ...)` rather than `x += static_cast<float>(...)`,
+  since `+=` on a cast-to-float RHS would still compute the addition
+  itself in `float` instead of `double` -- the same class of bug, just
+  one level up.
+- **Verification**: rebuilt (zero warnings, all 3 engine files + 2
+  others recompiled clean), then repeated the tester's exact baseline
+  comparison -- fresh pre-fix binary vs. fresh fixed binary, both run as
+  `orcisf_cli optimize <scratch>/aplikasi 800000 12000 40 25 1000 50 2 2
+  1 12345 1` against separate scratch copies of `Example/Apl1-1`. Output
+  is now **byte-identical** except for the expected timestamped-output-
+  path line (`Output written to: .../2026-08-13.10.49\aplikasi`, which
+  differs only because the two scratch directories have different names
+  -- not a numeric difference). Also re-ran `equilibrium` on the fixed
+  binary: residual `0.015625`, matching the value documented elsewhere
+  in this file.
+- Files: `src/engine/src/BeamDesign.cpp`, `src/engine/src/ColumnDesign.cpp`,
+  `src/engine/src/StructuralAnalysis.cpp`, `AGENTS.md`
+
+## [2026-08-13] — tester: #49 re-test -- 6/6 PASS
+
+- Ran `builder`, then forced a genuinely clean recompile (`touch` on
+  all 5 changed files) to independently confirm zero warnings from a
+  real rebuild -- **criterion 4 PASS** again, no reuse of the coder
+  session's own build.
+- Independently rebuilt a fresh pre-fix baseline binary (separate
+  `git stash` of the 5 changed files, full rebuild -- reproduced the
+  original C4244/C4996/C4611 warnings verbatim, confirming the baseline
+  was genuinely pre-fix, not a stale artifact) and re-ran the identical
+  `orcisf_cli optimize <scratch>/aplikasi 800000 12000 40 25 1000 50 2 2
+  1 12345 1` command against separate scratch copies of `Example/Apl1-1`
+  for both binaries. `diff` now shows **only** the expected timestamped-
+  output-path line differing (different scratch directory names) --
+  every numeric line, including generation 32's previously-drifting
+  `kdl` value and the final `MEMBER_RESULTS`, is byte-identical --
+  **criteria 1 and 5 PASS**, confirming the coder's re-fix (whole-
+  expression casts instead of pow()-sub-term casts) actually resolved
+  the drift this tester flagged last pass.
+- Re-reviewed `main.cpp`'s `fopen_s`/`_dupenv_s` guards and
+  `PdfExport.cpp`'s scoped `#pragma warning` -- **criteria 2, 3, 6
+  PASS** (criterion 2's non-Windows branch remains UNVERIFIED locally,
+  no macOS/Linux toolchain in this environment; CI is the authoritative
+  check per `AGENTS.md`).
+- **All 6 criteria PASS.** Recommend closing #49 -- awaiting user
+  confirmation before any remote comment/close action, per this
+  project's standing convention.
+- Files: `AGENTS.md` (Tracked Issues table)

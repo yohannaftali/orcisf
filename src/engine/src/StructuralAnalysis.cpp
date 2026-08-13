@@ -8,9 +8,9 @@
 namespace orcisf::engine {
 
 void PeriksaBatang(StructureData& sd, int perb) {
-    sd.EL[perb] = std::sqrt(std::pow(sd.X[sd.JK[perb]] - sd.X[sd.JJ[perb]], 2) +
-                             std::pow(sd.Y[sd.JK[perb]] - sd.Y[sd.JJ[perb]], 2) +
-                             std::pow(sd.Z[sd.JK[perb]] - sd.Z[sd.JJ[perb]], 2));
+    sd.EL[perb] = static_cast<float>(std::sqrt(std::pow(sd.X[sd.JK[perb]] - sd.X[sd.JJ[perb]], 2) +
+                                                std::pow(sd.Y[sd.JK[perb]] - sd.Y[sd.JJ[perb]], 2) +
+                                                std::pow(sd.Z[sd.JK[perb]] - sd.Z[sd.JJ[perb]], 2)));
     sd.CX = (sd.X[sd.JK[perb]] - sd.X[sd.JJ[perb]]) / sd.EL[perb];
     sd.Cy = (sd.Y[sd.JK[perb]] - sd.Y[sd.JJ[perb]]) / sd.EL[perb];
     sd.CZ = (sd.Z[sd.JK[perb]] - sd.Z[sd.JJ[perb]]) / sd.EL[perb];
@@ -115,20 +115,22 @@ void Inersia(StructureData& sd) {
         sd.AX[iin] = sd.b[iin] * sd.h[iin];
 
         if (sd.b[iin] <= sd.h[iin]) {
-            sd.XI[iin] = ((1.f / 3.f) -
-                          0.21f * sd.b[iin] / sd.h[iin] *
-                              (1.f - std::pow(sd.b[iin], 4) / (12.f * std::pow(sd.h[iin], 4)))) *
-                         sd.h[iin] * std::pow(sd.b[iin], 3);
+            sd.XI[iin] = static_cast<float>(
+                ((1.f / 3.f) -
+                 0.21f * sd.b[iin] / sd.h[iin] *
+                     (1.f - std::pow(sd.b[iin], 4) / (12.f * std::pow(sd.h[iin], 4)))) *
+                sd.h[iin] * std::pow(sd.b[iin], 3));
         } else {
             // Roark's Formulas for Stress & Strain, Warren C. Young 1989, p.348
             float _a = 0.5f * sd.b[iin];
             float _b = 0.5f * sd.h[iin];
-            sd.XI[iin] = _a * std::pow(_b, 3) *
-                         ((16.f / 3.f) - (3.36f * _b / _a) * (1.f - std::pow(_b, 4) / (12.f * std::pow(_a, 4))));
+            sd.XI[iin] = static_cast<float>(
+                _a * std::pow(_b, 3) *
+                ((16.f / 3.f) - (3.36f * _b / _a) * (1.f - std::pow(_b, 4) / (12.f * std::pow(_a, 4)))));
         }
 
-        sd.YI[iin] = sd.h[iin] * std::pow(sd.b[iin], 3) / 12.f;
-        sd.ZI[iin] = sd.b[iin] * std::pow(sd.h[iin], 3) / 12.f;
+        sd.YI[iin] = static_cast<float>(sd.h[iin] * std::pow(sd.b[iin], 3) / 12.f);
+        sd.ZI[iin] = static_cast<float>(sd.b[iin] * std::pow(sd.h[iin], 3) / 12.f);
     }
 }
 
@@ -292,9 +294,9 @@ void BeratSendiri(StructureData& sd) {
             sd.W_Balok[ibs] = 24000.f * sd.b[ibs] * sd.h[ibs] * 1.E-6f;
             sd.W[ibs] += sd.W_Balok[ibs];
             sd.AML[2][ibs] += sd.W_Balok[ibs] * sd.EL[ibs] / 2.f;
-            sd.AML[6][ibs] += sd.W_Balok[ibs] * std::pow(sd.EL[ibs], 2) / 12.f;
+            sd.AML[6][ibs] = static_cast<float>(sd.AML[6][ibs] + sd.W_Balok[ibs] * std::pow(sd.EL[ibs], 2) / 12.f);
             sd.AML[8][ibs] += sd.W_Balok[ibs] * sd.EL[ibs] / 2.f;
-            sd.AML[12][ibs] += -sd.W_Balok[ibs] * std::pow(sd.EL[ibs], 2) / 12.f;
+            sd.AML[12][ibs] = static_cast<float>(sd.AML[12][ibs] + -sd.W_Balok[ibs] * std::pow(sd.EL[ibs], 2) / 12.f);
             sd.js_balok++;
         } else {
             sd.b[ibs] = Isi(sd.var_k[sd.no_struktur][0 + 5 * sd.js_kolom], sd.sisi_d_K);
@@ -343,7 +345,7 @@ void Hasil(StructureData& sd) {
         PeriksaBatang(sd, ih);
 
         if (sd.CXZ > 0.001f) {
-            sd.MLAP[ih] = -sd.AM[ih][6] + 0.125f * sd.W[ih] * std::pow(sd.EL[ih], 2);
+            sd.MLAP[ih] = static_cast<float>(-sd.AM[ih][6] + 0.125f * sd.W[ih] * std::pow(sd.EL[ih], 2));
             sd.MTUM_KI[ih] = -sd.AM[ih][6];
             sd.MTUM_KA[ih] = sd.AM[ih][12];
             sd.GESER_KI[ih] = sd.AM[ih][2];

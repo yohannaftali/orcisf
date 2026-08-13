@@ -252,10 +252,21 @@ std::string WritePdfReport(const StructureData& sd, const std::vector<MemberResu
     HPDF_Doc pdf = HPDF_New(ErrorHandler, nullptr);
     if (!pdf) return "Failed to initialize PDF document";
 
+    // C4611 (setjmp/longjmp vs. C++ object destruction) is expected and
+    // accepted here -- see AGENTS.md's report/ section: this is the
+    // standard libharu error-handling pattern used throughout its own
+    // examples, not something to rewrite HPDF's API surface to avoid.
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4611)
+#endif
     if (setjmp(g_jmp_env)) {
         HPDF_Free(pdf);
         return "PDF generation failed (see stderr for HPDF error code)";
     }
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
     HPDF_SetCompressionMode(pdf, HPDF_COMP_ALL);
     HPDF_Font font = HPDF_GetFont(pdf, "Helvetica", nullptr);

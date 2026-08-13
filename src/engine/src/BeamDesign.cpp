@@ -136,8 +136,8 @@ void DesignBeam(StructureData& sd) {
     sd.kendala = 0.f;
     sd.harga = 0.f;
 
-    sd.AS = 0.25f * kPi * std::pow(sd.DIA1, 2) * sd.NL1;
-    sd.AS1 = 0.25f * kPi * std::pow(sd.DIA2, 2) * sd.NL2;
+    sd.AS = static_cast<float>(0.25f * kPi * std::pow(sd.DIA1, 2) * sd.NL1);
+    sd.AS1 = static_cast<float>(0.25f * kPi * std::pow(sd.DIA2, 2) * sd.NL2);
 
     Analisa(sd);
     SengkangBalok(sd);
@@ -145,9 +145,10 @@ void DesignBeam(StructureData& sd) {
 
     sd.volume_beton = sd.B * sd.H * 0.5f * sd.L / 1.E6f;
     sd.berat_besi = (sd.AS + sd.AS1) * 0.5f * sd.L * kBjBesi / 1.E6f;
-    sd.berat_sengkang = 0.5f * (std::fabs(sd.L / (sd.Jarak_S / 1000.f)) - 1.f) *
-                        (2.f * ((sd.B - 2.f * sd.selimut_balok) / 1000.f + 2.f * (sd.H - 2.f * sd.selimut_balok) / 1000.f)) *
-                        (kPi / 4.f) * std::pow(sd.DIAS / 1000.f, 2) * kBjBesi;
+    sd.berat_sengkang = static_cast<float>(
+        0.5f * (std::fabs(sd.L / (sd.Jarak_S / 1000.f)) - 1.f) *
+        (2.f * ((sd.B - 2.f * sd.selimut_balok) / 1000.f + 2.f * (sd.H - 2.f * sd.selimut_balok) / 1000.f)) *
+        (kPi / 4.f) * std::pow(sd.DIAS / 1000.f, 2) * kBjBesi);
 
     sd.harga = sd.volume_beton * sd.harga_beton + sd.berat_besi * sd.harga_besi + sd.berat_sengkang * sd.harga_besi;
 }
@@ -156,24 +157,25 @@ void Lendutan(StructureData& sd, int no_batang_l) {
     sd.n = 2.E5f / (sd.E * 1.E-6f);
     sd.fr = 0.7f * std::sqrt(sd.FC);
 
-    sd.AS = 0.25f * kPi * std::pow(sd.DIA1, 2) * sd.NL1;
-    sd.AS1 = 0.25f * kPi * std::pow(sd.DIA2, 2) * sd.NL2;
+    sd.AS = static_cast<float>(0.25f * kPi * std::pow(sd.DIA1, 2) * sd.NL1);
+    sd.AS1 = static_cast<float>(0.25f * kPi * std::pow(sd.DIA2, 2) * sd.NL2);
 
     sd.LGN = (sd.n * sd.AS / sd.B) *
              (std::sqrt(1.f + (2.f * sd.B * (sd.H - sd.selimut_balok)) / (sd.n * sd.AS)) - 1.f);
 
-    sd.Icr = (1.f / 3.f) * sd.B * std::pow(sd.LGN, 3) +
-             sd.n * sd.AS * std::pow((sd.H - sd.selimut_balok) - sd.LGN, 2);
+    sd.Icr = static_cast<float>((1.f / 3.f) * sd.B * std::pow(sd.LGN, 3) +
+                                 sd.n * sd.AS * std::pow((sd.H - sd.selimut_balok) - sd.LGN, 2));
 
-    sd.Ig = (1.f / 12.f) * sd.B * std::pow(sd.H, 3);
+    sd.Ig = static_cast<float>((1.f / 12.f) * sd.B * std::pow(sd.H, 3));
 
     sd.Mcr = sd.fr * sd.Ig / (0.5f * sd.H);
 
     float mlap_term = sd.MLAP[no_batang_l] * 1.e3f;
-    sd.Ie = std::pow(sd.Mcr / mlap_term, 3) * sd.Ig + (1.f - std::pow(sd.Mcr / mlap_term, 3)) * sd.Icr;
+    sd.Ie = static_cast<float>(std::pow(sd.Mcr / mlap_term, 3) * sd.Ig +
+                                (1.f - std::pow(sd.Mcr / mlap_term, 3)) * sd.Icr);
 
-    sd.LENDUTAN = ((5.f * std::pow(sd.L * 1000.f, 2)) / (48.f * (sd.E * 1.E-6f) * sd.Ie)) *
-                  std::fabs(sd.MLAP[no_batang_l]) * 1000.f;
+    sd.LENDUTAN = static_cast<float>(((5.f * std::pow(sd.L * 1000.f, 2)) / (48.f * (sd.E * 1.E-6f) * sd.Ie)) *
+                                      std::fabs(sd.MLAP[no_batang_l]) * 1000.f);
 
     sd.Lambda = 2.f / (1.f + 50.f * sd.AS1 / (sd.B * sd.H));
     sd.LENDUTAN = (1.f + sd.Lambda) * sd.LENDUTAN;
