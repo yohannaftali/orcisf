@@ -3771,3 +3771,74 @@ the shared mechanism.
 - Files: `.github/workflows/build-src.yml`, `AGENTS.md` (GitHub
   Workflow section: new bullet documenting how/why Linux gets ninja via
   apt; Tracked Issues row for #56 -> `ready-for-review`).
+
+## [2026-08-13] — tester: #56 -- 5/5 PASS (triggered 3 live CI runs; also fixed a doc inaccuracy + added a follow-up fix)
+- Fetched issue #56 fresh from GitHub (5 Acceptance Criteria, all
+  `- [ ]`, no comments). This issue is CI-config-only (no `src/` code
+  touched), so the `builder` skill's local binary rebuild doesn't
+  apply -- verification target was the live GitHub Actions workflow
+  itself via the API (`$TOKEN` from `.env`, never printed).
+- **Criterion 1** (Linux no longer depends on a single unretried
+  network download for ninja) -- PASS. Confirmed via
+  `git show f1c24b4 -- .github/workflows/build-src.yml`: `ninja-build`
+  folded into the existing `apt-get install` step, `Setup Ninja`
+  (`gha-setup-ninja@v4`) gated `if: runner.os != 'Linux'`. Confirmed
+  live in run 31696710433's Linux job step list: `Install Linux GL/X11
+  dev packages` (now includes ninja) `completed success`, `Setup
+  Ninja` `completed skipped`.
+- **Criterion 2** (ninja version not silently downgraded) -- PASS.
+  `packages.ubuntu.com/noble/ninja-build` lookup: 1.11.1-2. Confirmed
+  again directly in the live job log: `Setting up ninja-build
+  (1.11.1-2)` -- matches what `gha-setup-ninja@v4` was already
+  resolving to on Windows/macOS. No downgrade.
+- **Criterion 3** (Node.js 20 warning addressed if easy) -- PASS, and
+  found + corrected a real inaccuracy in the prior `coder` pass's
+  documentation along the way. The coder session had claimed the fix
+  "clears the Linux leg's warning" -- checking the actual run log
+  disproved this: `gha-setup-ninja`'s own contribution to Linux's
+  final `##[warning]` line was gone, but `actions/checkout@v4` alone
+  (unconditional in every job) still triggered the identical warning
+  on Linux too. Corrected `AGENTS.md`'s claim to match the evidence.
+  Checked whether any pinned action had a node24-capable newer
+  release: `actions/checkout` did (`v7.0.0+`, confirmed via its raw
+  `action.yml`); `ilammy/msvc-dev-cmd` and `seanmiddleditch/gha-setup-
+  ninja` did not (`v1.13.0`/`v6` latest tags, both still `node20`).
+  Verified `actions/checkout@v4` -> `@v7` was safe for this workflow's
+  plain default usage (v7's only breaking change affects
+  `pull_request_target` fork checkouts; this workflow only triggers on
+  `push`/`pull_request`). Committed and pushed the bump (`88be7cd`).
+  Re-verified against that run's fresh logs: Linux now shows **zero**
+  Node 20 warnings; Windows/macOS still show it, now blaming only
+  `ilammy/msvc-dev-cmd`/`seanmiddleditch/gha-setup-ninja` (checkout
+  dropped off both lists) -- nothing further actionable until those
+  two ship a node24 release.
+- **Criterion 4** (Linux succeeds at least twice in a row) -- PASS,
+  exceeded. Triggered a manual re-run of 31696710433 (the original
+  ninja-only fix) via `POST .../runs/{id}/rerun`, then a second real
+  push (`88be7cd`, the checkout bump). All three Linux runs succeeded
+  with no ECONNRESET or any ninja-related failure: `f1c24b4` original
+  (11:42-11:52 UTC, ~9m23s), its re-run (11:54-12:04, ~9m9s), and
+  `88be7cd` (12:01-12:10, ~9m). Windows/macOS were green throughout
+  too. Noted (not a defect): the second run's Linux log showed
+  transient HTTP 502s from `ftpmirror.gnu.org` fetching unrelated
+  vcpkg source deps (automake/gperf) -- these did not fail the job,
+  since vcpkg's own downloader retries/falls back, unlike the old
+  `gha-setup-ninja` step which had no such retry. Reinforces the
+  issue's own diagnosis of what the actual defect was.
+- **Criterion 5** (`AGENTS.md` CI section updated) -- PASS. Present
+  from the `coder` pass, then corrected (criterion 3 above) and
+  extended (documenting the `checkout@v7` bump) during this pass.
+- User asked mid-session "why not use node24" and, after confirming a
+  real lever existed (`checkout@v7`), explicitly approved bumping it
+  as part of this same issue rather than filing a separate chore --
+  done, see criterion 3.
+- Verdict: **5/5 PASS**. No FAILs, nothing UNVERIFIED. Two additional
+  commits landed during this tester pass beyond the original `coder`
+  commit: `f1c24b4` (untouched, already existed) and `88be7cd`
+  (`actions/checkout@v4` -> `@v7`, made at explicit user request after
+  presenting the tradeoff). Recommend closing #56 -- awaiting the
+  user's explicit confirmation before any remote action (comment/close),
+  per this project's convention.
+- Files: `.github/workflows/build-src.yml` (checkout bump), `AGENTS.md`
+  (corrected + extended CI section; Tracked Issues row -> `ready-for-
+  review (tester: 5/5 PASS)`).
