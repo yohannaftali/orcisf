@@ -21,7 +21,8 @@ void DrawMemberLoadsTable(const SceneModel& scene, Selection& selection, Editabl
     if (!BeginTableView("member_loads", 3)) return;
     ImGui::TableSetupColumn("Batang", ImGuiTableColumnFlags_WidthFixed, 60.f);
     ImGui::TableSetupColumn("W (N/m)");
-    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 60.f);
+    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize,
+                             TableTrashColumnWidth());
     ImGui::TableHeadersRow();
 
     for (const MemberLoadVisual& ml : scene.member_loads) {
@@ -43,7 +44,7 @@ void DrawMemberLoadsTable(const SceneModel& scene, Selection& selection, Editabl
             if (on_geometry_changed) on_geometry_changed();
         }
         ImGui::TableSetColumnIndex(2);
-        if (editable && ImGui::SmallButton("Clear")) {
+        if (editable && TableTrashButton("##clear")) {
             if (undo) undo->PushUndo(editable->SdForUndo());
             editable->ClearMemberLoad(ml.no_batang);
             if (on_geometry_changed) on_geometry_changed();
@@ -68,7 +69,8 @@ void DrawJointLoadsTable(const SceneModel& scene, Selection& selection, Editable
     ImGui::TableSetupColumn("Mx");
     ImGui::TableSetupColumn("My");
     ImGui::TableSetupColumn("Mz");
-    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 60.f);
+    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize,
+                             TableTrashColumnWidth());
     ImGui::TableHeadersRow();
 
     static const char* kFieldIds[6] = {"##fx", "##fy", "##fz", "##mx", "##my", "##mz"};
@@ -99,7 +101,7 @@ void DrawJointLoadsTable(const SceneModel& scene, Selection& selection, Editable
         }
 
         ImGui::TableSetColumnIndex(7);
-        if (editable && ImGui::SmallButton("Clear")) {
+        if (editable && TableTrashButton("##clear")) {
             if (undo) undo->PushUndo(editable->SdForUndo());
             editable->ClearJointLoad(jl.no_joint);
             if (on_geometry_changed) on_geometry_changed();

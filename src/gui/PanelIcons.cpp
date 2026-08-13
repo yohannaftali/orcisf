@@ -80,6 +80,20 @@ void DrawLogIcon(ImDrawList* dl, ImVec2 o, ImU32 c, float size) {
 
 } // namespace
 
+// Issue #54: lid + handle + can body with two rib lines -- a standard
+// trash-can silhouette, kept to the same normalized-[0,1]-box + P()
+// convention as every icon above, but not routed through DrawPanelIcon()
+// since it isn't a panel icon.
+void DrawTrashIcon(ImDrawList* dl, ImVec2 origin, ImU32 color, float size) {
+    dl->AddLine(P(origin, 0.4f, 0.1f, size), P(origin, 0.4f, 0.2f, size), color, 1.1f);
+    dl->AddLine(P(origin, 0.6f, 0.1f, size), P(origin, 0.6f, 0.2f, size), color, 1.1f);
+    dl->AddLine(P(origin, 0.4f, 0.1f, size), P(origin, 0.6f, 0.1f, size), color, 1.1f);
+    dl->AddLine(P(origin, 0.15f, 0.22f, size), P(origin, 0.85f, 0.22f, size), color, 1.3f);
+    dl->AddRect(P(origin, 0.25f, 0.25f, size), P(origin, 0.75f, 0.88f, size), color, 0.f, 0, 1.2f);
+    dl->AddLine(P(origin, 0.4f, 0.35f, size), P(origin, 0.4f, 0.78f, size), color, 1.f);
+    dl->AddLine(P(origin, 0.6f, 0.35f, size), P(origin, 0.6f, 0.78f, size), color, 1.f);
+}
+
 void DrawPanelIcon(PanelIcon icon, ImDrawList* dl, ImVec2 origin, ImU32 color, float size) {
     switch (icon) {
         case PanelIcon::Viewport: DrawViewportIcon(dl, origin, color, size); break;

@@ -2,6 +2,8 @@
 
 #include <imgui.h>
 
+#include "gui/PanelIcons.h"
+
 // Issue #52: a shared, reusable base for every editable list table in this
 // project (Joints/Members/Loads today; any future panel needing a table
 // should use this instead of re-implementing ImGui::BeginTable from
@@ -40,6 +42,57 @@ inline bool TableRowSelectable(const char* label, bool selected) {
     return ImGui::Selectable(label, selected,
                               ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap,
                               ImVec2(0.f, ImGui::GetFrameHeight()));
+}
+
+// Issue #54/#55: horizontally centers a narrow, fixed-size widget (a
+// checkbox, the trash button, ...) about to be drawn within the
+// *current table column's* available width, rather than leaving it at
+// ImGui's default left edge of the cell -- a `WidthFixed` DOF/action
+// column is deliberately wider than the widget itself (room for the
+// short header text above it), so without this the widget reads as
+// visibly left-aligned under a centered-looking header instead of
+// lining up with it. Must be called after `TableSetColumnIndex()` and
+// before the widget, in the same cell.
+inline void CenterNextTableItem(float item_width) {
+    float avail = ImGui::GetContentRegionAvail().x;
+    if (avail > item_width) {
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - item_width) * 0.5f);
+    }
+}
+
+// Issue #54: the action column's width for TableTrashButton() below --
+// just enough for a square icon button + a little breathing room, tied
+// to ImGui::GetFrameHeight() (already DPI-correct via issue #31's
+// FontScaleDpi) rather than a hardcoded literal, so it scales with the
+// current font/frame size the same way every other cell in these tables
+// already does.
+inline float TableTrashColumnWidth() { return ImGui::GetFrameHeight() * 1.6f; }
+
+// Issue #54: replaces every plain-text "Delete"/"Clear" `SmallButton` in
+// these tables with a light-red trash-can icon button, so a destructive
+// row action reads as visually distinct at a glance. Deliberately always
+// tinted (not just on hover) -- the whole point is to stand out
+// immediately, not only once the user happens to hover it. `{0.82f,
+// 0.22f, 0.24f, ...}` (~#D13A3D) is documented alongside this project's
+// other UI/viewport colors in AGENTS.md's issue #54 note; pick a
+// different one there first if this ever needs to change, don't just
+// edit the literal here.
+inline bool TableTrashButton(const char* str_id) {
+    const float h = ImGui::GetFrameHeight();
+    CenterNextTableItem(h);
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    const ImVec2 size(h, h);
+    bool clicked = ImGui::InvisibleButton(str_id, size);
+    bool hovered = ImGui::IsItemHovered();
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImU32 bg = hovered ? IM_COL32(209, 58, 61, 255) : IM_COL32(209, 58, 61, 200);
+    dl->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), bg, ImGui::GetStyle().FrameRounding);
+
+    float icon_size = h * 0.5f;
+    ImVec2 icon_origin(pos.x + (size.x - icon_size) * 0.5f, pos.y + (size.y - icon_size) * 0.5f);
+    DrawTrashIcon(dl, icon_origin, IM_COL32(255, 255, 255, 255), icon_size);
+    return clicked;
 }
 
 } // namespace orcisf::gui

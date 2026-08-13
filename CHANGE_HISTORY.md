@@ -3527,6 +3527,130 @@ the shared mechanism.
   bleed-through at all.
 - Files: `src/app/DockTabIcons.cpp`, `AGENTS.md`
 
+## [2026-08-13] — feat(src): edge/corner window resize for the borderless window (#53)
+
+- **New `src/app/WindowResize.{h,cpp}`**: `BorderResizer` class, polling
+  raw GLFW cursor/window state once per frame (called from `main.cpp`
+  right after `glfwPollEvents()`, before `ImGui::NewFrame()` -- same
+  slot issue #31's DPI-rescale poll already uses) rather than as ImGui
+  widgets, since it needs to hit-test the literal outer window border,
+  which has no corresponding ImGui window content. Kept entirely
+  separate from `CustomTitleBar` (which *is* ImGui-widget-based, running
+  inside the frame) so the two update models can't become ambiguous
+  about which one consumed a given click.
+- Same "anchor to an absolute screen-cursor position at drag start"
+  technique `CustomTitleBar`'s own drag already uses, for the same
+  self-oscillation reason (`glfwSetWindowPos`/`Size` moves the window
+  but not the physical cursor).
+- Minimum window size (480x360) is clamped inside `BorderResizer`
+  itself, with position re-derived from the *clamped* size for edges
+  that move the window's own origin (west/north) -- clamping size and
+  position independently from the same raw delta would let them
+  disagree once the minimum was hit, visually drifting the window away
+  from the cursor.
+- Resize disables itself while maximized (matching `CustomTitleBar`'s
+  drag) and is a no-op on Wayland (same reason `CustomTitleBar`'s drag
+  already documents -- Wayland compositors own window placement/size,
+  not the client).
+- Standard GLFW resize cursors (NS/EW/NESW/NWSE, needs GLFW 3.4+; this
+  project pins 3.5) are cached once each rather than recreated every
+  frame (would leak -- GLFW never frees a cursor until
+  `glfwDestroyCursor()`).
+- **Verification**: `build.ps1` clean (zero warnings). Interactive
+  regression test via `GetWindowRect()` before/after each action (not
+  just visual inspection): east-edge drag grew width only; SE-corner
+  drag grew width and height together; `CustomTitleBar`'s drag-to-move
+  and Maximize button both re-confirmed working afterward with no
+  regression. Cursor-shape-on-hover and the Wayland no-op path were not
+  independently verified (no Wayland environment here); macOS/Linux not
+  verified (no access in this environment).
+- Files: `src/app/WindowResize.h` (new), `src/app/WindowResize.cpp`
+  (new), `src/app/main.cpp`, `src/CMakeLists.txt`, `AGENTS.md`
+
+## [2026-08-13] — feat(src): trash-icon delete/clear buttons (#54)
+
+- **`gui/PanelIcons.{h,cpp}`**: new standalone `DrawTrashIcon()` (lid +
+  handle + can body + two rib lines), colocated with this project's
+  other hand-drawn icons but not routed through the `PanelIcon` enum/
+  dispatch, since it isn't a panel tab icon.
+- **`gui/TableView.h`**: new `TableTrashButton(str_id)` (square
+  `InvisibleButton`, always-visible light-red background `{209,58,61}`
+  ~`#D13A3D`, white trash icon) and `TableTrashColumnWidth()`
+  (`GetFrameHeight() * 1.6f`, DPI-correct via #31's `FontScaleDpi`
+  rather than a hardcoded literal).
+- **`JointsPanel`/`MembersPanel`/`LoadsPanel`** (both its tables, 4 call
+  sites total): plain-text `ImGui::SmallButton("Delete")`/`("Clear")`
+  replaced with `TableTrashButton(...)`, drop-in inside the exact same
+  `if (editable && ...)` blocks -- no change to the underlying delete/
+  clear logic, so issue #21's cascade-delete modal and issue #41's
+  click-routing fix are unaffected by construction. The action column's
+  `TableSetupColumn` flags changed from plain `WidthFixed` to
+  `WidthFixed | NoResize` with the new `TableTrashColumnWidth()` --
+  the one column in these tables deliberately excluded from #52's
+  default resizable/stretch behavior.
+- **Verification**: `build.ps1` clean (zero warnings). Interactive
+  screenshot on a bootstrapped dataset: trash icons render with the
+  light-red background as expected; clicking one correctly deleted the
+  intended row (confirmed by re-screenshotting the table before/after
+  and checking remaining row count/coordinates). Action column width
+  stayed visually stable across every interaction, consistent with
+  `NoResize`, though a precise column-border drag-attempt wasn't
+  conclusively confirmed against the exact border pixel (coordinate
+  targeting proved difficult this session -- the flag itself is
+  standard/well-established ImGui behavior). DPI-override rendering for
+  this specific button was not independently re-tested.
+- Files: `src/gui/PanelIcons.h`, `src/gui/PanelIcons.cpp`,
+  `src/gui/TableView.h`, `src/gui/JointsPanel.cpp`,
+  `src/gui/MembersPanel.cpp`, `src/gui/LoadsPanel.cpp`, `AGENTS.md`
+
+## [2026-08-13] — chore: file CI reliability issue #56
+
+- User reported a Linux CI failure: `seanmiddleditch/gha-setup-ninja@v4`
+  crashed with an uncaught `ECONNRESET` ("socket hang up") while
+  downloading `ninja-linux.zip` from GitHub Releases, before configure/
+  build ever ran. Windows/macOS legs are unaffected -- this is specific
+  to how the Linux leg fetches its ninja binary, not a code/config
+  problem. Recognized this as the same failure signature already seen
+  once during the earlier #49-release CI-artifact investigation this
+  session (never filed as its own issue at the time).
+- Filed as **#56**, scoped as a CI-reliability fix: switch the Linux leg
+  to `apt-get install ninja-build` (matching the workflow's existing
+  apt-get pattern for GL/X11 dev packages, and typically far more
+  reliable than a single unretried GitHub-Releases download) or add
+  retry logic if `gha-setup-ninja` is kept, plus a check that the
+  Node 20 deprecation warning in the same log incidentally clears.
+- Files: `AGENTS.md` (Tracked Issues table)
+
+## [2026-08-13] — feat(src): 6 per-DOF restraint checkboxes in the Joints table (#55)
+
+- **`gui/JointsPanel.cpp`**: the single "Restrained" summary column is
+  replaced with 6 individual `UX`/`UY`/`UZ`/`RX`/`RY`/`RZ` columns,
+  matching `PropertiesPanel`'s existing per-DOF labels/order (issue
+  #40) exactly. Both surfaces read/write the exact same
+  `EditableStructure::GetJointDof()`/`SetJointDof()` -- no new editing
+  logic, purely a new display surface for issue #40's existing API, per
+  the issue's own framing.
+- DOF columns are `WidthFixed | NoResize` (not #52's default stretch
+  sizing), width `GetFrameHeight() * 1.4f` -- letting 6 short checkbox
+  columns stretch would waste width as padding at the direct expense of
+  X/Y/Z, the opposite of what #52 was trying to fix. Column count went
+  from 6 to 11; `TableSetColumnIndex()` calls updated accordingly (DOF
+  loop at `4 + i`, trash button fixed at `10`).
+- `EditableStructure::SetJointRestrained()` (issue #40's old
+  all-6-at-once setter) is now unused by any panel -- left in place
+  rather than deleted, since removing a small public API wasn't in this
+  issue's scope.
+- **Verification**: `build.ps1` clean (zero warnings). Interactive
+  screenshot confirmed the full sync chain: toggled `UY` in the Joints
+  table -> checkbox showed checked, the joint's viewport cube turned
+  orange (restrained-joint color), and selecting that joint showed
+  `PropertiesPanel`'s own `UY` checkbox already checked -- proving one
+  shared source of truth, not two independently-toggled copies.
+  Row-selection via the Joint-number column still works. Multi-DOF
+  combinations and the #21 cascade-delete-modal interaction with the
+  now-wider row were not independently re-tested this session.
+- Files: `src/gui/JointsPanel.cpp`, `AGENTS.md`
+
 ## [2026-08-13] — reviewer: #49 PASS, cut release v0.0.6-alpha
 
 - Independently audited commit `b509606` (architecture/design,
@@ -3560,3 +3684,27 @@ the shared mechanism.
   auto-mode permission classifier; completed after the user explicitly
   confirmed "go ahead and create v0.0.6-alpha".
 - Files: `AGENTS.md` (Tracked Issues table)
+
+## [2026-08-13] — fix(src): center trash-icon/checkbox widgets in fixed-width table columns (#54/#55 follow-up)
+- User reported the trash-icon delete/clear buttons (#54) and the 6
+  per-DOF restraint checkboxes (#55) rendered flush against the left
+  edge of their `WidthFixed` table columns instead of centered.
+- Root cause: `TableTrashButton()` and the DOF `Checkbox()` calls drew
+  at ImGui's default cursor position (left edge of the cell's content
+  region); those columns are deliberately wider than the widget itself
+  (room for short header text), so the widget read as left-aligned
+  under a centered-looking header.
+- Fix: added `CenterNextTableItem(item_width)` to `src/gui/TableView.h`
+  (offsets the cursor by `(GetContentRegionAvail().x - item_width) / 2`
+  via `SetCursorPosX()`), called once inside `TableTrashButton()` itself
+  (so all four call sites -- JointsPanel, MembersPanel, LoadsPanel's two
+  tables -- pick it up automatically) and once per checkbox in
+  `JointsPanel.cpp`'s 6-DOF loop.
+- Verified: clean rebuild via `builder` (zero warnings). Interactively
+  launched `orcisf_gui.exe`, bootstrapped a blank structure, placed a
+  joint, and confirmed via a full-window screenshot that both the DOF
+  checkboxes and the trash icon now render centered within their
+  columns (compared against this session's earlier pre-fix screenshots
+  of the same table).
+- Files: `src/gui/TableView.h`, `src/gui/JointsPanel.cpp`, `AGENTS.md`
+  (#54 section)

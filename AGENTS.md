@@ -1181,6 +1181,69 @@ instead of `ImGui::BeginTable(...)` for any new editable list table:**
   feature) -- low risk given the flag is directly present in
   `kTableViewFlags` and every column is correctly configured.
 
+**`TableTrashButton()`/`TableTrashColumnWidth()` (issue #54) — the one
+deliberate exception to #52's "every column resizable by default"
+rule:**
+- **Trash-can glyph lives in `gui/PanelIcons.{h,cpp}`** as a standalone
+  `DrawTrashIcon()` (same normalized-`[0,1]`-box + `P()` convention as
+  every `DrawXxxIcon()` there) -- *not* added to the `PanelIcon` enum/
+  `DrawPanelIcon()` dispatch, since it isn't a panel tab icon, just
+  colocated with this project's other hand-drawn icons.
+- **`TableTrashButton(str_id)`** (`gui/TableView.h`) draws a square
+  `InvisibleButton` with an always-visible (not hover-only) light-red
+  background -- the whole point is to read as destructive at a glance,
+  not only once hovered. Color is `{209, 58, 61}` (~`#D13A3D`) at alpha
+  200 normally / 255 on hover; documented here as the canonical value --
+  change it here first if it ever needs to, don't just edit whichever
+  call site you're touching. This is the first UI-chrome color
+  documented alongside issue #50's viewport palette; cross-check any
+  future destructive-action color against it the same way.
+- **`TableTrashColumnWidth()`** returns `GetFrameHeight() * 1.6f` --
+  tied to the current font/frame size (already DPI-correct via issue
+  #31's `FontScaleDpi`) rather than a hardcoded pixel literal, so it
+  scales with everything else in the table automatically. The action
+  column in all four tables (`JointsPanel`, `MembersPanel`,
+  `LoadsPanel`'s member-loads and joint-loads tables) uses
+  `ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize`
+  with this width -- the one column in these tables *not* covered by
+  #52's default resizable/stretch behavior, since there's nothing
+  useful to reflow into a wider trash-button column.
+- **No change to the underlying delete/clear logic at any of the four
+  call sites** -- `TableTrashButton()` is a drop-in replacement for the
+  old `ImGui::SmallButton("Delete")`/`("Clear")` inside the exact same
+  `if (editable && ...)` blocks, so issue #21's cascade-delete
+  confirmation modal (Joints panel) and issue #41's click-routing fix
+  are both unaffected by construction, not just "should still work."
+- **Verification status:** compiled cleanly (zero warnings). Interactive
+  screenshot confirmed the trash icon renders with the light-red
+  background on a real (bootstrapped) dataset, and clicking it correctly
+  deleted the intended row (verified by re-screenshotting the table
+  before/after and confirming the row count and remaining rows'
+  coordinates). The action column's width was visually stable across
+  every interaction this session, consistent with `NoResize` -- a
+  precise column-border drag-attempt was made but not conclusively
+  confirmed against the exact border pixel (coordinate targeting proved
+  difficult this session); the flag itself is a standard, well-
+  established ImGui feature directly present in the `TableSetupColumn`
+  call. DPI-override (`ORCISF_UI_SCALE`) rendering was not independently
+  re-tested for this specific button (relies on the same
+  `GetFrameHeight()`-based scaling already verified for #52's columns).
+- **Left-alignment fix (follow-up, same day)**: the trash button (and
+  #55's 6 DOF checkboxes) originally drew at `GetCursorScreenPos()`/the
+  default ImGui cursor position, which is the left edge of the cell's
+  content region -- since these `WidthFixed` columns are deliberately
+  wider than the widget itself (room for header text), the widget read
+  as visibly left-aligned under a centered-looking header. Fixed with a
+  new shared `CenterNextTableItem(item_width)` helper in
+  `gui/TableView.h` (computes the offset via
+  `ImGui::GetContentRegionAvail().x`, shifts the cursor with
+  `SetCursorPosX()`), called once inside `TableTrashButton()` itself (so
+  all four call sites get it automatically) and once per DOF checkbox in
+  `JointsPanel.cpp`'s loop. Verified via a clean rebuild (zero warnings)
+  and an interactive full-window screenshot of a bootstrapped structure
+  with a placed joint, comparing against this same session's earlier
+  pre-fix screenshots.
+
 **Row `Selectable` click-blocking fix (issue #41) — read before touching
 any `ImGui::Selectable(...)` row in `JointsPanel.cpp`/`MembersPanel.cpp`/
 `LoadsPanel.cpp`, or adding a new editable table row anywhere in
@@ -1331,12 +1394,14 @@ SetJointDof()`, or `ViewportPanel.cpp`'s `ClassifyRestraintPreset()`:**
   `GetJointDof()`** (new) set/read a single `JRL` flag directly — `dof_index`
   0..5 in the legacy "arah 1..6" order (UX, UY, UZ, RX, RY, RZ), the same
   order `SetJointLoad()`'s `actions[6]` already uses. The old
-  `SetJointRestrained()` (all-6-at-once) is kept, unchanged, since
-  `JointsPanel`'s existing single "Restrained" summary checkbox and
-  `AddJoint()`'s "free by default" bootstrap still use it — issue #40
-  didn't ask to change that entry point, only to add a finer-grained one
-  alongside it (`AGENTS.md`'s own `gui/editor/` note anticipated exactly
-  this as a future refinement, not a replacement).
+  `SetJointRestrained()` (all-6-at-once) was kept alongside it when this
+  issue landed, since `JointsPanel`'s single "Restrained" summary
+  checkbox still used it at the time -- **issue #55 later replaced that
+  checkbox with 6 individual `GetJointDof()`/`SetJointDof()` columns
+  (see its own section below)**, so `SetJointRestrained()` is now unused
+  by any panel (still defined/exported, not removed, since deleting a
+  small public API wasn't in #55's scope -- a future cleanup pass could
+  remove it if nothing else ever needs an all-6-at-once toggle again).
 - **`PropertiesPanel.cpp`'s `DrawJointProperties()`** replaced the single
   "Restrained (fixed support)" checkbox with 6 independent `UX`/`UY`/
   `UZ`/`RX`/`RY`/`RZ` checkboxes (always read fresh from `JRL` via
@@ -1370,6 +1435,51 @@ SetJointDof()`, or `ViewportPanel.cpp`'s `ClassifyRestraintPreset()`:**
   checked `RX` on top of Roller's `UY` and confirmed the label correctly
   fell back to `[Custom]` for a combination matching none of the four
   presets.
+
+**6 per-DOF checkbox columns in the Joints table (issue #55) — read
+before touching `JointsPanel.cpp`'s `DrawJointsTable()` column setup:**
+- **Replaces the single "Restrained" summary checkbox with 6 individual
+  columns (`UX`/`UY`/`UZ`/`RX`/`RY`/`RZ`)**, matching `PropertiesPanel`'s
+  own DOF labels/order exactly (`JointsPanel.cpp`'s `kDofLabels`
+  deliberately duplicates `PropertiesPanel.cpp`'s array rather than
+  sharing a single constant across files -- both are small, local,
+  file-scoped arrays already, and the two panels don't otherwise share
+  any header; keep them in sync by hand if the order/labels ever change).
+  Both surfaces read/write the exact same `EditableStructure::
+  GetJointDof()`/`SetJointDof()` (issue #40's existing per-DOF API, no
+  new editing logic) fresh every frame, so a checkbox toggled in one
+  place is immediately reflected in the other on the very next frame --
+  confirmed interactively (see below), not just true by code inspection.
+- **The 6 DOF columns are `WidthFixed | NoResize`, not part of issue
+  #52's default proportional-stretch sizing** -- sized via
+  `ImGui::GetFrameHeight() * 1.4f` (DPI-correct through issue #31's
+  `FontScaleDpi`, same pattern as `TableTrashColumnWidth()`). Letting 6
+  short checkbox columns stretch would waste most of the table's width
+  as empty padding around tiny checkboxes, directly at the expense of
+  the X/Y/Z columns that actually benefit from stretching -- the
+  opposite of what issue #52 was trying to achieve.
+- **Column count went from 6 to 11** (`Joint`, `X`, `Y`, `Z`, 6 DOF
+  columns, the trash-button column) -- if you ever add/remove a column
+  here, the `BeginTableView("joints_list", N)` count and every
+  `TableSetColumnIndex()` call in the row loop must move together (the
+  DOF loop uses `TableSetColumnIndex(4 + i)`, the trash button is fixed
+  at index `10`).
+- **`EditableStructure::SetJointRestrained()` (the old all-6-at-once
+  setter, issue #40) is now unused** -- see that issue's own section
+  above for why it wasn't deleted outright.
+- **Verification status:** compiled cleanly (zero warnings). Interactive
+  screenshot confirmed the full sync chain end-to-end on a real
+  (bootstrapped) joint: toggled the `UY` checkbox in the Joints table →
+  the checkbox showed checked in the table, the joint's 3D viewport cube
+  turned orange (the existing restrained-joint color), and selecting
+  that same joint showed `PropertiesPanel`'s own `UY` checkbox already
+  checked (screenshotted, not assumed) -- proving both surfaces
+  genuinely share one source of truth rather than two independently-
+  toggled copies. Row-selection via the `Joint` number column (issue
+  #41's `TableRowSelectable()`, carried through #52) was also confirmed
+  still functional. Manual multi-DOF combinations (e.g. checking two
+  DOFs on the same joint) and the #21 cascade-delete-modal interaction
+  with the wider row were not independently re-tested this session.
 
 **2D plane-locked drawing (issue #22, part of epic #20) — read before
 touching `gui/viewport/Camera.{h,cpp}`, `gui/viewport/Math3D.h`'s
@@ -1610,6 +1720,69 @@ window setup:**
   drag mechanism all confirmed interactively. macOS/Linux not verified in
   this environment (no access) -- verify via a real build there before
   treating Phase 0 as fully done on those platforms.
+
+**Edge/corner window resize (issue #53) — read before touching
+`app/WindowResize.{h,cpp}` or `main.cpp`'s render loop:**
+- **A new, separate `BorderResizer` class, not folded into
+  `CustomTitleBar`** -- deliberately so, since it operates on raw
+  GLFW-level cursor/window state every frame (`glfwGetCursorPos`/
+  `glfwGetWindowSize`/`glfwGetMouseButton` polling), independent of
+  ImGui entirely, whereas `CustomTitleBar::Draw()` only runs *inside* an
+  ImGui frame as ordinary widgets. Mixing the two update models in one
+  class would make the "did ImGui already consume this click" question
+  ambiguous; keeping them separate makes it structurally impossible for
+  one to interfere with the other.
+- **`BorderResizer::Update(window)` is called once per frame in
+  `main.cpp`, right after `glfwPollEvents()` and *before*
+  `ImGui::NewFrame()`** -- same reasoning issue #31's DPI-rescale poll
+  already established for that exact spot: it's the only point in the
+  loop guaranteed to run once per frame outside any ImGui frame, so a
+  resize that happens here is visible to ImGui's own viewport-size read
+  the same frame (no one-frame lag/flicker), and it can never race with
+  `CustomTitleBar`'s ImGui-widget-based drag zone, which runs later,
+  inside the frame.
+- **Same "anchor to an absolute screen-cursor position captured once at
+  drag start" technique as `CustomTitleBar`'s own drag** (see that
+  section's note above for why per-frame delta accumulation
+  self-oscillates) -- `BorderResizer` recomputes
+  `glfwGetWindowPos() + glfwGetCursorPos()` fresh every frame relative
+  to a start-of-resize anchor, not `ImGui::GetIO().MouseDelta` (which
+  it can't use anyway, running outside the ImGui frame).
+- **Minimum window size is clamped in `BorderResizer` itself
+  (`kMinWindowWidth`/`kMinWindowHeight` = 480x360), not via
+  `glfwSetWindowSizeLimits()`.** `glfwSetWindowSizeLimits()` would clamp
+  the *size* GLFW actually applies, but `BorderResizer` separately
+  computes the new *position* for edges that move the window's own
+  origin (west/north) from the same unclamped delta -- if only the size
+  got silently clamped by GLFW, position and size would disagree about
+  where the fixed (opposite) edge actually is, and the window would
+  visually drift away from the cursor once the minimum was hit. Clamping
+  the size first and *then* re-deriving the position from the clamped
+  size (not the raw delta) keeps both consistent -- see the "size first,
+  then position" comment in `WindowResize.cpp`.
+- **Resize is disabled while maximized** (mirrors `CustomTitleBar`'s
+  drag, which already disables itself the same way) and **is a no-op on
+  Wayland** (`glfwGetPlatform() == GLFW_PLATFORM_WAYLAND`) -- Wayland
+  compositors don't let a client reposition/resize its own window via
+  `glfwSetWindowPos`/`glfwSetWindowSize` at all (same limitation
+  `CustomTitleBar`'s drag already documents), so there's nothing this
+  class could do there; left inert rather than pretending to work.
+- **Cursor shape** uses GLFW's standard resize-cursor shapes
+  (`GLFW_RESIZE_NS_CURSOR`/`_EW_CURSOR`/`_NESW_CURSOR`/`_NWSE_CURSOR`,
+  added in GLFW 3.4 -- this project pins 3.5, see `vcpkg.json`), cached
+  lazily (one `GLFWcursor*` per shape, created once and kept for the
+  process lifetime) rather than recreated every frame, which would leak
+  since GLFW never frees a cursor object until `glfwDestroyCursor()`.
+- **Verification status:** compiled cleanly (zero warnings). Interactive
+  regression test on Windows: dragged the right edge (width grew,
+  left/top/bottom unchanged), dragged the bottom-right corner (width
+  *and* height grew together, left/top unchanged), then confirmed
+  `CustomTitleBar`'s own drag-to-move and Maximize button both still
+  work correctly afterward (no regression) -- all verified via
+  `GetWindowRect()` before/after each action, not just visual
+  inspection. Cursor-shape-on-hover and the Wayland no-op path were not
+  independently verified (no Wayland environment available here).
+  macOS/Linux not verified in this environment (no access).
 
 **DPI awareness (issue #31) — read before touching `main.cpp`'s startup
 sequence or its `EnableWindowsDpiAwareness()`/font/style-scaling code:**
@@ -2334,9 +2507,10 @@ later, different one (e.g. closing an issue or cutting a release).
 | #50 | feat(src): dark-cobalt ground-plane grid with X/Z axis labels + document coordinate system in README | closed | 2026-08-13 |
 | #51 | fix(src): foreground-drawlist overlays (dock tab icons, joint/member/grid labels) bleed over the menu bar and neighboring panels | ready-for-review (3rd pass: window->DrawList, confirmed against exact repro) | 2026-08-13 |
 | #52 | feat(src): responsive, resizable-column table component for Joints/Members/Loads panels | ready-for-review | 2026-08-13 |
-| #53 | fix(src): borderless application window cannot be resized by dragging its edges | open | 2026-08-13 |
-| #54 | feat(src): trash-icon delete/clear buttons (light-red background) with a fixed, non-resizable action column | open | 2026-08-13 |
-| #55 | feat(src): show all 6 per-DOF restraint checkboxes in the Joints table, not one summary checkbox | open | 2026-08-13 |
+| #53 | fix(src): borderless application window cannot be resized by dragging its edges | ready-for-review | 2026-08-13 |
+| #54 | feat(src): trash-icon delete/clear buttons (light-red background) with a fixed, non-resizable action column | ready-for-review | 2026-08-13 |
+| #55 | feat(src): show all 6 per-DOF restraint checkboxes in the Joints table, not one summary checkbox | ready-for-review | 2026-08-13 |
+| #56 | chore(ci): Linux build-src job fails intermittently on flaky ninja download (ECONNRESET) | open | 2026-08-13 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

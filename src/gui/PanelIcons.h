@@ -25,4 +25,10 @@ enum class PanelIcon { Viewport, Detailing, Properties, Joints, Members, Loads, 
 // bar's own font metrics, not a fixed constant).
 void DrawPanelIcon(PanelIcon icon, ImDrawList* dl, ImVec2 origin, ImU32 color, float size);
 
+// Issue #54: a small trash-can glyph for destructive Delete/Clear table
+// actions, standalone (not part of the PanelIcon enum/dispatch above --
+// it isn't a panel) but sharing this file's icon-drawing home and the
+// same normalized-[0,1]-box convention as every DrawXxxIcon() above.
+void DrawTrashIcon(ImDrawList* dl, ImVec2 origin, ImU32 color, float size);
+
 } // namespace orcisf::gui

@@ -11,6 +11,13 @@ namespace orcisf::gui {
 
 namespace {
 
+// Issue #55: same order/convention as PropertiesPanel.cpp's kDofLabels
+// (issue #40) -- kept in sync deliberately, since both surfaces edit the
+// exact same EditableStructure::SetJointDof()/GetJointDof() state and
+// must never disagree about which column is which DOF.
+constexpr const char* kDofLabels[6] = {"UX", "UY", "UZ", "RX", "RY", "RZ"};
+constexpr const char* kDofIds[6] = {"##ux", "##uy", "##uz", "##rx", "##ry", "##rz"};
+
 // Members whose JJ or JK reference joint_id -- used both to size the
 // confirmation modal's warning text and (indirectly, since
 // EditableStructure::DeleteJoint() recomputes this itself) to decide
@@ -26,13 +33,26 @@ std::vector<int> TouchingMembers(const engine::StructureData& sd, int joint_id) 
 void DrawJointsTable(const SceneModel& scene, Selection& selection, EditableStructure* editable, UndoStack* undo,
                       const std::function<void()>& on_geometry_changed, int& pending_delete_joint,
                       std::vector<int>& pending_delete_joint_members, bool& open_delete_popup) {
-    if (!BeginTableView("joints_list", 6)) return;
+    // Issue #55: the single "Restrained" summary checkbox is replaced by
+    // 6 individual DOF columns, matching PropertiesPanel's per-DOF
+    // editing (issue #40) exactly. Each DOF column is a narrow WidthFixed
+    // column (just enough for the short "UX"-style header + a checkbox)
+    // rather than participating in #52's default proportional-stretch
+    // sizing -- letting 6 short columns stretch would waste most of the
+    // table's width on empty space around tiny checkboxes, at the direct
+    // expense of the X/Y/Z columns that actually benefit from stretching.
+    if (!BeginTableView("joints_list", 11)) return;
     ImGui::TableSetupColumn("Joint", ImGuiTableColumnFlags_WidthFixed, 50.f);
     ImGui::TableSetupColumn("X (m)");
     ImGui::TableSetupColumn("Y (m)");
     ImGui::TableSetupColumn("Z (m)");
-    ImGui::TableSetupColumn("Restrained", ImGuiTableColumnFlags_WidthFixed, 80.f);
-    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 60.f);
+    const float dof_col_width = ImGui::GetFrameHeight() * 1.4f;
+    for (const char* label : kDofLabels) {
+        ImGui::TableSetupColumn(label, ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize,
+                                 dof_col_width);
+    }
+    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize,
+                             TableTrashColumnWidth());
     ImGui::TableHeadersRow();
 
     static const char* kFieldIds[3] = {"##x", "##y", "##z"};
@@ -63,16 +83,24 @@ void DrawJointsTable(const SceneModel& scene, Selection& selection, EditableStru
             if (on_geometry_changed) on_geometry_changed();
         }
 
-        ImGui::TableSetColumnIndex(4);
-        bool restrained = jv.restrained;
-        if (editable && ImGui::Checkbox("##restrained", &restrained)) {
-            if (undo) undo->PushUndo(editable->SdForUndo());
-            editable->SetJointRestrained(jv.no_joint, restrained);
-            if (on_geometry_changed) on_geometry_changed();
+        // Issue #55: reads/writes the exact same EditableStructure::
+        // GetJointDof()/SetJointDof() (issue #40) PropertiesPanel's own 6
+        // checkboxes use -- checked fresh from JRL every frame here too,
+        // so this table and the Properties panel can never drift out of
+        // sync with each other for the currently-selected joint.
+        for (int i = 0; i < 6; ++i) {
+            ImGui::TableSetColumnIndex(4 + i);
+            CenterNextTableItem(ImGui::GetFrameHeight());
+            bool v = editable && editable->GetJointDof(jv.no_joint, i);
+            if (editable && ImGui::Checkbox(kDofIds[i], &v)) {
+                if (undo) undo->PushUndo(editable->SdForUndo());
+                editable->SetJointDof(jv.no_joint, i, v);
+                if (on_geometry_changed) on_geometry_changed();
+            }
         }
 
-        ImGui::TableSetColumnIndex(5);
-        if (editable && ImGui::SmallButton("Delete")) {
+        ImGui::TableSetColumnIndex(10);
+        if (editable && TableTrashButton("##delete")) {
             std::vector<int> touching = TouchingMembers(editable->SdForUndo(), jv.no_joint);
             if (touching.empty()) {
                 if (undo) undo->PushUndo(editable->SdForUndo());

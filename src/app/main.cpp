@@ -6,6 +6,7 @@
 #include "app/AppIcon.h"
 #include "app/Application.h"
 #include "app/Theme.h"
+#include "app/WindowResize.h"
 #include "gui/UiScale.h"
 
 // gl3w must be included before any other header that pulls in GL/gl.h
@@ -276,9 +277,19 @@ int main(int, char**) {
 
     orcisf::app::Application app;
     app.SetWindow(window);
+    orcisf::app::BorderResizer border_resizer;
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
+
+        // Issue #53: raw GLFW-level edge/corner resize for the borderless
+        // window (#19 removed the OS's own resize border along with its
+        // title bar). Deliberately called here, before ImGui::NewFrame()
+        // -- it never touches ImGui, so it can't conflict with
+        // CustomTitleBar's drag zone or button hit-testing (those run
+        // later, inside the frame), and a resize started this frame is
+        // visible to ImGui's own viewport-size read the same frame.
+        border_resizer.Update(window);
 
         // Issue #31: live monitor-to-monitor DPI changes. Polled rather
         // than handled via glfwSetWindowContentScaleCallback() so the

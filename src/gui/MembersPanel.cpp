@@ -24,7 +24,8 @@ void DrawMembersTable(const SceneModel& scene, Selection& selection, EditableStr
     ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 110.f);
     ImGui::TableSetupColumn("Joint A");
     ImGui::TableSetupColumn("Joint B");
-    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 60.f);
+    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize,
+                             TableTrashColumnWidth());
     ImGui::TableHeadersRow();
 
     for (const MemberVisual& mv : scene.members) {
@@ -83,7 +84,7 @@ void DrawMembersTable(const SceneModel& scene, Selection& selection, EditableStr
         }
 
         ImGui::TableSetColumnIndex(4);
-        if (editable && ImGui::SmallButton("Delete")) {
+        if (editable && TableTrashButton("##delete")) {
             if (undo) undo->PushUndo(editable->SdForUndo());
             editable->DeleteMember(mv.no_batang);
             if (selection.kind == SelectionKind::Member && selection.id == mv.no_batang) selection.Clear();
