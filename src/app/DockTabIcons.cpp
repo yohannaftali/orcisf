@@ -45,7 +45,6 @@ constexpr std::array<Entry, 8> kPanels = {{
 } // namespace
 
 void DrawDockTabIcons() {
-    ImDrawList* fg = ImGui::GetForegroundDrawList();
     const float icon_size = gui::Scaled(13.f);
     const ImU32 color = ImGui::GetColorU32(ImGuiCol_Text);
 
@@ -77,14 +76,30 @@ void DrawDockTabIcons() {
             float label_x = tab_bar->BarRect.Min.x + tab.Offset + tab_bar->FramePadding.x;
             float center_y = tab_bar->BarRect.Min.y + tab_bar->BarRect.GetHeight() * 0.5f;
             ImVec2 origin(label_x, center_y - icon_size * 0.5f);
-            // Issue #51: clip to this tab bar's own rect (not the whole
-            // foreground draw list, which has no clipping of its own) so
-            // the icon can never bleed upward into the main menu bar row
-            // immediately above a docked panel's tab bar, regardless of
-            // any future drift in the Y-centering math above.
-            fg->PushClipRect(tab_bar->BarRect.Min, tab_bar->BarRect.Max, true);
-            gui::DrawPanelIcon(entry.icon, fg, origin, color, icon_size);
-            fg->PopClipRect();
+
+            // Issue #51 (third pass): the first two passes (clip to
+            // tab_bar->BarRect, then also clamp to WorkPos.y) both
+            // treated this as a *position* bug and couldn't have worked --
+            // the user's actual report (opening File and seeing the
+            // Viewport/Detailing tab icons rendered on top of the
+            // dropdown) is the exact same root cause already diagnosed
+            // and fixed for ViewportPanel's label overlays: drawing onto
+            // ImGui::GetForegroundDrawList() composites *after every
+            // window*, popups included, by Dear ImGui's own layering --
+            // no clip rect or position clamp changes which layer a draw
+            // call belongs to. The fix here is the same one: draw onto
+            // the *owning panel's own* window draw list (`window->
+            // DrawList`) instead. This is valid even though this
+            // function runs after that window's Begin()/End() cycle for
+            // the frame -- ImGui doesn't finalize/copy per-window draw
+            // data until ImGui::Render(), called after this function --
+            // and it makes the icon participate in normal per-window
+            // z-order, so a popup opened later the same frame correctly
+            // draws over it, exactly like a real docked-tab icon should.
+            ImDrawList* dl = window->DrawList;
+            dl->PushClipRect(tab_bar->BarRect.Min, tab_bar->BarRect.Max, true);
+            gui::DrawPanelIcon(entry.icon, dl, origin, color, icon_size);
+            dl->PopClipRect();
             break;
         }
     }

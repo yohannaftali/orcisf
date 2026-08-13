@@ -3456,6 +3456,77 @@ the shared mechanism.
 - Files: `src/gui/TableView.h` (new), `src/gui/JointsPanel.cpp`,
   `src/gui/MembersPanel.cpp`, `src/gui/LoadsPanel.cpp`, `AGENTS.md`
 
+## [2026-08-13] — fix(src): #51 second pass, dock-tab-icon clamp; file #53/#54/#55 (#52 follow-ups)
+
+- User re-tested #51 and #52 in the running app and reported: (a) dock
+  tab icons still overlap the menu bar (the first clip-to-`BarRect` fix
+  wasn't enough), and (b) the outer OS window still can't be resized by
+  dragging its edges, blocking a full test of #52's column reflow.
+- **#51 second pass**: root-caused why the first clip fix could still
+  fail -- clipping an icon to its own `tab_bar->BarRect` only helps if
+  `BarRect` is itself positioned correctly; if the dock node's tab bar
+  rect is ever above the reserved menu-bar/icon-toolbar chrome on some
+  frame, clipping to that same too-high rect doesn't stop the overlap.
+  Fixed by additionally clamping both the clip rect and the icon's own
+  draw position to `ImGui::GetMainViewport()->WorkPos.y` --
+  `Application::OnFrame()`'s own authoritative "below the menu bar and
+  icon toolbar" boundary, already mutated earlier in the same frame and
+  still valid when `DrawDockTabIcons()` reads it at end-of-frame. This
+  is a structural fix (eliminates the whole class of "icon renders
+  above reserved chrome" bug) rather than a re-guess at the original
+  Y-drift, since the exact reproducing layout/steps weren't captured.
+- **New issue #53** (bug): the outer application window can't be
+  resized by dragging its edges at all -- issue #19's borderless-chrome
+  Phase 0 only ever implemented title-bar drag-to-move +
+  minimize/maximize/close, never edge-resize hit-testing. Scoped
+  separately from #52 (which needs a resizable window to be fully
+  testable, but doesn't own window-resize itself).
+- **New issue #54** (enhancement): replace the plain-text
+  "Delete"/"Clear" buttons in Joints/Members/Loads tables with a
+  hand-drawn trash-can icon on a light-red background, and make that
+  action column's width fixed and explicitly non-resizable (the one
+  deliberate exception to #52's default resizable-columns behavior).
+- **New issue #55** (enhancement): show all 6 individual UX/UY/UZ/RX/RY/RZ
+  restraint checkboxes directly in the Joints table (reusing issue
+  #40's existing `GetJointDof()`/`SetJointDof()` API, not a new
+  implementation), instead of the current single "Restrained" summary
+  checkbox -- lets every joint's exact restraint state be seen/edited
+  from the table without selecting each joint individually in
+  Properties.
+- **Verification**: `build.ps1` clean (zero warnings) for the #51 fix.
+  Not independently re-confirmed with a screenshot of the user's exact
+  original repro layout (steps weren't captured) -- see `AGENTS.md`'s
+  issue #51 section for the honest verification-status note.
+- Files: `src/app/DockTabIcons.cpp`, `AGENTS.md`
+
+## [2026-08-13] — fix(src): #51 third pass -- window->DrawList, confirmed against exact user repro
+
+- User gave the exact reproducing steps this time: open the File menu;
+  the Viewport/Detailing tab icons render on top of the dropdown. This
+  immediately revealed that the two previous passes (clip to
+  `tab_bar->BarRect`, then also clamp to `WorkPos.y`) were solving the
+  wrong problem -- both treated it as a *position* bug, but it's the
+  identical *compositing-layer* bug already diagnosed and fixed for
+  `ViewportPanel`'s label overlays in the same issue's first commit:
+  `ImGui::GetForegroundDrawList()` composites after *every* window,
+  popups included, so no clip rect or position clamp can stop it
+  rendering over an open menu.
+- **Actual fix**: `DrawDockTabIcons()` now draws onto the owning
+  panel's own `window->DrawList` (already have direct access via the
+  file's existing `imgui_internal.h` include) instead of the foreground
+  draw list -- valid even running after that window's `Begin()`/`End()`
+  for the frame, since Dear ImGui doesn't finalize per-window draw data
+  until `ImGui::Render()`, called later. This makes the icon participate
+  in normal per-window z-order, so a popup opened later the same frame
+  correctly draws over it. The `WorkPos.y` clamp from pass 2 was
+  removed (solved a problem that didn't exist); the `BarRect` clip is
+  kept, now purely for position bounds.
+- **Verification**: `build.ps1` clean (zero warnings). Screenshotted
+  the user's exact repro after the fix -- File menu opened, Viewport/
+  Detailing tab icons fully hidden behind the dropdown, no
+  bleed-through at all.
+- Files: `src/app/DockTabIcons.cpp`, `AGENTS.md`
+
 ## [2026-08-13] — reviewer: #49 PASS, cut release v0.0.6-alpha
 
 - Independently audited commit `b509606` (architecture/design,

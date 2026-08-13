@@ -1815,32 +1815,42 @@ sequence or its `EnableWindowsDpiAwareness()`/font/style-scaling code:**
   `PushClipRect`/`PopClipRect` pair** in `ViewportPanel::Draw()`, right
   before/after all three calls -- don't reintroduce a fourth overlay
   call outside that scope without adding it to the same clip.
-- **`DockTabIcons.cpp`'s icon-overlapping-the-menu-bar report is a
-  different mechanism and needed a different fix**: it must stay on
-  the foreground draw list (icons are drawn once per frame for *all*
-  panels from `Application::OnFrame()`'s end, not from within any
-  single panel's `Begin()`/`End()` scope, so there's no single "owning
-  window" draw list to switch to). Instead, each icon draw is now
-  wrapped in its own `PushClipRect(tab_bar->BarRect.Min,
-  tab_bar->BarRect.Max, true)` -- this bounds the icon strictly inside
-  its own tab bar's rectangle, so it can never visually intrude into
-  the menu bar row immediately above, regardless of any future drift
-  in the Y-centering math. The exact root cause of the *original*
-  Y-drift was not conclusively reproduced interactively this session
-  (default-layout screenshots showed correctly-positioned icons); this
-  clip is a defensible, permanent bound on the geometry either way --
-  if a future report shows icons still off in some layout, re-check the
-  Y-centering math in `DrawDockTabIcons()` itself, now protected by
-  this clip from ever being visually catastrophic in the meantime.
-- **Verification status:** compiled cleanly (zero warnings). Interactive
-  screenshot confirmed the exact reported scenario: placed a joint/
-  label directly under where the File menu opens, opened the menu, and
-  confirmed the label (and its gizmo) render fully behind the menu
-  dropdown with no bleed-through -- a real regression test, not just
-  code review. Dock tab icon clipping compiled and the default-layout
-  case (Viewport/Detailing tabs) screenshot-confirmed correctly
-  positioned; a layout that reproduces the *original* overlap report
-  was not found/re-tested this session.
+- **`DockTabIcons.cpp`'s icon-overlapping-an-open-menu report went
+  through three passes before landing on the right fix -- the first two
+  treated it as a *position* bug, but it was the exact same
+  *compositing-layer* bug as the Viewport labels above, just not
+  recognized as such at first.** The user's precise repro (open File;
+  the Viewport/Detailing tab icons render on top of the dropdown) is
+  `GetForegroundDrawList()`'s always-composites-last behavior, same as
+  the label case -- no clip rect or position clamp changes which layer
+  a draw call belongs to, so **pass 1** (clip to `tab_bar->BarRect`) and
+  **pass 2** (additionally clamp to `ImGui::GetMainViewport()->WorkPos.y`)
+  could not have fixed this, and the user correctly re-reported it as
+  still broken after both. **Pass 3, the actual fix**: draw onto the
+  *owning panel's own* `window->DrawList` (directly accessible via
+  `imgui_internal.h`, already included) instead of the foreground draw
+  list. This is valid even though `DrawDockTabIcons()` runs after that
+  window's `Begin()`/`End()` cycle for the frame -- Dear ImGui doesn't
+  finalize/copy per-window draw data until `ImGui::Render()`, called
+  after this function -- and it makes the icon participate in normal
+  per-window z-order, so a popup opened later the same frame correctly
+  draws over it. The `PushClipRect(tab_bar->BarRect, ...)` is kept, now
+  purely for position bounds (not compositing) matching the same
+  reasoning as the Viewport overlays' clip.
+- **Lesson for next time**: when a `GetForegroundDrawList()` overlay is
+  reported as rendering over something it shouldn't, check *first*
+  whether the "something" is a popup/menu (compositing-layer bug, fix =
+  switch draw list) or a neighboring panel/chrome region (position bug,
+  fix = clip/clamp) -- don't reach for a position fix on a compositing
+  problem a second time. Both passes 1 and 2 compiled cleanly and
+  "looked" plausible without a screenshot of the exact repro; the user's
+  precise steps (open File, watch two named icons) is what finally made
+  the real cause obvious.
+- **Verification status:** compiled cleanly (zero warnings). Both the
+  Viewport-label fix and this final dock-tab-icon fix were confirmed
+  with a direct regression screenshot of the user's own exact repro
+  steps -- File menu opened, Viewport/Detailing tab icons fully hidden
+  behind the dropdown with no bleed-through.
 
 **`gui/viewport/` (issue #5) — three things worth knowing before touching it:**
 - **Member cross-section thickness/orientation is a schematic
@@ -2322,8 +2332,11 @@ later, different one (e.g. closing an issue or cutting a release).
 | #48 | docs(optimization): document the Flexible Polyhedron (Nelder-Mead family) algorithm | closed | 2026-08-12 |
 | #49 | chore(src): fix MSVC build warnings (C4244 narrowing, C4996 deprecated CRT, C4611 setjmp/dtor) | closed | 2026-08-13 |
 | #50 | feat(src): dark-cobalt ground-plane grid with X/Z axis labels + document coordinate system in README | closed | 2026-08-13 |
-| #51 | fix(src): foreground-drawlist overlays (dock tab icons, joint/member/grid labels) bleed over the menu bar and neighboring panels | ready-for-review | 2026-08-13 |
+| #51 | fix(src): foreground-drawlist overlays (dock tab icons, joint/member/grid labels) bleed over the menu bar and neighboring panels | ready-for-review (3rd pass: window->DrawList, confirmed against exact repro) | 2026-08-13 |
 | #52 | feat(src): responsive, resizable-column table component for Joints/Members/Loads panels | ready-for-review | 2026-08-13 |
+| #53 | fix(src): borderless application window cannot be resized by dragging its edges | open | 2026-08-13 |
+| #54 | feat(src): trash-icon delete/clear buttons (light-red background) with a fixed, non-resizable action column | open | 2026-08-13 |
+| #55 | feat(src): show all 6 per-DOF restraint checkboxes in the Joints table, not one summary checkbox | open | 2026-08-13 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
