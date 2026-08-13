@@ -262,6 +262,31 @@ void SceneRenderer::DrawLoads(const SceneModel& scene, const float* view_proj) {
     }
 }
 
+void SceneRenderer::DrawGrid(const SceneModel& scene, const float* view_proj) {
+    // Dark cobalt blue (~#14295C) -- deliberately distinct from every other
+    // viewport color (beams/columns/joints/loads/highlight, see the palette
+    // in Render() below) so the ground reference grid never reads as real
+    // structure. Documented alongside the rest of the viewport palette in
+    // AGENTS.md's gui/viewport/ section.
+    static constexpr float kGridColor[4] = {0.08f, 0.16f, 0.36f, 1.f};
+    constexpr float kLineThickness = 0.03f; // meters -- thin, like DrawArrow's shaft
+
+    GroundGridLayout layout = ComputeGroundGridLayout(scene);
+    float x0 = layout.x_index_min * layout.spacing_m;
+    float x1 = layout.x_index_max * layout.spacing_m;
+    float z0 = layout.z_index_min * layout.spacing_m;
+    float z1 = layout.z_index_max * layout.spacing_m;
+
+    for (int i = layout.x_index_min; i <= layout.x_index_max; ++i) {
+        float x = i * layout.spacing_m;
+        DrawBox(Vec3{x, layout.y, z0}, Vec3{x, layout.y, z1}, kLineThickness, kLineThickness, kGridColor, view_proj);
+    }
+    for (int i = layout.z_index_min; i <= layout.z_index_max; ++i) {
+        float z = i * layout.spacing_m;
+        DrawBox(Vec3{x0, layout.y, z}, Vec3{x1, layout.y, z}, kLineThickness, kLineThickness, kGridColor, view_proj);
+    }
+}
+
 unsigned int SceneRenderer::Render(const SceneModel& scene, const Camera& camera, int width, int height,
                                     int selected_member) {
     EnsureGLObjects();
@@ -294,6 +319,11 @@ unsigned int SceneRenderer::Render(const SceneModel& scene, const Camera& camera
     static constexpr float kHighlightColor[4] = {1.f, 0.82f, 0.15f, 1.f};
     static constexpr float kJointColor[4] = {0.75f, 0.78f, 0.82f, 1.f};
     static constexpr float kRestraintColor[4] = {0.95f, 0.55f, 0.15f, 1.f};
+
+    // Issue #50: drawn before the structure so it reads as a background
+    // reference plane -- depth testing (already enabled above) still lets
+    // members/joints correctly occlude it where they overlap.
+    DrawGrid(scene, view_proj.m);
 
     for (const MemberVisual& mv : scene.members) {
         const float* color = mv.is_beam ? kBeamColor : kColumnColor;

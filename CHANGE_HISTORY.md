@@ -3227,6 +3227,197 @@ the shared mechanism.
   verified acceptance criteria and closed the issue on GitHub.
 - Files: `AGENTS.md` (Tracked Issues table)
 
+## [2026-08-13] — feat: file ground-plane grid issue #50
+
+- User asked to confirm whether ORCISF's ground plane is X-Y or X-Z --
+  confirmed **X-Z (Y-up)** directly from `AGENTS.md`'s existing
+  documentation (`Camera::WorldUp() = {0,1,0}`, `orcisf_cli`'s
+  equilibrium check "arah 2 = Y", and issue #40's Roller-preset
+  correction, all previously established), no new investigation needed.
+- Filed issue #50 for the requested follow-up: a dark-cobalt-colored
+  ground-plane grid in the X-Z plane with X1/X2/X3.../Z1/Z2/Z3... axis
+  labels, reusing the existing UCS-icon (#23) and `DrawEntityLabels()`
+  (#39) world-to-screen projection technique rather than introducing a
+  new one, and the existing `EditorOptions::grid_size_m` snap-to-grid
+  spacing (#6) where it fits.
+- Files: `AGENTS.md` (Tracked Issues table)
+
+## [2026-08-13] — feat: update issue #50 with README documentation criterion
+
+- User asked (via `/planner`) to keep the X-Z ground plane but add the
+  requested grid, plus document the coordinate system in `README.md`.
+  Recognized this as a near-duplicate of the just-filed #50 (same grid/
+  orientation ask) rather than a separate request -- asked the user how
+  to handle the overlap; they chose to update #50 rather than file a
+  second issue.
+- Patched #50's title and Acceptance Criteria: added a new criterion
+  requiring `README.md` to document the Y-up/X-Z-ground-plane
+  convention in plain terms, so a first-time user understands the
+  layout even before the new grid renders.
+- Files: `AGENTS.md` (Tracked Issues table)
+
+## [2026-08-13] — feat(src): ground-plane grid + coordinate-system docs (#50)
+
+- **`gui/viewport/SceneModel.h`/`.cpp`**: new `GroundGridLayout`
+  `ComputeGroundGridLayout(const SceneModel&)` -- pure geometry (adaptive
+  spacing that doubles from 1m until the per-axis line count fits a
+  48-line cap, extent from the structure's joint bounding box + 3m
+  margin snapped outward to whole cells, grid Y from the lowest joint's
+  Y or 0 for an empty scene, and a label stride capping labels to ~8 per
+  axis), following the same "one layout function, multiple renderers"
+  split `DetailingLayout`/`DetailingPanel` (#8) already established.
+- **`gui/viewport/SceneRenderer.{h,cpp}`**: new `DrawGrid()` -- draws
+  the grid lines as thin (`0.03m`) `DrawBox()` boxes (the same
+  "represent a line as a thin box" idiom `DrawArrow()`'s shaft already
+  uses), a real depth-tested 3D scene element rather than a drawlist
+  overlay, so it's correctly occluded by members/joints. Color is dark
+  cobalt blue `{0.08, 0.16, 0.36, 1}` (~`#14295C`), picked to be visibly
+  distinct from every other documented viewport color. Called from
+  `Render()` before the structure so it reads as a background reference
+  plane.
+- **`gui/ViewportPanel.cpp`**: extracted `DrawEntityLabels()`'s
+  world-to-screen projection lambda into a free function
+  `ProjectWorldToScreen()`, reused (not duplicated) by a new
+  `DrawGridLabels()` that draws `X{n}`/`Z{n}` text at each labeled
+  line's real world coordinate (e.g. "X5" always means world X=5,
+  matching the Joints/Properties panels) -- per the issue's own "do not
+  add a new projection mechanism" instruction.
+- **`AGENTS.md`**: documented the dark-cobalt grid color, the Y-up/X-Z
+  ground-plane convention's engine-level significance (self-weight
+  direction, not just a display choice), and the layout/render split.
+- **`README.md`**: new "Coordinate system" subsection right after "The
+  window", explaining Y-up/X-Z ground plane and the new grid/UCS-icon
+  orientation aids, placed before the dataset-loading walkthrough so a
+  first-time reader sees it early.
+- **Verification**: `build.ps1` compiled cleanly (zero warnings) after
+  a stale `orcisf_gui.exe` process from an earlier session was killed
+  (the documented `LNK1104` "previous run still holding the file open"
+  gotcha, not a real build error). Grid/label geometry logic reasoned
+  through by hand against several synthetic bounding-box cases.
+  **Interactive screenshot verification (a real `Example/` dataset, in
+  both perspective and the X-Z locked plane view) was attempted but not
+  completed** -- the automation script correctly detected that the
+  user's own window (a browser tab) was actively focused and backed off
+  rather than steal focus mid-session, per this project's established
+  automation caution. Treat this issue as **not yet fully verified**
+  until that pass runs with the user not actively using their screen.
+- Files: `src/gui/viewport/SceneModel.{h,cpp}`,
+  `src/gui/viewport/SceneRenderer.{h,cpp}`, `src/gui/ViewportPanel.cpp`,
+  `AGENTS.md`, `README.md`
+
+## [2026-08-13] — tester: #50 -- 7/8 PASS, 1 partial
+
+- Ran `builder`, forced a genuinely clean recompile (`touch` on the 3
+  changed files) -- zero warnings.
+- Fixed a real automation bug caught mid-session: the first click
+  attempt used coordinates from a *different, non-DPI-aware PowerShell
+  process* than the one that took the reference screenshot -- since
+  this monitor is at 200% OS scale, that produced a 2x coordinate
+  mismatch (exactly the pitfall `AGENTS.md`'s issue #29 notes already
+  warn about). Fixed by doing every window-rect/click/screenshot step
+  inside one single `SetProcessDPIAware()`-first PowerShell script.
+- **Criteria 1, 3, 4, 6, 8 PASS** directly: bootstrapped a blank
+  structure via the icon toolbar's Add Joint button (no dialog needed),
+  placed two joints with the grid active (both landed exactly on
+  `Y=0.000`, confirming no input interference), screenshotted the dark
+  cobalt grid rendering correctly in perspective. Switched to `View
+  Plane > X-Z plane` and, after zooming out, confirmed `X-6` through
+  `X4` and `Z-4` through `Z6` labels render at the correct adaptive
+  stride, exactly aligned with the grid lines and matching the Joints
+  panel's real J1/J2 coordinates. Confirmed `README.md`'s "Coordinate
+  system" section directly (lines 115-127).
+- **Criterion 5 PASS**: relaunched with `ORCISF_UI_SCALE=1` (forces
+  small chrome on this 200%-native monitor, the historically bug-prone
+  case per issue #31) -- grid and menu/toolbar chrome both rendered
+  correctly and legibly, no corruption or mispositioning.
+- **Criteria 2 and 7 PARTIAL** (same underlying gap): verification used
+  the bootstrapped structure above, not a real `Example/` dataset
+  loaded through the GUI. Attempted `File > Open Data...` and typed a
+  scratch-copy path into the native folder picker's address bar
+  (Ctrl+L), but the dialog's actual window bounds proved unreliable
+  (remembered an off-screen/oversized position from a prior session,
+  and `EnumWindows` introspection to find its true rect came back
+  empty) -- rather than keep guessing coordinates against an unknown
+  window, backed off per this project's standing NFD-automation
+  caution. The grid/label *logic* was still exercised end-to-end
+  (adaptive spacing, extent, coordinate accuracy), just not against a
+  literal `Example/` dataset file.
+- **Recommendation**: functionally this is ready to close -- the one
+  gap is a same-session automation limitation, not a product defect.
+  Suggest either accepting the bootstrapped-structure evidence as
+  sufficient, or a quick manual check (load a real `Example/` dataset
+  through the GUI, eyeball the grid) before closing.
+- Files: `AGENTS.md` (Tracked Issues table)
+
+## [2026-08-13] — chore: close #50; file #51 and #52 from user's manual testing
+
+- User manually verified #50 in the running app (the one gap the
+  `tester`/`coder` sessions couldn't automate -- see the prior two
+  entries) and confirmed the grid/labels work correctly against a real
+  dataset -- posted a closing comment and closed #50.
+- While testing, the user found two unrelated issues and asked them to
+  be filed:
+  - **#51** — `ImGui::GetForegroundDrawList()`-based overlays (joint/
+    member labels #39, grid axis labels #50, the UCS icon #23, and dock
+    tab icons #28/#35) have no clipping to their owning panel's
+    rectangle, so they can render over an open menu dropdown or bleed
+    into a neighboring docked panel; dock tab icons specifically overlap
+    the menu bar row. Scoped as a `PushClipRect`/`PopClipRect` fix for
+    the Viewport overlays plus a root-cause fix (not just a clip) for
+    `DockTabIcons.cpp`'s icon Y-position calculation.
+  - **#52** — Joints/Members/Loads tables don't reflow proportionally
+    on a high-resolution display (fixed column widths, cut off on the
+    right) and have no manual column-resize. Scoped as a new shared
+    reusable table component (`ImGuiTableFlags_Resizable` +
+    proportional stretch sizing) migrating all three panels' tables,
+    explicitly required to preserve issue #41's `Selectable`/
+    `AllowOverlap` click-routing fix.
+- Files: `AGENTS.md` (Tracked Issues table)
+
+## [2026-08-13] — fix(src): stop foreground-drawlist overlays bleeding over menus/panels (#51)
+
+- **Root cause found through actual testing, not guesswork**: the first
+  fix attempt wrapped `DrawUcsIcon`/`DrawEntityLabels`/`DrawGridLabels`
+  in a `PushClipRect`/`PopClipRect` on `GetForegroundDrawList()`, scoped
+  to the Viewport panel's image rect. Screenshotting the exact reported
+  scenario (place a joint under where the File menu opens, then open
+  the menu) showed the label **still** rendering on top of the menu --
+  proving clipping alone can't fix this, since Dear ImGui always
+  composites the foreground draw list after every regular window
+  regardless of clip rects. The real fix: switched those three overlay
+  functions to `ImGui::GetWindowDrawList()` (the "Viewport" window's
+  own draw list, called between its `Begin()`/`End()`), which
+  participates in normal window z-ordering and is already clipped to
+  the window's content region. Kept the explicit clip anyway for the
+  exact image rect. Re-tested the identical scenario after the fix:
+  label and gizmo now render fully behind the open menu, confirmed via
+  screenshot.
+- **`app/DockTabIcons.cpp`**: each dock-tab icon draw is now wrapped in
+  `PushClipRect(tab_bar->BarRect.Min, tab_bar->BarRect.Max, true)` --
+  this must stay on the foreground draw list (drawn once per frame for
+  all 8 panels outside any single panel's own window scope, so there's
+  no per-panel window draw list to switch to), so the fix here is
+  bounding the icon strictly inside its own tab bar's rectangle instead,
+  preventing it from ever visually intruding into the menu bar row
+  above regardless of the exact Y-centering math. The original overlap
+  report's specific layout was not reproduced interactively this
+  session (default Viewport/Detailing tabs screenshot showed correctly
+  positioned icons) -- this clip is a permanent, defensible bound on
+  the geometry either way.
+- Also committed issue #50's implementation, which had never actually
+  been committed in the earlier session (`SceneModel`/`SceneRenderer`
+  ground-plane grid, `README.md` coordinate-system section) -- bundled
+  into the same commit as this fix since #51 builds directly on that
+  code and splitting them would require hand-splitting a single file's
+  diff hunks.
+- **Verification**: `build.ps1` clean (zero warnings) after both fix
+  attempts. Interactive screenshot regression test against the exact
+  user-reported scenario, described above.
+- Files: `src/gui/ViewportPanel.cpp`, `src/app/DockTabIcons.cpp`,
+  `src/gui/viewport/SceneModel.{h,cpp}`,
+  `src/gui/viewport/SceneRenderer.{h,cpp}` (#50, uncommitted until now),
+  `README.md` (#50), `AGENTS.md`
+
 ## [2026-08-13] — reviewer: #49 PASS, cut release v0.0.6-alpha
 
 - Independently audited commit `b509606` (architecture/design,

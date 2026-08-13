@@ -92,27 +92,37 @@ const char* ClassifyRestraintPreset(EditableStructure& editable, int joint_id) {
     return "Custom";
 }
 
+// Issue #39's world-to-screen projection (proj * view * point, perspective
+// divide), factored out of DrawEntityLabels so issue #50's grid labels can
+// reuse the exact same technique rather than a second projection
+// mechanism -- both need a real point-in-space projection, unlike
+// DrawUcsIcon's direction-only dot products above. Returns false for
+// points behind the eye (w <= ~0) or far enough off to the side that
+// drawing them would be pointless -- callers just skip that entity/line
+// for this frame.
+bool ProjectWorldToScreen(const Mat4& vp, ImVec2 image_min, ImVec2 image_size, const Vec3& world,
+                           ImVec2& out_screen) {
+    float x = world.x, y = world.y, z = world.z;
+    float cx = vp.m[0] * x + vp.m[4] * y + vp.m[8] * z + vp.m[12];
+    float cy = vp.m[1] * x + vp.m[5] * y + vp.m[9] * z + vp.m[13];
+    float cw = vp.m[3] * x + vp.m[7] * y + vp.m[11] * z + vp.m[15];
+    if (cw < 1e-4f) return false;
+    float ndc_x = cx / cw;
+    float ndc_y = cy / cw;
+    if (ndc_x < -1.3f || ndc_x > 1.3f || ndc_y < -1.3f || ndc_y > 1.3f) return false;
+    out_screen.x = image_min.x + (ndc_x * 0.5f + 0.5f) * image_size.x;
+    out_screen.y = image_min.y + (1.f - (ndc_y * 0.5f + 0.5f)) * image_size.y;
+    return true;
+}
+
 void DrawEntityLabels(ImDrawList* dl, const SceneModel& scene, const Camera& camera, float aspect, ImVec2 image_min,
                        ImVec2 image_size, const Selection& selection, EditableStructure* editable) {
     Mat4 view = camera.ViewMatrix();
     Mat4 proj = camera.ProjectionMatrix(aspect);
     Mat4 vp = Mat4::Multiply(proj, view);
 
-    // Returns false for points behind the eye (w <= ~0) or far enough off
-    // to the side that drawing them would be pointless -- callers just
-    // skip the label for that entity this frame.
     auto project = [&](const Vec3& world, ImVec2& out_screen) {
-        float x = world.x, y = world.y, z = world.z;
-        float cx = vp.m[0] * x + vp.m[4] * y + vp.m[8] * z + vp.m[12];
-        float cy = vp.m[1] * x + vp.m[5] * y + vp.m[9] * z + vp.m[13];
-        float cw = vp.m[3] * x + vp.m[7] * y + vp.m[11] * z + vp.m[15];
-        if (cw < 1e-4f) return false;
-        float ndc_x = cx / cw;
-        float ndc_y = cy / cw;
-        if (ndc_x < -1.3f || ndc_x > 1.3f || ndc_y < -1.3f || ndc_y > 1.3f) return false;
-        out_screen.x = image_min.x + (ndc_x * 0.5f + 0.5f) * image_size.x;
-        out_screen.y = image_min.y + (1.f - (ndc_y * 0.5f + 0.5f)) * image_size.y;
-        return true;
+        return ProjectWorldToScreen(vp, image_min, image_size, world, out_screen);
     };
 
     const ImU32 joint_color = IM_COL32(255, 225, 120, 255);
@@ -139,6 +149,44 @@ void DrawEntityLabels(ImDrawList* dl, const SceneModel& scene, const Camera& cam
         if (!project((m.a + m.b) * 0.5f, screen)) continue;
         std::string label = "M" + std::to_string(m.no_batang);
         dl->AddText(ImVec2(screen.x + dx, screen.y - dy), member_color, label.c_str());
+    }
+}
+
+// Issue #50: X{n}/Z{n} axis labels for the ground-plane grid --
+// SceneRenderer::DrawGrid() draws the actual GL line geometry (a real
+// scene element, depth-tested against the structure); this is the
+// text-label half, following the same DetailingLayout/DetailingPanel (#8)
+// split of "one layout function, multiple renderers" so the lines and
+// labels can never disagree about where a given grid line actually is.
+// Labels use the real world coordinate (e.g. "X5" = world X=5, matching
+// the Joints/Properties panels), not an arbitrary line index.
+void DrawGridLabels(ImDrawList* dl, const SceneModel& scene, const Camera& camera, float aspect, ImVec2 image_min,
+                     ImVec2 image_size) {
+    GroundGridLayout layout = ComputeGroundGridLayout(scene);
+    Mat4 vp = Mat4::Multiply(camera.ProjectionMatrix(aspect), camera.ViewMatrix());
+
+    // A lighter tint of DrawGrid's dark-cobalt line color, so the label
+    // stays associated with the grid at a glance but is still readable
+    // against the dark viewport background.
+    const ImU32 label_color = IM_COL32(110, 150, 220, 255);
+    float x0 = layout.x_index_min * layout.spacing_m;
+    float z0 = layout.z_index_min * layout.spacing_m;
+
+    for (int i = layout.x_index_min; i <= layout.x_index_max; ++i) {
+        if (i % layout.label_stride != 0) continue;
+        float x = i * layout.spacing_m;
+        ImVec2 screen;
+        if (!ProjectWorldToScreen(vp, image_min, image_size, Vec3{x, layout.y, z0}, screen)) continue;
+        std::string label = "X" + std::to_string(static_cast<int>(std::lround(x)));
+        dl->AddText(screen, label_color, label.c_str());
+    }
+    for (int i = layout.z_index_min; i <= layout.z_index_max; ++i) {
+        if (i % layout.label_stride != 0) continue;
+        float z = i * layout.spacing_m;
+        ImVec2 screen;
+        if (!ProjectWorldToScreen(vp, image_min, image_size, Vec3{x0, layout.y, z}, screen)) continue;
+        std::string label = "Z" + std::to_string(static_cast<int>(std::lround(z)));
+        dl->AddText(screen, label_color, label.c_str());
     }
 }
 
@@ -385,13 +433,40 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
     const float ucs_margin = Scaled(34.f);      // horizontal distance from the left edge
     const float ucs_bottom_gap = Scaled(96.f);  // vertical distance from the bottom edge
     ImVec2 ucs_center(image_min.x + ucs_margin, image_min.y + image_size.y - ucs_bottom_gap);
-    DrawUcsIcon(ImGui::GetForegroundDrawList(), ucs_center, ucs_radius, camera_);
+
+    // Issue #51: the UCS icon and both label overlays below used to draw
+    // onto GetForegroundDrawList(), which by Dear ImGui's own compositing
+    // order (background draw list, then every window in z-order, then the
+    // foreground draw list last) renders on top of *every* window -- a
+    // menu bar dropdown included. Clipping alone can't fix that (a clip
+    // only bounds *where* pixels land, not which layer they composite
+    // into), so this now draws on this "Viewport" window's own draw list
+    // instead: it participates in normal window z-ordering (correctly
+    // drawn *behind* a popup/menu opened afterward the same frame) and is
+    // already clipped to the window's own content region by Dear ImGui,
+    // which also happens to fix the "label bleeds into a neighboring
+    // docked panel" report. The explicit PushClipRect/PopClipRect below is
+    // kept anyway for the exact image rect (a hair tighter than the
+    // window's full content region, e.g. excludes the plane-offset
+    // overlay's own area) rather than relying on the window clip alone.
+    ImDrawList* overlay_dl = ImGui::GetWindowDrawList();
+    overlay_dl->PushClipRect(image_min, ImVec2(image_min.x + image_size.x, image_min.y + image_size.y), true);
+
+    DrawUcsIcon(overlay_dl, ucs_center, ucs_radius, camera_);
 
     // Issue #39/#40: joint/member number labels (+ the selected joint's
     // restraint preset), drawn after the UCS icon so they layer on top of
     // it if one ever happens to land nearby.
-    DrawEntityLabels(ImGui::GetForegroundDrawList(), scene, camera_, image_size.x / image_size.y, image_min,
-                      image_size, selection, editable);
+    DrawEntityLabels(overlay_dl, scene, camera_, image_size.x / image_size.y, image_min, image_size, selection,
+                      editable);
+
+    // Issue #50: ground-plane grid axis labels (the GL line geometry
+    // itself is drawn inside renderer_.Render() above, as part of the 3D
+    // scene). Drawn every frame regardless of view_plane -- the grid is
+    // visible in both perspective and the X-Z locked orthographic view.
+    DrawGridLabels(overlay_dl, scene, camera_, image_size.x / image_size.y, image_min, image_size);
+
+    overlay_dl->PopClipRect();
 
     // Issue #24: the plane-offset control used to live only in Toolbar's
     // "View Plane" menu, which had to be reopened for every adjustment --

@@ -112,6 +112,20 @@ Run), and a docked set of panels: **Viewport** (3D view), **Detailing**
 Optimization** to switch between layout presets sized for different stages
 of the workflow — no panel is ever hidden by a preset, just resized/re-tabbed.
 
+### Coordinate system
+
+ORCISF's 3D viewport is **Y-up**: **Y** is the vertical (height) axis, and
+**X** and **Z** form the horizontal ground plane. This matches the
+direct-stiffness engine's own convention (self-weight is applied along
+"arah 2 = Y") — it isn't just a display choice, so don't confuse it with
+tools that treat Z as vertical (Blender/CAD-style X-Y-ground conventions).
+A dark-cobalt-blue reference grid on the X-Z ground plane, labeled `X1,
+X2, X3...` and `Z1, Z2, Z3...` along its edges (matching the real
+coordinates shown in the Joints/Properties panels), is always visible in
+the Viewport to help orient a structure at a glance — together with the
+small UCS (axis) icon in the corner, which shows the current camera
+orientation in every view mode.
+
 ### 1. Start a dataset
 
 - **File > New Data** — prompts for a save location, then starts a blank,

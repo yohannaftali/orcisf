@@ -77,7 +77,14 @@ void DrawDockTabIcons() {
             float label_x = tab_bar->BarRect.Min.x + tab.Offset + tab_bar->FramePadding.x;
             float center_y = tab_bar->BarRect.Min.y + tab_bar->BarRect.GetHeight() * 0.5f;
             ImVec2 origin(label_x, center_y - icon_size * 0.5f);
+            // Issue #51: clip to this tab bar's own rect (not the whole
+            // foreground draw list, which has no clipping of its own) so
+            // the icon can never bleed upward into the main menu bar row
+            // immediately above a docked panel's tab bar, regardless of
+            // any future drift in the Y-centering math above.
+            fg->PushClipRect(tab_bar->BarRect.Min, tab_bar->BarRect.Max, true);
             gui::DrawPanelIcon(entry.icon, fg, origin, color, icon_size);
+            fg->PopClipRect();
             break;
         }
     }

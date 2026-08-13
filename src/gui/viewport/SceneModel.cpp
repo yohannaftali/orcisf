@@ -183,4 +183,75 @@ int PickJoint(const SceneModel& scene, const Vec3& ray_origin, const Vec3& ray_d
     return best_no_joint;
 }
 
+GroundGridLayout ComputeGroundGridLayout(const SceneModel& scene) {
+    GroundGridLayout layout;
+
+    constexpr float kMinHalfExtent = 5.f; // meters -- keeps a small/empty scene's grid usable
+    constexpr float kMarginM = 3.f;       // meters of margin beyond the structure's own extent
+
+    float min_x = -kMinHalfExtent, max_x = kMinHalfExtent;
+    float min_z = -kMinHalfExtent, max_z = kMinHalfExtent;
+    float min_y = 0.f;
+    bool have = false;
+    for (const JointVisual& j : scene.joints) {
+        if (!have) {
+            min_x = max_x = j.pos.x;
+            min_z = max_z = j.pos.z;
+            min_y = j.pos.y;
+            have = true;
+        } else {
+            min_x = std::min(min_x, j.pos.x);
+            max_x = std::max(max_x, j.pos.x);
+            min_z = std::min(min_z, j.pos.z);
+            max_z = std::max(max_z, j.pos.z);
+            min_y = std::min(min_y, j.pos.y);
+        }
+    }
+    layout.y = min_y;
+
+    if (have) {
+        min_x -= kMarginM;
+        max_x += kMarginM;
+        min_z -= kMarginM;
+        max_z += kMarginM;
+        // A single joint (or a tightly clustered few) would otherwise
+        // produce a near-zero-size grid -- guarantee a usable minimum span.
+        if (max_x - min_x < 2.f * kMinHalfExtent) {
+            float cx = (min_x + max_x) * 0.5f;
+            min_x = cx - kMinHalfExtent;
+            max_x = cx + kMinHalfExtent;
+        }
+        if (max_z - min_z < 2.f * kMinHalfExtent) {
+            float cz = (min_z + max_z) * 0.5f;
+            min_z = cz - kMinHalfExtent;
+            max_z = cz + kMinHalfExtent;
+        }
+    }
+
+    // Doubling the spacing until the line count fits kMaxLinesPerAxis keeps
+    // the grid legible (and the per-frame draw-call count bounded)
+    // regardless of how large the loaded structure is, rather than a fixed
+    // spacing that would either vanish into a wall of lines on a big
+    // building or barely cover a small one.
+    constexpr int kMaxLinesPerAxis = 48;
+    float span = std::max(max_x - min_x, max_z - min_z);
+    float spacing = 1.f;
+    while (span / spacing > static_cast<float>(kMaxLinesPerAxis)) {
+        spacing *= 2.f;
+    }
+    layout.spacing_m = spacing;
+
+    layout.x_index_min = static_cast<int>(std::floor(min_x / spacing));
+    layout.x_index_max = static_cast<int>(std::ceil(max_x / spacing));
+    layout.z_index_min = static_cast<int>(std::floor(min_z / spacing));
+    layout.z_index_max = static_cast<int>(std::ceil(max_z / spacing));
+
+    int x_lines = layout.x_index_max - layout.x_index_min;
+    int z_lines = layout.z_index_max - layout.z_index_min;
+    constexpr int kMaxLabelsPerAxis = 8;
+    layout.label_stride = std::max(1, (std::max(x_lines, z_lines) + kMaxLabelsPerAxis - 1) / kMaxLabelsPerAxis);
+
+    return layout;
+}
+
 } // namespace orcisf::gui

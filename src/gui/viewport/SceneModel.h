@@ -93,4 +93,23 @@ int PickMember(const SceneModel& scene, const math3d::Vec3& ray_origin, const ma
 // the member underneath it. Returns -1 if none is within pick range.
 int PickJoint(const SceneModel& scene, const math3d::Vec3& ray_origin, const math3d::Vec3& ray_dir);
 
+// Issue #50: pure-geometry layout for the ground-plane reference grid
+// (X-Z plane, per ORCISF's Y-up convention -- see AGENTS.md's
+// gui/viewport/ section) -- shared by SceneRenderer::DrawGrid() (the GL
+// line geometry) and ViewportPanel's label overlay so both agree on
+// exactly where every line/label sits, the same reasoning
+// DetailingLayout/DetailingPanel's split (#8) uses. Grid lines are
+// anchored to true world-space multiples of `spacing_m` (not centered on
+// the structure's own bounding box), so a label like "X5" always means
+// world X=5 -- matching the coordinates already shown in the
+// Joints/Properties panels.
+struct GroundGridLayout {
+    float spacing_m = 1.f;          // meters between adjacent grid lines
+    int x_index_min = -5, x_index_max = 5;  // grid covers world X in [x_index_min*spacing_m, x_index_max*spacing_m]
+    int z_index_min = -5, z_index_max = 5;  // same, for world Z
+    float y = 0.f;                  // world Y the grid plane sits at (lowest joint's Y, or 0 if none)
+    int label_stride = 1;           // label every Nth line (1 = every line)
+};
+GroundGridLayout ComputeGroundGridLayout(const SceneModel& scene);
+
 } // namespace orcisf::gui

@@ -1675,6 +1675,132 @@ sequence or its `EnableWindowsDpiAwareness()`/font/style-scaling code:**
   found to misbehave, treat it as a new report (details:
   `CHANGE_HISTORY.md`, 2026-08-11, issue #31).
 
+**Ground-plane reference grid (issue #50) — read before touching
+`SceneRenderer::DrawGrid()`, `ViewportPanel`'s `DrawGridLabels()`, or
+`SceneModel.h`'s `ComputeGroundGridLayout()`:**
+- **ORCISF's viewport is Y-up with an X-Z ground plane** -- `Camera::
+  WorldUp() == {0,1,0}`, and `orcisf_cli`'s equilibrium check documents
+  "arah 2 = Y" as vertical (this is also why issue #40's Roller preset
+  restrains UY, not UZ, despite that issue's own literal text -- see its
+  own note below). This convention is inherited from the original 1999
+  Borland source, not a modern GUI choice -- **do not change it without
+  re-verifying every `Example/` dataset's checked-in results**, since
+  `BeratSendiri()`'s self-weight direction depends on it (see the
+  `engine/` section's caution about deliberate deviations).
+- **The grid line/label layout is pure geometry, shared by two
+  renderers** -- `GroundGridLayout ComputeGroundGridLayout(const
+  SceneModel&)` (`gui/viewport/SceneModel.h`/`.cpp`) computes spacing
+  (adaptive: doubles from 1m until the line count per axis fits a
+  48-line cap, so a huge building doesn't turn into a wall of lines),
+  extent (the structure's joint bounding box + 3m margin, snapped
+  outward to whole grid cells), grid Y (the lowest joint's Y, or 0 for
+  an empty/new scene), and `label_stride` (skips lines so at most ~8
+  labels appear per axis). `SceneRenderer::DrawGrid()` (the actual GL
+  line geometry, real depth-tested 3D scene element) and
+  `ViewportPanel`'s `DrawGridLabels()` (the X{n}/Z{n} text overlay) both
+  call this same function -- exactly the `DetailingLayout`/
+  `DetailingPanel` (#8) split, for the same reason: one layout function,
+  multiple renderers, so lines and labels can never disagree about where
+  a grid line actually is.
+- **Grid lines are anchored to true world-space multiples of
+  `spacing_m`, not centered on the structure's bounding box** -- so a
+  label like "X5" always means world X=5, matching the coordinates
+  already shown in the Joints/Properties panels, not an arbitrary
+  relative index. Labels use `std::lround(x)`/`std::lround(z)` of the
+  actual world coordinate, not a line-count index.
+- **Grid lines reuse `SceneRenderer::DrawBox()` as thin boxes (0.03m
+  thick) rather than adding a `GL_LINES` pipeline** -- the same "a line
+  is a thin box" idiom `DrawArrow()`'s shaft already uses, so this
+  needed no new shader, VAO, or vertex format. This also means the grid
+  is a real depth-tested scene element (correctly occluded by members/
+  joints where they overlap), unlike the UCS icon/entity labels below,
+  which are draw-list overlays with no depth concept at all.
+- **Grid color is dark cobalt blue, `{0.08f, 0.16f, 0.36f, 1.f}`
+  (~`#14295C`)** -- deliberately distinct from every other documented
+  viewport color (`kBeamColor`/`kColumnColor`/`kJointColor`/
+  `kRestraintColor`/`kHighlightColor`/the load-arrow colors, all in
+  `SceneRenderer.cpp`'s `Render()`/`DrawLoads()`), so the reference grid
+  is never mistaken for real structure. If you ever add another scene
+  color, cross-check it against this list the same way.
+- **Labels are drawn as an `ImDrawList::AddText()` overlay** on the
+  Viewport window's own draw list (see issue #51 below -- this was the
+  foreground draw list until #51 moved it), reusing
+  `ProjectWorldToScreen()` -- issue #39's `DrawEntityLabels()` world-to-
+  screen projection, extracted into its own free function specifically
+  so this issue's labels wouldn't need a second projection mechanism.
+  Like the UCS icon and entity labels, this never creates an ImGui item
+  and can't intercept orbit/pan/click-to-place input.
+- **Verification status:** compiled cleanly (zero warnings). Interactive
+  screenshot verification completed for both perspective and the X-Z
+  locked plane view (#22), including a forced `ORCISF_UI_SCALE=1` DPI
+  check and click-to-place-while-grid-active -- all confirmed working,
+  with labels matching the Joints panel's real coordinates exactly. The
+  one remaining gap: verification used a bootstrapped blank structure
+  (Add Joint toolbar button + manual placement), not a real `Example/`
+  dataset loaded via `File > Open Data...` -- the native folder-picker
+  dialog's window bounds were unreliable to automate safely this
+  session (a remembered off-screen/oversized position from a prior
+  use), so the attempt was abandoned rather than forced. See
+  `CHANGE_HISTORY.md`, 2026-08-13 (tester pass) for the full breakdown.
+  **Closed 2026-08-13 after the user manually confirmed it against a
+  real dataset.**
+
+**Foreground-drawlist overlays bleeding over menus/neighboring panels
+(issue #51) — read before touching `ViewportPanel.cpp`'s `DrawUcsIcon`/
+`DrawEntityLabels`/`DrawGridLabels`, or `app/DockTabIcons.cpp`:**
+- **Root cause of the "labels render on top of an open menu" report**:
+  `ImGui::GetForegroundDrawList()` renders, by Dear ImGui's own
+  compositing order, *after every regular window* (background draw
+  list → every window in z-order → foreground draw list last) --
+  meaning nothing drawn there can ever be occluded by a menu popup, no
+  matter how you clip it. **A `PushClipRect`/`PopClipRect` alone does
+  not fix this** -- clipping only bounds *where* pixels can land, not
+  *which compositing layer* they belong to. Confirmed by trying the
+  clip-only fix first, screenshotting a File-menu-open-over-a-label
+  case, and seeing the label still show through; the actual fix was
+  switching `DrawUcsIcon`/`DrawEntityLabels`/`DrawGridLabels` to draw
+  on `ImGui::GetWindowDrawList()` instead (called while the "Viewport"
+  window is current, i.e. between its `Begin()`/`End()`) -- a window's
+  own draw list participates in normal window z-ordering, so a popup
+  opened afterward the same frame correctly draws on top of it. This
+  also incidentally fixes "labels bleed into a neighboring docked
+  panel", since a window's draw list is already clipped to its own
+  content region by Dear ImGui -- the explicit `PushClipRect`/
+  `PopClipRect` around the three calls (to the exact `image_min`/
+  `image_size` rect) is kept anyway for precision (a hair tighter than
+  the window's full content region) but is no longer doing the heavy
+  lifting alone.
+- **The UCS icon (#23) and both label overlays (#39, #50) share one
+  `PushClipRect`/`PopClipRect` pair** in `ViewportPanel::Draw()`, right
+  before/after all three calls -- don't reintroduce a fourth overlay
+  call outside that scope without adding it to the same clip.
+- **`DockTabIcons.cpp`'s icon-overlapping-the-menu-bar report is a
+  different mechanism and needed a different fix**: it must stay on
+  the foreground draw list (icons are drawn once per frame for *all*
+  panels from `Application::OnFrame()`'s end, not from within any
+  single panel's `Begin()`/`End()` scope, so there's no single "owning
+  window" draw list to switch to). Instead, each icon draw is now
+  wrapped in its own `PushClipRect(tab_bar->BarRect.Min,
+  tab_bar->BarRect.Max, true)` -- this bounds the icon strictly inside
+  its own tab bar's rectangle, so it can never visually intrude into
+  the menu bar row immediately above, regardless of any future drift
+  in the Y-centering math. The exact root cause of the *original*
+  Y-drift was not conclusively reproduced interactively this session
+  (default-layout screenshots showed correctly-positioned icons); this
+  clip is a defensible, permanent bound on the geometry either way --
+  if a future report shows icons still off in some layout, re-check the
+  Y-centering math in `DrawDockTabIcons()` itself, now protected by
+  this clip from ever being visually catastrophic in the meantime.
+- **Verification status:** compiled cleanly (zero warnings). Interactive
+  screenshot confirmed the exact reported scenario: placed a joint/
+  label directly under where the File menu opens, opened the menu, and
+  confirmed the label (and its gizmo) render fully behind the menu
+  dropdown with no bleed-through -- a real regression test, not just
+  code review. Dock tab icon clipping compiled and the default-layout
+  case (Viewport/Detailing tabs) screenshot-confirmed correctly
+  positioned; a layout that reproduces the *original* overlap report
+  was not found/re-tested this session.
+
 **`gui/viewport/` (issue #5) — three things worth knowing before touching it:**
 - **Member cross-section thickness/orientation is a schematic
   approximation, not the legacy local-axis convention.** `SceneRenderer`
@@ -2154,6 +2280,9 @@ later, different one (e.g. closing an issue or cutting a release).
 | #47 | docs(column): document column slenderness, biaxial interaction, and stirrup design | closed | 2026-08-12 |
 | #48 | docs(optimization): document the Flexible Polyhedron (Nelder-Mead family) algorithm | closed | 2026-08-12 |
 | #49 | chore(src): fix MSVC build warnings (C4244 narrowing, C4996 deprecated CRT, C4611 setjmp/dtor) | closed | 2026-08-13 |
+| #50 | feat(src): dark-cobalt ground-plane grid with X/Z axis labels + document coordinate system in README | closed | 2026-08-13 |
+| #51 | fix(src): foreground-drawlist overlays (dock tab icons, joint/member/grid labels) bleed over the menu bar and neighboring panels | ready-for-review | 2026-08-13 |
+| #52 | feat(src): responsive, resizable-column table component for Joints/Members/Loads panels | open | 2026-08-13 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
