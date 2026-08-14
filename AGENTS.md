@@ -2484,16 +2484,59 @@ later, different one (e.g. closing an issue or cutting a release).
     show the warning** as long as `ilammy/msvc-dev-cmd` has no node24
     release to pin to — nothing this workflow can do about that until
     upstream ships one.
+  - **Every job stages a release-ready artifact and uploads it via
+    `actions/upload-artifact`** (added for v0.0.7-alpha, the first
+    release shipping macOS/Linux binaries — see the `Releases` bullet
+    below). Checked all three vcpkg triplets directly
+    (`vcpkg/triplets/{x64-windows,arm64-osx,x64-linux}.cmake`): only
+    `x64-windows` is `VCPKG_LIBRARY_LINKAGE dynamic`, so only the
+    Windows staging step bundles DLLs (`gl3w.dll`, `glfw3.dll`,
+    `hpdf.dll`, `libpng16.dll`, `nfd.dll`, `z.dll` — confirmed against a
+    real build output directory, not guessed); `arm64-osx`/`x64-linux`
+    are both static, so their staging steps just copy the `.app`
+    bundle / binary + `icons/`. Artifact names are
+    `orcisf_gui-${{ matrix.preset }}` (e.g. `orcisf_gui-windows-
+    release`).
+  - **`actions/upload-artifact`'s zip round-trip does NOT preserve the
+    Unix executable bit** — confirmed by downloading a real artifact:
+    both the Linux binary and the macOS bundle's `Contents/MacOS/
+    orcisf_gui` came back `-rw-r--r--`, not `-rwxr-xr-x`. This is a
+    GitHub Actions artifact limitation, not something this workflow's
+    staging steps get wrong — whoever repackages these artifacts into
+    release assets **must** explicitly restore the exec bit before
+    shipping (e.g. `tar --mode=755` when building the release
+    `.tar.gz`, which forces the archived permission metadata regardless
+    of the source filesystem — see the next bullet for why `chmod`
+    alone isn't reliable everywhere).
 - **Releases:** GitHub Releases publish prebuilt GUI binaries. The project
   is currently in **alpha** — tags/releases use a `v0.0.x-alpha` scheme
   (first one: `v0.0.1-alpha`). Bump the patch number for each subsequent
   alpha; move to a `v0.x.0` (beta) or `v1.0.0` scheme only once the user
-  explicitly decides the project has left alpha. **Only create a release
-  after explicit user confirmation** — either the user asks directly, or
-  the `reviewer` skill proposes one (per its Step 8: only when the change
-  includes an actual `src/` code change, never for docs/tooling-only
-  changes) and the user confirms. A release is a user-visible,
-  hard-to-quietly-undo action either way.
+  explicitly decides the project has left alpha.
+  - **Since v0.0.7-alpha, releases ship binaries for all three
+    platforms** (v0.0.1 through v0.0.6 were Windows-only, built locally
+    since this project's usual dev environment has no macOS/Linux
+    toolchain). The Linux/macOS assets are built by
+    `build-src.yml`'s CI (see above), downloaded as artifacts, and
+    repackaged as release assets — **not** built locally. Windows keeps
+    its established convention: `orcisf_gui.exe` + its 6 runtime DLLs +
+    `icons/*.png`, zipped. Linux/macOS use `.tar.gz` (not `.zip`) so the
+    executable-bit fix above survives — a zip built on a Windows
+    machine (this project's usual dev environment) cannot reliably
+    carry Unix permission metadata at all, `chmod` included: confirmed
+    directly in this environment — even a freshly created local file
+    resists `chmod +x` (NTFS has no such bit for `git`'s POSIX
+    emulation layer to set), so packaging must happen with `tar
+    --mode=755` (forces the *archived* permission bits, independent of
+    whatever the source filesystem reports) rather than relying on a
+    local `chmod` + `zip`. macOS's asset is the whole `.app` bundle,
+    unsigned/not notarized (Gatekeeper will warn on first launch — no
+    Apple Developer account/signing set up for this project yet).
+  - **Only create a release after explicit user confirmation** — either
+    the user asks directly, or the `reviewer` skill proposes one (per
+    its Step 8: only when the change includes an actual `src/` code
+    change, never for docs/tooling-only changes) and the user confirms.
+    A release is a user-visible, hard-to-quietly-undo action either way.
 
 ## Tracked Issues
 | ID | Title | Status | Last Checked |

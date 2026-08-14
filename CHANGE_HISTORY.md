@@ -3849,3 +3849,82 @@ the shared mechanism.
   (github.com/yohannaftali/orcisf/issues/56#issuecomment-5280327721)
   and closed the issue (`state_reason: completed`) via the GitHub API.
 - `AGENTS.md`'s Tracked Issues row for #56 updated to `closed`.
+
+## [2026-08-14] — reviewer: #51-#55 PASS WITH NOTES; cut v0.0.7-alpha, first release with macOS/Linux binaries
+- All GitHub issues were already closed going into this pass (no open
+  tracker items) -- the actual review target was `src/`'s real code
+  diff since `v0.0.6-alpha` (issues #50-#55: ground-plane grid, the
+  #51 draw-list fix, the shared table component, window resize, trash
+  buttons, per-DOF checkboxes), none of which had been through an
+  independent `reviewer` audit yet (only `tester`'s per-criterion
+  checks, some GUI-live criteria left UNVERIFIED there).
+- **Architecture/design audit**: no findings. Every changed file maps
+  precisely to its issue's documented scope; no scope creep; no
+  contradicted `AGENTS.md` "read before touching" notes.
+- **Bug/security audit -- one real, reproducible bug found**:
+  `src/app/WindowResize.cpp`'s `HitTest()` (issue #53) has a diagonal
+  dead zone at each corner. Every corner condition pairs one `near_*`
+  flag (5px `EdgeThickness()`) with one `corner_*` flag (12px
+  `CornerThickness()`) instead of testing both axes against
+  `corner_t` -- e.g. a cursor 8 scaled-px diagonally in from a corner
+  matches none of the 8 corner conditions nor the 4 plain-edge ones,
+  so `HitTest()` silently returns `Edge::None` inside the intended
+  larger corner hit box. Fix: use `corner_top && corner_left` (etc.)
+  instead of `near_top && corner_left`. Minor (small pixel band,
+  easily missed by a natural corner-drag click), not release-blocking
+  -- filed as a follow-up rather than reopening #53 (the feature is
+  substantially working; this is a partial-coverage refinement). No
+  security or concurrency findings.
+- **Also found, unrelated to #50-#55**: a fresh `--clean-first` rebuild
+  via `builder` surfaced a live MSVC `C4244` warning in
+  `src/app/AppIcon.cpp:38` (`wchar_t`->`char` narrowing in
+  `ExecutableDir()`) -- the same warning visible in this session's
+  earlier CI annotations. Contradicts #49's "zero compiler warnings"
+  claim; that file was simply never in #49's scope and only shows up
+  on a full clean rebuild, not an incremental one. Also a good
+  follow-up-issue candidate, not addressed in this pass.
+- **End-to-end**: fresh `windows-release` build succeeds (the one
+  pre-existing warning above, zero from this diff's own files). Did
+  not interactively smoke-test the GUI this pass (same automation
+  hazard already documented for the #52-#55 `tester` pass).
+- **Verdict: PASS WITH NOTES.** #50-#55 all already closed; no reopen
+  needed for either finding above.
+- **Release**: warranted (real `src/` code change since `v0.0.6-alpha`).
+  User explicitly asked for a 3-OS release (Windows/macOS/Linux) --
+  every prior release (`v0.0.1` through `v0.0.6-alpha`) shipped
+  Windows-only, since this project's usual dev environment has no
+  macOS/Linux toolchain. Added `actions/upload-artifact` staging steps
+  to `build-src.yml` (commit `0260ea7`) after checking all three vcpkg
+  triplets directly (`x64-windows` is the only dynamic one --
+  confirmed against a real build output directory: `gl3w.dll`,
+  `glfw3.dll`, `hpdf.dll`, `libpng16.dll`, `nfd.dll`, `z.dll`;
+  `arm64-osx`/`x64-linux` are both static). Triggered a fresh 3-leg CI
+  run, downloaded all three artifacts.
+  - **Real gotcha caught before shipping**: `actions/upload-artifact`'s
+    zip round-trip strips the Unix executable bit -- confirmed by
+    inspecting the downloaded Linux binary and the macOS bundle's
+    `Contents/MacOS/orcisf_gui`, both `-rw-r--r--` instead of
+    `-rwxr-xr-x`. Attempted the obvious fix (`chmod +x` locally) and
+    found a *second* gotcha: this Windows/NTFS dev environment doesn't
+    honor `chmod` at all (verified with a freshly created, never-
+    downloaded local file -- still `-rw-r--r--` after `chmod +x`).
+    Fixed by packaging Linux/macOS as `.tar.gz` via `tar
+    --owner=0 --group=0 --mode=755`, which forces the *archived*
+    permission bits directly regardless of what the source filesystem
+    reports -- confirmed via `tar -tvzf` showing correct
+    `-rwxr-xr-x`/`drwxr-xr-x` entries before upload. Windows kept its
+    established `.zip` convention (Windows binaries need no Unix
+    permission bits).
+  - Cut **v0.0.7-alpha**
+    (https://github.com/yohannaftali/orcisf/releases/tag/v0.0.7-alpha)
+    with all three assets: `orcisf_gui-v0.0.7-alpha-windows-x64.zip`
+    (unchanged convention: exe + 6 DLLs + icons), `orcisf_gui-v0.0.7-
+    alpha-macos-arm64.tar.gz` (full `.app` bundle, unsigned/not
+    notarized -- no Apple Developer signing set up for this project),
+    `orcisf_gui-v0.0.7-alpha-linux-x64.tar.gz` (binary + icons).
+    Release notes cover #50-#56 since v0.0.6-alpha and both findings
+    from this pass.
+- Files: `.github/workflows/build-src.yml` (artifact upload, commit
+  `0260ea7`), `AGENTS.md` (new CI-artifact-upload bullet + Releases
+  section documents the 3-OS packaging convention and both permission
+  gotchas above).
