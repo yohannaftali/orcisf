@@ -67,3 +67,48 @@ jobs:
       - name: Build (${{ matrix.preset }})
         working-directory: src
         run: cmake --build --preset ${{ matrix.preset }}
+
+      # First release to ship prebuilt macOS/Linux binaries (previously
+      # Windows-only, built locally since this project's usual dev
+      # environment has no macOS/Linux toolchain -- see AGENTS.md's
+      # Validation section). All three vcpkg triplets used here were
+      # checked directly (vcpkg/triplets/{x64-windows,arm64-osx,
+      # x64-linux}.cmake): only x64-windows is VCPKG_LIBRARY_LINKAGE
+      # dynamic (needs its vcpkg-built DLLs staged alongside the exe,
+      # matching every prior release's asset layout); arm64-osx and
+      # x64-linux are both static, so their vcpkg dependencies are
+      # already inside the binary and only OS-provided system
+      # frameworks/libraries are needed at runtime.
+      - name: Stage release artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        working-directory: src/build/windows-release
+        run: |
+          mkdir -p dist
+          cp orcisf_gui.exe gl3w.dll glfw3.dll hpdf.dll libpng16.dll nfd.dll z.dll dist/
+          cp -r icons dist/
+
+      - name: Stage release artifact (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        working-directory: src/build/macos-release
+        run: |
+          mkdir -p dist
+          cp -r orcisf_gui.app dist/
+
+      - name: Stage release artifact (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        working-directory: src/build/linux-release
+        run: |
+          mkdir -p dist
+          cp orcisf_gui dist/
+          cp -r icons dist/
+          chmod +x dist/orcisf_gui
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: orcisf_gui-${{ matrix.preset }}
+          path: src/build/${{ matrix.preset }}/dist
+          if-no-files-found: error
