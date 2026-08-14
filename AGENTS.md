@@ -2508,6 +2508,40 @@ later, different one (e.g. closing an issue or cutting a release).
     `.tar.gz`, which forces the archived permission metadata regardless
     of the source filesystem — see the next bullet for why `chmod`
     alone isn't reliable everywhere).
+  - **Two further node20 sources found after the investigation above,
+    both now fixed (issue #57).** That investigation's blame list was
+    accurate when it ran, but it doesn't cover these:
+    - **`actions/upload-artifact` is node20 at v4 *and* v5 — node24
+      only starts at v6.** The upload step was added *after* the node20
+      audit, so it silently reintroduced a node20 action on all three
+      legs that the audit predates. Now pinned **v7**. Don't "simplify"
+      this back to v4/v5: v5 looks newer than the v4 it replaced but is
+      still node20.
+    - **`seanmiddleditch/gha-setup-ninja@v4` declares node16**, not
+      node20 — a runtime GitHub has already removed from its runners.
+      The audit correctly noted v6 (its latest) is still node20, but the
+      pinned v4 was a generation worse. Rather than trade one deprecated
+      runtime for another, the action was **removed entirely**: ninja now
+      comes from `brew`/`choco` on macOS/Windows (matching what Linux
+      already does with `apt`), which involves no Node runtime at all and
+      drops the unretried release-zip download on those legs too. Each is
+      guarded by a `command -v ninja` check, so it's a no-op when the
+      runner image already ships ninja. **`ilammy/msvc-dev-cmd@v1`
+      remains the only node20 action**, unchanged and Windows-only.
+  - **Compiler warnings are parsed out of the build log and surfaced**
+    (issue #57) — the build is tee'd to `src/build.log`, warnings are
+    grepped in both MSVC (`path(l,c): warning C####:`) and GCC/Clang
+    (`path:l:c: warning:`) formats, filtered to this project's own three
+    targets (dependency/toolchain paths dropped), then emitted as a job
+    summary table plus inline `::warning::` annotations. `/W4` and
+    `-Wall -Wextra` were already enabled long before this; what was
+    missing was anything that *showed* their output, which is exactly how
+    issue #49's ~20 warnings accumulated unnoticed. Warnings are
+    **reported, not fatal** — the workflow-level `ORCISF_WARNINGS_AS_ERRORS`
+    env var flips that in one line, deliberately left `false` until a run
+    establishes the macOS/Linux `-Wall -Wextra` baseline (never reviewed;
+    this project is developed almost entirely on Windows). `PdfExport.cpp`'s
+    C4611 is already scoped-suppressed, so it won't block that flip.
 - **Releases:** GitHub Releases publish prebuilt GUI binaries. The project
   is currently in **alpha** — tags/releases use a `v0.0.x-alpha` scheme
   (first one: `v0.0.1-alpha`). Bump the patch number for each subsequent
@@ -2595,6 +2629,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #54 | feat(src): trash-icon delete/clear buttons (light-red background) with a fixed, non-resizable action column | closed (tester: source-verified, no FAILs; DPI-override screenshot UNVERIFIED this pass -- see AGENTS.md #54 note) | 2026-08-13 |
 | #55 | feat(src): show all 6 per-DOF restraint checkboxes in the Joints table, not one summary checkbox | closed (tester: source-verified, no FAILs; live sync UNVERIFIED this pass -- see AGENTS.md #55 note) | 2026-08-13 |
 | #56 | chore(ci): Linux build-src job fails intermittently on flaky ninja download (ECONNRESET) | closed | 2026-08-13 |
+| #57 | chore(ci): rewrite build-src.yml -- Node 24 actions, apt ninja on Linux, warning detection, artifact upload | ready-for-review (scope reduced: #56's ninja/checkout/artifact work had already landed; see CHANGE_HISTORY 2026-08-14) | 2026-08-14 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

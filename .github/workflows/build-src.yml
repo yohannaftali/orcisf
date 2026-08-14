@@ -11,6 +11,27 @@ on:
       - "src/**"
       - ".github/workflows/build-src.yml"
 
+env:
+  # Issue #57: does a compiler warning from orcisf_gui/orcisf_engine/
+  # orcisf_cli FAIL the build, or is it merely REPORTED?
+  #
+  # "Report only" for now, deliberately. This project is developed almost
+  # entirely on Windows (see AGENTS.md's Validation section), so the
+  # macOS/Linux legs' `-Wall -Wextra` output has never been reviewed
+  # against a real build. Flipping this to true before a run establishes
+  # that baseline would turn CI red on pre-existing warnings nobody has
+  # seen yet. The "Summarise compiler warnings" step still makes every
+  # warning loudly visible on an otherwise green run, which is the actual
+  # gap being closed here.
+  #
+  # Set to "true" to make warnings fatal once a run shows the baseline is
+  # zero on all three legs. Nothing else needs to change.
+  #
+  # Note PdfExport.cpp's C4611 is already scoped-suppressed with
+  # #pragma warning(push/pop) (issue #49), so it won't appear in the
+  # summary or block that flip.
+  ORCISF_WARNINGS_AS_ERRORS: "false"
+
 jobs:
   build:
     strategy:
@@ -51,9 +72,36 @@ jobs:
           echo "CC=cl" >> "$GITHUB_ENV"
           echo "CXX=cl" >> "$GITHUB_ENV"
 
-      - name: Setup Ninja
-        if: runner.os != 'Linux'
-        uses: seanmiddleditch/gha-setup-ninja@v4
+      # Was seanmiddleditch/gha-setup-ninja@v4. AGENTS.md's Node 20
+      # investigation established that this action's *latest* tag (v6) is
+      # still node20, so it can never clear the deprecation warning -- but
+      # the pinned v4 is worse still: its manifest declares **node16**
+      # (read from its raw action.yml), a runtime GitHub has already
+      # removed from its runners. Rather than bump v4 -> v6 to trade one
+      # deprecated runtime for another, ninja now comes from each runner's
+      # own package manager, which involves no Node runtime at all and no
+      # unretried release-zip download (issue #56's ECONNRESET, which only
+      # bit Linux but is the same mechanism here). Skipped outright when
+      # the image already ships ninja, so this usually costs nothing.
+      - name: Setup Ninja (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          if command -v ninja >/dev/null 2>&1; then
+            echo "ninja already on PATH: $(ninja --version)"
+          else
+            brew install ninja
+          fi
+
+      - name: Setup Ninja (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          if command -v ninja >/dev/null 2>&1; then
+            echo "ninja already on PATH: $(ninja --version)"
+          else
+            choco install ninja -y --no-progress
+          fi
 
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
@@ -64,9 +112,74 @@ jobs:
         working-directory: src
         run: cmake --preset ${{ matrix.preset }}
 
+      # Tee'd to a log so the warning summary below can parse it. pipefail
+      # matters here: without it the pipeline's status is tee's (always 0)
+      # and a genuinely failed build would report success.
       - name: Build (${{ matrix.preset }})
         working-directory: src
-        run: cmake --build --preset ${{ matrix.preset }}
+        shell: bash
+        run: |
+          set -o pipefail
+          cmake --build --preset ${{ matrix.preset }} 2>&1 | tee build.log
+
+      # Issue #57: make compiler warnings findable without reading the whole
+      # build log. /W4 and -Wall -Wextra were already enabled on all three
+      # targets long before this step existed -- what was missing was
+      # anything that *surfaced* their output, which is how issue #49's ~20
+      # MSVC warnings accumulated unnoticed. Runs even when the build failed;
+      # a warning is often the clue to why.
+      - name: Summarise compiler warnings
+        if: always()
+        working-directory: src
+        shell: bash
+        run: |
+          LOG=build.log
+          if [ ! -f "$LOG" ]; then
+            echo "No build log produced (build step never ran)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # MSVC:      path(line,col): warning C4244: ...
+          # GCC/Clang: path:line:col: warning: ...
+          # Dependency warnings aren't ours to fix and vcpkg emits many, so
+          # drop anything from a dependency/toolchain path -- this is what
+          # scopes the check to orcisf_gui/orcisf_engine/orcisf_cli.
+          grep -E '(: warning [A-Z]+[0-9]+:|: warning:)' "$LOG" \
+            | grep -viE 'vcpkg|_deps|/usr/include|/Program Files' \
+            | sort -u > warnings.txt || true
+
+          COUNT=$(wc -l < warnings.txt | tr -d '[:space:]')
+
+          {
+            echo "## Compiler warnings -- ${{ matrix.preset }}"
+            echo ""
+            if [ "$COUNT" -eq 0 ]; then
+              echo ":white_check_mark: **No warnings** from \`orcisf_gui\` / \`orcisf_engine\` / \`orcisf_cli\`."
+            else
+              echo ":warning: **$COUNT warning(s)** from this project's own targets."
+              echo ""
+              echo '```'
+              head -n 50 warnings.txt
+              # An `if`, not `[ ] && echo`: GitHub runs `shell: bash` as
+              # `bash -eo pipefail`, so a bare false test returns 1 and
+              # would abort the whole step.
+              if [ "$COUNT" -gt 50 ]; then
+                echo "... and $((COUNT - 50)) more"
+              fi
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Inline annotations too, so warnings show on the run's Checks
+          # view rather than only in the summary tab.
+          head -n 50 warnings.txt | while IFS= read -r line; do
+            echo "::warning::$line"
+          done
+
+          if [ "$COUNT" -gt 0 ] && [ "${ORCISF_WARNINGS_AS_ERRORS}" = "true" ]; then
+            echo "::error::$COUNT compiler warning(s) present and ORCISF_WARNINGS_AS_ERRORS is true."
+            exit 1
+          fi
 
       # First release to ship prebuilt macOS/Linux binaries (previously
       # Windows-only, built locally since this project's usual dev
@@ -106,8 +219,13 @@ jobs:
           cp -r icons dist/
           chmod +x dist/orcisf_gui
 
+      # v7, not v4: `actions/upload-artifact` is still node20 at v4 AND v5
+      # -- node24 only starts at v6 (read from each tag's raw action.yml).
+      # This step was added *after* AGENTS.md's Node 20 investigation ran,
+      # so it silently reintroduced a node20 action on all three legs that
+      # the investigation's blame list predates and doesn't mention.
       - name: Upload release artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: orcisf_gui-${{ matrix.preset }}
           path: src/build/${{ matrix.preset }}/dist

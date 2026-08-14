@@ -3928,3 +3928,68 @@ the shared mechanism.
   `0260ea7`), `AGENTS.md` (new CI-artifact-upload bullet + Releases
   section documents the 3-OS packaging convention and both permission
   gotchas above).
+
+## [2026-08-14] — chore(ci): warning detection + two remaining node20 sources (#57)
+
+**Correction first: issue #57 was filed on a stale local checkout.** Its
+Objective claims "#56's fix never landed" and "the workflow still calls
+gha-setup-ninja on all three legs" -- that was wrong. Local `main` was 6
+commits behind `origin/main`, and `git log` against that stale tree showed
+the workflow's last commit predating #56. In reality `f1c24b4` (apt ninja
+on Linux), `88be7cd` (checkout v4 -> v7), and `0260ea7` (artifact staging
++ upload) had all already landed. The lesson is mechanical and worth
+keeping: **`git fetch` before diagnosing "X never landed" from `git log`** --
+a stale tree makes an absent commit indistinguishable from an unpushed one.
+
+With that corrected, most of #57's scope was already done. What genuinely
+remained, and what this change does:
+
+- **Compiler warning detection (the real gap, entirely absent).** The build
+  is now tee'd to `src/build.log` and a `Summarise compiler warnings` step
+  greps it for both MSVC (`path(l,c): warning C####:`) and GCC/Clang
+  (`path:l:c: warning:`) formats, filters out dependency/toolchain paths so
+  only orcisf_gui/orcisf_engine/orcisf_cli remain, and emits a job-summary
+  table plus inline `::warning::` annotations. `/W4` and `-Wall -Wextra`
+  were already on; nothing ever surfaced their output, which is precisely
+  how issue #49's ~20 warnings accumulated unnoticed. Report-only behind a
+  workflow-level `ORCISF_WARNINGS_AS_ERRORS` flag -- deliberately `false`
+  until a run establishes the macOS/Linux baseline, which has never been
+  reviewed (Windows-only development). PdfExport.cpp's C4611 is already
+  scoped-suppressed from #49, so it won't block flipping that later.
+- **`actions/upload-artifact@v4` -> `@v7`.** v4 *and* v5 are node20; node24
+  only starts at v6 (read from each tag's raw `action.yml`). The upload step
+  was added *after* AGENTS.md's node20 investigation ran, so it silently
+  reintroduced a node20 action on all three legs that the investigation's
+  blame list predates and doesn't mention.
+- **`seanmiddleditch/gha-setup-ninja@v4` removed entirely.** The prior
+  investigation correctly found v6 (latest) is still node20; it didn't note
+  that the *pinned* v4 declares **node16**, a runtime GitHub has already
+  removed from its runners. Rather than trade one deprecated runtime for
+  another, macOS/Windows now get ninja from `brew`/`choco` (mirroring
+  Linux's `apt`), each guarded by a `command -v ninja` check so it no-ops
+  when the image already ships it. No Node runtime, and no unretried
+  release-zip download on those legs either. `ilammy/msvc-dev-cmd@v1` is now
+  the only node20 action left, as before.
+
+**Two changes from the first draft were deliberately dropped after reading
+the prior work**, because both would have reverted documented,
+evidence-based decisions:
+- Tarring the Linux/macOS artifacts in CI to preserve the exec bit --
+  already known and deliberately handled at the *release repackaging* stage
+  (`tar --mode=755`), verified there against a really-downloaded artifact.
+- Globbing `*.dll` instead of the hardcoded 6 Windows DLL names -- that list
+  was confirmed against a real build output directory, not guessed.
+
+**Validation**: YAML parses; all 10 `run:` blocks pass `bash -n`; file is
+pure LF/ASCII. The warning parser was exercised against a synthetic log
+mixing MSVC + GCC warnings with vcpkg/`/usr/include` noise (correctly kept
+4, dropped 3) and against a clean log (0 warnings, and confirmed it does
+not abort under `bash -eo pipefail` when grep matches nothing -- the `||
+true` is load-bearing). Two `set -e` bugs were caught and fixed before
+commit: a bare `[ "$COUNT" -gt 50 ] && echo` aborts the step whenever the
+test is false, and an unmatched `cp *.dll` glob aborts before its own
+diagnostic. **Not yet run on real CI** -- the three legs, the warning
+summary's real output, and whether Windows/macOS still show a node20
+annotation all need a live run.
+
+- Files: `.github/workflows/build-src.yml`, `AGENTS.md`, `CHANGE_HISTORY.md`
