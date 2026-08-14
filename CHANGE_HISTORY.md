@@ -3988,8 +3988,25 @@ not abort under `bash -eo pipefail` when grep matches nothing -- the `||
 true` is load-bearing). Two `set -e` bugs were caught and fixed before
 commit: a bare `[ "$COUNT" -gt 50 ] && echo` aborts the step whenever the
 test is false, and an unmatched `cp *.dll` glob aborts before its own
-diagnostic. **Not yet run on real CI** -- the three legs, the warning
-summary's real output, and whether Windows/macOS still show a node20
-annotation all need a live run.
+diagnostic.
+
+**Confirmed on real CI** (run 31771821558, commit `d23c3c7`, all three legs
+green):
+- **The compiler-warning baseline is ZERO on all three legs.** Every leg's
+  summary reported "No warnings" from orcisf_gui/orcisf_engine/orcisf_cli.
+  This is the exact precondition the `ORCISF_WARNINGS_AS_ERRORS` comment
+  names for flipping it to `true` -- the macOS/Linux `-Wall -Wextra` output
+  that had never been reviewed turns out to be clean.
+- **Node 20 annotations are gone from macOS and Linux entirely**, and
+  Windows now names only `ilammy/msvc-dev-cmd@v1` ("...being forced to run
+  on Node.js 24: ilammy/msvc-dev-cmd@v1"). Before this change the blame
+  lists were Windows: `checkout@v4, msvc-dev-cmd@v1, gha-setup-ninja@v4`;
+  macOS: `checkout@v4, gha-setup-ninja@v4`; Linux: `checkout@v4`.
+- **Both Windows and macOS runners already ship ninja 1.13.2** -- the
+  `command -v ninja` guard short-circuited, so neither `choco` nor `brew`
+  ever ran. `gha-setup-ninja` had been downloading a redundant copy on
+  every run of both legs; Linux installed `ninja-build` from apt as
+  intended. Net effect: no leg downloads ninja over the network any more.
+- Artifact upload succeeded on all three legs via `upload-artifact@v7`.
 
 - Files: `.github/workflows/build-src.yml`, `AGENTS.md`, `CHANGE_HISTORY.md`
