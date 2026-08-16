@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string>
 
+#include "engine/AnalysisResults.h"
 #include "engine/Engine.h"
 #include "engine/MemberResults.h"
 #include "engine/StructuralAnalysis.h"
@@ -65,7 +66,7 @@ int CmdEquilibrium(const std::string& dataset) {
     // already folded column self-weight into) plus the resultant of every
     // beam's distributed self-weight/applied load (W) must balance the sum
     // of support reactions.
-    double sum_AJ = 0.0, sum_beam_resultant = 0.0, sum_reactions = 0.0;
+    double sum_AJ = 0.0, sum_beam_resultant = 0.0;
     for (int j = 1; j <= sd.NJ; ++j) {
         sum_AJ += sd.AJ[6 * j - 4]; // arah 2 = Y
     }
@@ -75,9 +76,9 @@ int CmdEquilibrium(const std::string& dataset) {
             sum_beam_resultant += -static_cast<double>(sd.W[i]) * sd.EL[i]; // W acts downward (-Y)
         }
     }
-    for (int j = 1; j <= sd.NJ; ++j) {
-        sum_reactions += sd.AR[6 * j - 4];
-    }
+    // issue #59: reactions now read via AnalysisResults::TotalReaction()
+    // instead of a second, independent AR summation loop.
+    double sum_reactions = ComputeAnalysisResults(sd).TotalReaction(1); // arah 2 = Y
 
     double applied_total = sum_AJ + sum_beam_resultant;
     std::cout << "Sum applied load, arah Y (joint AJ + beam self-weight resultant): " << applied_total << "\n";
@@ -155,6 +156,27 @@ int CmdOptimize(const std::string& dataset, float harga_beton, float harga_besi,
         }
         std::cout << "\n";
     }
+
+    // issue #59: cross-check the new AnalysisResults accessor against the
+    // .str file WriteFinalResults() just wrote for this same run -- both
+    // read the identical "frozen slot" sd.AM/DJ/AR state (WriteFinalResults
+    // was called inside RunFullOptimization() above; no Struktur() call has
+    // happened since), so these should match the .str file's own numbers
+    // exactly (see engine/README.md's "Deliberate deviations").
+    std::cout << "ANALYSIS_RESULTS\n";
+    AnalysisResults analysis = ComputeAnalysisResults(sd);
+    for (const MemberForces& f : analysis.member_forces) {
+        std::cout << "batang=" << f.no_batang << " A(N=" << f.axial_a << ",Vy=" << f.shear_y_a
+                   << ",Vz=" << f.shear_z_a << ",T=" << f.torsion_a << ",My=" << f.moment_y_a
+                   << ",Mz=" << f.moment_z_a << ") B(N=" << f.axial_b << ",Vy=" << f.shear_y_b
+                   << ",Vz=" << f.shear_z_b << ",T=" << f.torsion_b << ",My=" << f.moment_y_b
+                   << ",Mz=" << f.moment_z_b << ")\n";
+    }
+    for (const JointReaction& r : analysis.reactions) {
+        std::cout << "reaksi joint=" << r.no_joint << " Fx=" << r.fx << " Fy=" << r.fy << " Fz=" << r.fz
+                   << " Mx=" << r.mx << " My=" << r.my << " Mz=" << r.mz << "\n";
+    }
+    std::cout << "Total reaksi arah Y: " << analysis.TotalReaction(1) << "\n";
     return 0;
 }
 

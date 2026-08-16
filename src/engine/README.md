@@ -30,6 +30,7 @@ engine/
 | `LegacyIO.{h,cpp}` | `InOut.hpp` (read half), `Pembebanan.hpp` (read half), `CETAK.HPP` | Reads the legacy `.inp/.isd/.idl/.ijl/.ids/.ijs/.bbn` format exactly (plain whitespace-token ASCII); writes `.opt/.str/.kdl/.inf` reproducing `cetak_akhir()`, including its specific choice of which population slot's geometry the `.str` section reflects (see the function's header comment). |
 | `Engine.{h,cpp}` | -- (new) | Facade: `RunFullOptimization()` / `LoadDatasetForViewing()`. Also writes the new detailed per-generation log (`<generic>.log.txt`, superset of `.his`). |
 | `Discretization.h` | `Diskritisasi.hpp` | `konversi()` → `Konversi()` — see the file's comment for why this isn't just `std::round`. |
+| `AnalysisResults.{h,cpp}` | -- (new, issue #59) | `ComputeAnalysisResults()`: captures `sd.AM`/`DJ`/`AR` (member end forces, joint displacements, support reactions) into GUI-friendly structs, for epic #58's results-visualization work. Reads the same "frozen slot" state `WriteFinalResults()`'s `.str` section already does -- see this file's own header comment and the "Deliberate deviations" section below before assuming it reflects the best (JSTD-1) structure. |
 
 ## Deliberate deviations from the legacy source (and why)
 
@@ -149,6 +150,20 @@ bit-reproducible anyway, per point 2 above), so validation targets what
 4. **Output files are well-formed**, matching the legacy `.opt`/`.kdl`
    layout (per-member dimensions, reinforcement, cost, and constraint
    breakdown) — see `LegacyIO.cpp`.
+
+**Issue #59 (`ComputeAnalysisResults()`) was verified against a real run.**
+`orcisf_cli optimize`'s new `ANALYSIS_RESULTS` section (member end forces +
+support reactions) was diffed against the same run's freshly-written
+`.str` file (`WriteStrukturSection()`'s "Gaya Ujung Batang"/"Reaksi
+Tumpuan" tables) for a scratch copy of `Apl1-1`: member 1's 12 end-force
+components and joint 1's 6 reaction components matched value-for-value
+(e.g. `AM` row `1  217200  -25960.2  24383.2  -0.987471  -40453.9
+-43050.6  -217200  25960.2  -24383.2  0.987471  -81462  -86750.2` vs.
+`ComputeAnalysisResults()`'s `A(N=217200,Vy=-25960.2,...) B(N=-217200,
+...,Mz=-86750.2)` for the same member). Also re-ran `orcisf_cli
+equilibrium` (unchanged residual, ~0) after refactoring its reaction sum
+to call `AnalysisResults::TotalReaction(1)` instead of its own
+independent `AR` loop, confirming the refactor didn't change behavior.
 
 **Issue #16 (re-optimize from last best) was empirically verified** with a
 standalone scratch program (not checked in) linking directly against

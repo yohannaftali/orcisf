@@ -2133,6 +2133,39 @@ things every future agent touching it must know:
   regression (same 0.015625 residual as before); GUI smoke-tested (Add
   Joint, restraint label) with no crash.
 
+**`engine::AnalysisResults`/`ComputeAnalysisResults()` (issue #59, part of
+epic #58 -- FE results visualization) — read before building #60/#61/#62
+on top of it, or assuming these numbers are "for the final structure":**
+- **This reads the same "frozen slot" `sd.AM`/`DJ`/`AR` state
+  `WriteFinalResults()`'s `.str` section already reads** (see this
+  file's own header comment and `engine/README.md`'s "Deliberate
+  deviations") — for a completed optimization run, that is whichever
+  population candidate was *last evaluated* during the search, not
+  necessarily the best (`JSTD-1`) structure. **Do not "fix" this by
+  re-running `Struktur()` for slot `JSTD-1` inside
+  `ComputeAnalysisResults()`** — that would make its numbers *diverge*
+  from `ComputeMemberResults()`'s own force-derived fields
+  (`MU`/`FMU`/`axial_demand`/...), which already carry this exact same
+  characteristic (they trace back to the same `Hasil()`-computed
+  `MLAP`/`MTUM_KI`/`PK`/`MKX`/`MKY`). Matching the existing GUI's numbers
+  is more important than "fixing" a documented, accepted legacy quirk in
+  only the new code path.
+- **`orcisf_cli`'s `equilibrium` command now calls
+  `AnalysisResults::TotalReaction(1)`** instead of an independent `AR`
+  summation loop — one code path reads "the reactions" now, not two that
+  could drift apart. `orcisf_cli optimize` also gained an
+  `ANALYSIS_RESULTS` output section (member end forces + reactions) as a
+  standing validation hook, matching the existing `MEMBER_RESULTS`
+  section's pattern.
+- **Verification status:** compiled cleanly (zero warnings). Cross-checked
+  against a real run: `orcisf_cli optimize`'s new `ANALYSIS_RESULTS`
+  section matched the same run's freshly-written `.str` file's "Gaya
+  Ujung Batang"/"Reaksi Tumpuan" tables value-for-value (member 1's 12
+  end-force components, joint 1's 6 reaction components); `orcisf_cli
+  equilibrium`'s residual is unchanged (~0) after the `TotalReaction()`
+  refactor (details: `engine/README.md`'s Validation section,
+  `CHANGE_HISTORY.md` 2026-08-16).
+
 ---
 
 ## Program Architecture (`Optimasi Beton/Source/`)
@@ -2631,7 +2664,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #56 | chore(ci): Linux build-src job fails intermittently on flaky ninja download (ECONNRESET) | closed | 2026-08-13 |
 | #57 | chore(ci): rewrite build-src.yml -- Node 24 actions, apt ninja on Linux, warning detection, artifact upload | closed | 2026-08-16 |
 | #58 | epic(src): FE analysis results visualization (deformed shape, force diagrams, tables) | open | 2026-08-16 |
-| #59 | feat(engine): expose joint displacements, member end forces, and support reactions for GUI consumption | open | 2026-08-16 |
+| #59 | feat(engine): expose joint displacements, member end forces, and support reactions for GUI consumption | ready-for-review (implemented + verified against a real run overnight, see CHANGE_HISTORY 2026-08-16) | 2026-08-16 |
 | #60 | feat(gui): deformed-shape overlay in the 3D viewport | open | 2026-08-16 |
 | #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | open | 2026-08-16 |
 | #62 | feat(gui): joint displacement / member force / reaction tables + global equilibrium check | open | 2026-08-16 |

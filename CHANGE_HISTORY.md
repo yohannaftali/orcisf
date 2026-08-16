@@ -4063,3 +4063,56 @@ introducing this project's first right-click context menu.
 
 No duplicate found in `CHANGE_HISTORY.md`/open issues before filing.
 - Files: `AGENTS.md`
+
+## [2026-08-16] — feat(engine): expose analysis results for GUI (#59)
+
+First of epic #58's 4 sub-issues, implemented autonomously overnight per
+the user's explicit instruction (`/coder`, "resolve all... without asking
+anything... merge and push tonight without my confirmation").
+
+New `engine::AnalysisResults`/`ComputeAnalysisResults()`
+(`src/engine/include/engine/AnalysisResults.h` + `src/AnalysisResults.cpp`,
+registered in `CMakeLists.txt`) captures `StructureData::AM`/`DJ`/`AR`
+(member end forces, joint displacements, support reactions -- already
+computed by `Hasil()`, never previously exposed outside the `.str` text
+file) into GUI-friendly `MemberForces`/`JointDisplacement`/`JointReaction`
+structs. `JointReaction`s are limited to restrained joints via
+`engine::ComputeRestraintSummary()` (issue #11), not re-derived inline.
+
+**A design subtlety discovered during implementation, not anticipated
+when #59 was filed**: `WriteFinalResults()`'s `.str` section (and by
+extension `sd.AM`/`DJ`/`AR` themselves) reflect whichever population
+candidate was *last evaluated* during the optimizer search, not
+necessarily the best (`JSTD-1`) structure -- a documented, deliberate
+legacy characteristic (`engine/README.md`'s "Deliberate deviations").
+`ComputeMemberResults()`'s own force-derived fields (`MU`/`FMU`/
+`axial_demand`/...) already carry this same characteristic. Decision:
+`ComputeAnalysisResults()` reads the frozen-slot state as-is rather than
+re-running `Struktur()` for slot `JSTD-1` -- re-running it would make the
+new function's numbers *disagree* with what PropertiesPanel/
+DetailingPanel/PDF export already display for the same run, which is a
+worse outcome than preserving the existing (accepted) legacy quirk in one
+more place. Documented in both the header comment and AGENTS.md so #60/
+#61/#62 build on this understanding rather than rediscovering it.
+
+`orcisf_cli`'s `equilibrium` command was refactored to call
+`AnalysisResults::TotalReaction(1)` instead of its own independent `AR`
+summation loop (one source of truth for "the reactions" now); `optimize`
+gained a new `ANALYSIS_RESULTS` output section (member end forces +
+reactions), both matching the existing `MEMBER_RESULTS` pattern and
+doubling as a standing validation hook.
+
+**Validation**: `src/build.ps1` (windows-release preset) built
+`orcisf_engine`/`orcisf_cli`/`orcisf_gui` cleanly, zero warnings.
+`orcisf_cli equilibrium` against a scratch `Example/Apl1-1` copy: residual
+unchanged (~0) after the refactor. `orcisf_cli optimize` (same scratch
+copy, `iter_mak=20`, `rng_seed=12345`) diffed against its own
+freshly-written `.str` file: member 1's 12 end-force components and
+joint 1's 6 reaction components matched value-for-value. Full narrative
+in `src/engine/README.md`'s Validation section.
+
+- Issue #59 addressed on GitHub (not yet closed -- left for tomorrow's
+  `tester`/`reviewer` pass per this project's normal workflow)
+- Files: `src/engine/include/engine/AnalysisResults.h`,
+  `src/engine/src/AnalysisResults.cpp`, `src/engine/CMakeLists.txt`,
+  `src/engine/tools/orcisf_cli.cpp`, `src/engine/README.md`, `AGENTS.md`
