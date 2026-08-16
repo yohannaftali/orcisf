@@ -4010,3 +4010,56 @@ green):
 - Artifact upload succeeded on all three legs via `upload-artifact@v7`.
 
 - Files: `.github/workflows/build-src.yml`, `AGENTS.md`, `CHANGE_HISTORY.md`
+
+## [2026-08-16] — chore(docs): reconcile tracked-issue status for #51/#57
+
+`/planner`'s Step 1B status sync found `AGENTS.md`'s Tracked Issues table
+still showing #51 and #57 as `ready-for-review`, while the GitHub API
+reports both `closed` (#51 on 2026-08-13T07:22:49Z, #57 on
+2026-08-14T05:03:58Z -- both dates already consistent with this file's own
+narrative entries for those issues, just never reflected back into the
+table). Updated both rows' Status/Last Checked columns; no code change.
+- Files: `AGENTS.md`
+
+## [2026-08-16] — epic(src): FE analysis results visualization (#58-#62)
+
+Filed via `/planner` from a user request describing SAP2000/ETABS-style
+results visualization (deformed shape, N/V/M/T diagrams, joint
+displacement/reaction tables, click-to-inspect, global equilibrium
+check). Grounded against the actual ported engine rather than filed
+verbatim: `StructureData::AM` (member end forces, local axes, 12
+values/member), `DJ` (joint displacements), and `AR` (support reactions)
+are already computed by `Hasil()` after every `Struktur()` call (see
+issue #42's `kMaxDof` note) but nothing currently exposes them to the
+GUI -- this is new GUI-facing plumbing/rendering over existing results,
+not new analysis math.
+
+Filed as an epic (**#58**) + 4 independently implementable sub-issues,
+following the #1/#13/#20 pattern:
+- **#59** -- engine: expose `AM`/`DJ`/`AR` via a new result type (the
+  dependency every other sub-issue needs).
+- **#60** -- gui: deformed-shape viewport overlay with an adjustable
+  scale factor.
+- **#61** -- gui: N/V/M/T force diagrams per member (computed
+  analytically from end forces + `W`, since the legacy `.bbn` format only
+  ever supports a uniform member load + joint actions -- no arbitrary
+  point load requires a separate mechanism) with click-to-inspect station
+  values and extreme-fiber stress.
+- **#62** -- gui: joint displacement / member force / reaction tables
+  (via issue #52's `TableView`) + a visible total-reactions-vs-applied-
+  load equilibrium check + CSV export.
+
+Two scope corrections made explicit in the epic body before filing
+children, so they don't get silently over-implemented or under-delivered
+later: **"load combinations" are out of scope** (the engine solves one
+combined load case per run, no multi-combination system exists anywhere
+in this port); **"stress distribution" is scoped to frame-member
+extreme-fiber stress** (`sigma = N/AX +- M/S`), not a continuum/shell
+stress field (ORCISF has no shell/solid elements to contour). Also:
+**right-click was translated to click-to-inspect**, matching this
+codebase's existing (and only) picking interaction convention
+(`ViewportPanel::PickMember()`/`PickJoint()`, issue #5) rather than
+introducing this project's first right-click context menu.
+
+No duplicate found in `CHANGE_HISTORY.md`/open issues before filing.
+- Files: `AGENTS.md`
