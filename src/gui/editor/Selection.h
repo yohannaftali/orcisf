@@ -73,6 +73,15 @@ struct EditorOptions {
     float plane_offset_xy = 0.f; // XY plane's Z
     float plane_offset_xz = 0.f; // XZ plane's Y
     float plane_offset_yz = 0.f; // YZ plane's X
+
+    // Issue #60: deformed-shape overlay (epic #58). Only takes effect
+    // when the loaded scene actually has analysis results (SceneModel::
+    // has_deformation) -- see ViewportPanel::Draw's overlay control,
+    // which disables the toggle otherwise rather than silently ignoring
+    // it. Scale exaggerates real (millimeter-to-centimeter-scale)
+    // structural displacements so they're visible at building scale.
+    bool show_deformed_shape = false;
+    float deformation_scale = 50.f;
 };
 
 } // namespace orcisf::gui

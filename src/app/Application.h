@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "app/CustomTitleBar.h"
+#include "engine/AnalysisResults.h"
 #include "engine/MemberResults.h"
 #include "gui/DetailingPanel.h"
 #include "gui/IconToolbar.h"
@@ -63,9 +64,11 @@ private:
     // Common load path for both OnOpenFolderRequested (view-only, no
     // results yet) and OnRunResult (results available): replaces
     // loaded_sd_, resets selection/undo/editor state, and rebuilds
-    // scene_/validation_issues_.
+    // scene_/validation_issues_. `analysis` (issue #60), if non-null,
+    // must be the AnalysisResults computed from the *same* sd `results`
+    // came from -- feeds SceneModel's deformed-shape data.
     void LoadStructure(engine::StructureData sd, const std::vector<engine::MemberResult>* results,
-                        std::string dataset_path);
+                        std::string dataset_path, const engine::AnalysisResults* analysis = nullptr);
 
     // Rebuilds scene_ + validation_issues_ from the current loaded_sd_ --
     // called after every edit. Any edit invalidates previously-computed
@@ -110,6 +113,13 @@ private:
     // it (which would also mutate loaded_sd_'s scratch fields again).
     bool has_run_results_ = false;
     std::vector<engine::MemberResult> current_results_;
+
+    // Issue #60: raw analysis results (member end forces, joint
+    // displacements/reactions) for the same run current_results_ was
+    // computed from -- the deformed-shape overlay's source data. Cleared
+    // (default-constructed, empty) whenever has_run_results_ goes false,
+    // same lifetime as current_results_.
+    engine::AnalysisResults current_analysis_;
 
     // Issue #25: the generic path the *most recent completed run* actually
     // wrote its .opt/.str/.kdl/.inf/.his/.log.txt to (a fresh timestamped

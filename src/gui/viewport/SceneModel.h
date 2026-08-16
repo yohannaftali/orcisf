@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "engine/AnalysisResults.h"
 #include "engine/MemberResults.h"
 #include "engine/StructureData.h"
 #include "gui/viewport/Math3D.h"
@@ -23,12 +24,24 @@ struct MemberVisual {
     bool has_results = false;  // false = geometry-only (no analysis/design run yet)
     float kendala = 0.f;       // 0 = every check satisfied; >0 = violated (see MemberResult::Kendala)
     engine::MemberResult result; // valid iff has_results
+
+    // Issue #60: this member's two endpoints' translational displacement
+    // (meters, unscaled -- SceneRenderer applies the user's live scale
+    // factor at draw time, not here), from engine::AnalysisResults.
+    // {0,0,0} when no analysis result was supplied to BuildSceneModel().
+    math3d::Vec3 disp_a{0.f, 0.f, 0.f}, disp_b{0.f, 0.f, 0.f};
 };
 
 struct JointVisual {
     int no_joint = 0;
     math3d::Vec3 pos;
     bool restrained = false;
+
+    // Issue #60: this joint's translational displacement (meters,
+    // unscaled), from engine::AnalysisResults. Rotational DOFs aren't
+    // represented -- linear joint-to-joint interpolation only, matching
+    // this renderer's existing schematic (non-rotated) member geometry.
+    math3d::Vec3 displacement_m{0.f, 0.f, 0.f};
 };
 
 // Issue #7: a member's uniform distributed load, present only for members
@@ -59,6 +72,12 @@ struct SceneModel {
     math3d::Vec3 bounds_center{0.f, 0.f, 0.f};
     float bounds_radius = 1.f;
 
+    // Issue #60: true iff BuildSceneModel() was given a non-null
+    // AnalysisResults -- gates the deformed-shape overlay (and any other
+    // future analysis-result-dependent view) the same way `has_results`
+    // gates each MemberVisual's design-result display.
+    bool has_deformation = false;
+
     bool Empty() const { return members.empty() && joints.empty(); }
 };
 
@@ -76,9 +95,13 @@ struct SceneModel {
 // MemberVisual::is_beam so the viewport/Properties/Detailing panels agree
 // with what the Members panel's dropdown shows -- purely a display choice,
 // never fed into engine::StructuralAnalysis/Optimizer (see EditableStructure.h).
+// `analysis`, if non-null (issue #60, from engine::ComputeAnalysisResults),
+// fills each MemberVisual/JointVisual's displacement_m for the deformed-
+// shape overlay -- same "same run, same sd" precondition as `results`.
 SceneModel BuildSceneModel(const engine::StructureData& sd, const std::vector<engine::MemberResult>* results,
                             std::string dataset_path,
-                            const std::array<int, engine::kMak>* type_overrides = nullptr);
+                            const std::array<int, engine::kMak>* type_overrides = nullptr,
+                            const engine::AnalysisResults* analysis = nullptr);
 
 // Returns the no_batang of the member whose centerline is closest to the
 // ray (world-space origin/direction, direction must be normalized), or -1

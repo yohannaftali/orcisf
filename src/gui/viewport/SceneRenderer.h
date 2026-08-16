@@ -21,8 +21,13 @@ public:
     // Renders `scene` from `camera` into an internal width x height
     // framebuffer (recreated on resize) and returns its color texture's
     // OpenGL id, ready for ImGui::Image. `selected_member` (no_batang, or
-    // -1) is drawn with a highlight outline color.
-    unsigned int Render(const SceneModel& scene, const Camera& camera, int width, int height, int selected_member);
+    // -1) is drawn with a highlight outline color. Issue #60:
+    // `show_deformed_shape` (only meaningful when `scene.has_deformation`
+    // -- caller gates this, see ViewportPanel::Draw) overlays a
+    // `deformation_scale`-exaggerated deformed shape alongside the
+    // (always-drawn) undeformed structure.
+    unsigned int Render(const SceneModel& scene, const Camera& camera, int width, int height, int selected_member,
+                         bool show_deformed_shape, float deformation_scale);
 
 private:
     void EnsureGLObjects();
@@ -41,6 +46,13 @@ private:
     // ComputeGroundGridLayout() (SceneModel.h) so the X{i}/Z{i} text labels
     // ViewportPanel draws separately agree exactly with where these lines are.
     void DrawGrid(const SceneModel& scene, const float* view_proj);
+    // Issue #60: deformed-shape overlay -- thin lines (DrawBox, same
+    // "line = thin box" idiom as DrawGrid) between each member's
+    // scale-exaggerated displaced endpoints, plus a small cube marker at
+    // each displaced joint. Drawn on top of (not replacing) the normal
+    // undeformed structure already drawn in Render(), in a color used
+    // nowhere else in this renderer so it always reads as overlay data.
+    void DrawDeformedShape(const SceneModel& scene, float scale, const float* view_proj);
 
     bool gl_objects_ready_ = false;
     unsigned int shader_program_ = 0;

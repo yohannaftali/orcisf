@@ -411,8 +411,9 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
     }
     camera_.SetViewPlane(options.view_plane, active_offset);
 
-    unsigned int texture = renderer_.Render(
-        scene, camera_, width, height, selection.kind == SelectionKind::Member ? selection.id : -1);
+    unsigned int texture =
+        renderer_.Render(scene, camera_, width, height, selection.kind == SelectionKind::Member ? selection.id : -1,
+                          options.show_deformed_shape, options.deformation_scale);
     ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(texture)), avail, ImVec2(0, 1), ImVec2(1, 0));
 
     ImVec2 image_min = ImGui::GetItemRectMin();
@@ -535,19 +536,67 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
         }
     }
 
+    // Issue #60: deformed-shape overlay toggle + scale slider, top-left
+    // corner (bottom-left is already the UCS icon + plane-offset control,
+    // #23/#24). Same technique as that overlay: real ImGui widgets (not
+    // GetForegroundDrawList() -- see issue #51's compositing-layer
+    // lesson), positioned with SetCursorScreenPos within this same
+    // "Viewport" window so they draw on top of the already-submitted
+    // Image() and naturally win input priority over it at that screen
+    // position.
+    bool deform_overlay_capturing = false;
+    {
+        const float control_width = Scaled(168.f);
+        const float gap = Scaled(4.f);
+        const float text_h = ImGui::GetTextLineHeight();
+        const float frame_h = ImGui::GetFrameHeight();
+        ImVec2 pos(image_min.x + Scaled(8.f), image_min.y + Scaled(8.f));
+        const float checkbox_y = pos.y + text_h + gap;
+        const float slider_y = checkbox_y + frame_h + gap;
+
+        ImDrawList* fg = ImGui::GetForegroundDrawList();
+        ImVec2 bg_min(pos.x - Scaled(6.f), pos.y - gap);
+        ImVec2 bg_max(pos.x + control_width + Scaled(6.f), slider_y + frame_h + gap);
+        fg->AddRectFilled(bg_min, bg_max, IM_COL32(20, 20, 24, 200), Scaled(4.f));
+
+        ImGui::SetCursorScreenPos(pos);
+        ImGui::PushID("deformed_shape_overlay");
+        ImGui::TextColored(ImVec4(0.30f, 0.95f, 0.95f, 1.f), "Deformed Shape");
+
+        // Issue #60 AC: disabled (with a tooltip explaining why) rather
+        // than silently no-op'd when the loaded scene has no analysis
+        // results yet -- same reasoning RunPanel/PDF export already gate
+        // on has_run_results_ for (issues #9/#25).
+        ImGui::BeginDisabled(!scene.has_deformation);
+        ImGui::SetCursorScreenPos(ImVec2(pos.x, checkbox_y));
+        ImGui::Checkbox("Show##deformed_toggle", &options.show_deformed_shape);
+        if (!scene.has_deformation && ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Run an optimization first to compute displacement results.");
+        }
+        deform_overlay_capturing |= ImGui::IsItemHovered() || ImGui::IsItemActive();
+        ImGui::SetCursorScreenPos(ImVec2(pos.x, slider_y));
+        ImGui::SetNextItemWidth(control_width);
+        ImGui::SliderFloat("##deformed_scale", &options.deformation_scale, 1.f, 500.f, "x%.0f");
+        deform_overlay_capturing |= ImGui::IsItemHovered() || ImGui::IsItemActive();
+        ImGui::EndDisabled();
+        ImGui::PopID();
+    }
+
     DrawGizmo(scene, selection, editable, undo, options, on_geometry_changed, image_min.x, image_min.y,
               image_size.x, image_size.y);
     bool gizmo_capturing = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
 
-    // Issue #24: also gate on !offset_overlay_capturing so a click/drag
-    // that starts on the plane-offset overlay (which sits on top of the
-    // image at that screen position) never starts an orbit/pan -- see the
-    // overlay's own comment above for why `hovered` alone can't tell.
-    if (hovered && !gizmo_capturing && !offset_overlay_capturing && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+    // Issue #24/#60: also gate on !offset_overlay_capturing /
+    // !deform_overlay_capturing so a click/drag that starts on either
+    // top-of-image overlay never starts an orbit/pan -- see those
+    // overlays' own comments above for why `hovered` alone can't tell.
+    if (hovered && !gizmo_capturing && !offset_overlay_capturing && !deform_overlay_capturing &&
+        ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         orbiting_ = true;
         drag_pixels_ = 0.f;
     }
-    if (hovered && !gizmo_capturing && !offset_overlay_capturing && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+    if (hovered && !gizmo_capturing && !offset_overlay_capturing && !deform_overlay_capturing &&
+        ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
         panning_ = true;
     }
 
@@ -578,7 +627,8 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
             panning_ = false;
         }
     }
-    if (hovered && !gizmo_capturing && !offset_overlay_capturing && io.MouseWheel != 0.f) {
+    if (hovered && !gizmo_capturing && !offset_overlay_capturing && !deform_overlay_capturing &&
+        io.MouseWheel != 0.f) {
         camera_.Zoom(io.MouseWheel);
     }
 

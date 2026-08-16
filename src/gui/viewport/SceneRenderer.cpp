@@ -287,8 +287,28 @@ void SceneRenderer::DrawGrid(const SceneModel& scene, const float* view_proj) {
     }
 }
 
+// Issue #60: bright cyan, used nowhere else in this renderer's palette
+// (grid = dark cobalt, restrained joints = orange, selection highlight =
+// gold, loads = red/green/blue/purple) -- see AGENTS.md's viewport-color
+// cross-check note.
+void SceneRenderer::DrawDeformedShape(const SceneModel& scene, float scale, const float* view_proj) {
+    static constexpr float kDeformedColor[4] = {0.30f, 0.95f, 0.95f, 1.f};
+    constexpr float kLineThickness = 0.025f; // meters -- thinner than a real member, reads as an overlay
+    constexpr float kJointMarkerSize = 0.05f;
+
+    for (const MemberVisual& mv : scene.members) {
+        Vec3 da = mv.a + mv.disp_a * scale;
+        Vec3 db = mv.b + mv.disp_b * scale;
+        DrawBox(da, db, kLineThickness, kLineThickness, kDeformedColor, view_proj);
+    }
+    for (const JointVisual& jv : scene.joints) {
+        Vec3 dp = jv.pos + jv.displacement_m * scale;
+        DrawCube(dp, kJointMarkerSize, kDeformedColor, view_proj);
+    }
+}
+
 unsigned int SceneRenderer::Render(const SceneModel& scene, const Camera& camera, int width, int height,
-                                    int selected_member) {
+                                    int selected_member, bool show_deformed_shape, float deformation_scale) {
     EnsureGLObjects();
     EnsureFramebuffer(width, height);
 
@@ -342,6 +362,10 @@ unsigned int SceneRenderer::Render(const SceneModel& scene, const Camera& camera
     }
 
     DrawLoads(scene, view_proj.m);
+
+    if (show_deformed_shape && scene.has_deformation) {
+        DrawDeformedShape(scene, deformation_scale, view_proj.m);
+    }
 
     glBindVertexArray(0);
     glUseProgram(0);

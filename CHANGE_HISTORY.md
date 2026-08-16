@@ -4116,3 +4116,62 @@ in `src/engine/README.md`'s Validation section.
 - Files: `src/engine/include/engine/AnalysisResults.h`,
   `src/engine/src/AnalysisResults.cpp`, `src/engine/CMakeLists.txt`,
   `src/engine/tools/orcisf_cli.cpp`, `src/engine/README.md`, `AGENTS.md`
+
+## [2026-08-16] — feat(gui): deformed-shape viewport overlay (#60)
+
+Second of epic #58's 4 sub-issues, implemented autonomously overnight
+(same `/coder` session as #59).
+
+`SceneModel::has_deformation` + `MemberVisual::disp_a`/`disp_b` +
+`JointVisual::displacement_m` (raw, unscaled meters) are populated by a
+new optional 5th `BuildSceneModel()` parameter, `const
+engine::AnalysisResults*` -- `Application::OnRunResult()` now computes
+`engine::ComputeAnalysisResults(sd)` alongside the existing
+`ComputeMemberResults(sd)` call and threads it through `LoadStructure()`.
+`SceneRenderer::DrawDeformedShape()` applies a live, ImGui-slider-driven
+scale factor at draw time (never baked into the scene) and renders thin
+cyan lines/joint markers alongside (not replacing) the undeformed
+structure. The toggle+slider overlay lives in the viewport's top-left
+corner (bottom-left is already the UCS icon/plane-offset control, #23/
+#24), disabled with a tooltip when the loaded scene has no analysis
+results yet, following #24's real-ImGui-widget-not-foreground-drawlist
+technique (issue #51's compositing-layer lesson) and OR'd into the same
+orbit/pan/zoom input-capture gate the plane-offset overlay already uses.
+
+**A real, apparently pre-existing bug (issue #63) was discovered while
+trying to verify this interactively, not caused by this change**: the
+RunPanel hung indefinitely after reporting "Converged" for a tiny
+(M=8) scratch dataset with `worker_threads=15` -- no further progress,
+no completion callback, Cancel/Run unresponsive, yet climbing CPU time
+(a busy background thread, not a true UI deadlock: `Process.Responding`
+stayed `True` throughout). Isolated to the GUI's Run path specifically:
+`orcisf_cli optimize` against the identical dataset and parameters
+(`worker_threads=15`, random seed) completed correctly in under a
+second, 6 times in a row (one incidental run during #59's own
+verification, five more run back-to-back specifically to stress-test
+this). Since `orcisf_cli` and `RunPanel::StartRun()`'s worker thread both
+call the exact same `engine::RunFullOptimization()`, and this change
+touches neither `RunPanel.cpp` nor `Optimizer.cpp`, #63 was filed
+separately rather than blocking #60 -- but it did prevent confirming
+#60's overlay actually renders correctly against a real completed run
+this session.
+
+**Validation**: `src/build.ps1` built cleanly, zero warnings. GUI
+launched without crashing; the new overlay control renders correctly in
+its disabled state with no dataset loaded (screenshotted). A real
+scratch dataset was loaded successfully via File > Open Data... (an
+NFD folder-picker dialog was driven by typing the path directly into its
+"Folder:" field rather than fighting click-coordinate targeting, per
+past sessions' notes on this dialog being hard to automate) -- the
+overlay control appeared correctly enabled/disabled-as-expected up to
+that point. Attempting to actually populate `has_deformation` via a real
+Run then hit #63. Engine-side correctness of the data this overlay
+consumes was already independently verified under #59.
+
+- Issue #60 addressed on GitHub (not yet closed -- left for tomorrow's
+  `tester`/`reviewer` pass); issue #63 filed as a new bug report, not
+  auto-triaged or fixed (out of scope for epic #58)
+- Files: `src/gui/viewport/SceneModel.h`, `src/gui/viewport/SceneModel.cpp`,
+  `src/gui/viewport/SceneRenderer.h`, `src/gui/viewport/SceneRenderer.cpp`,
+  `src/gui/ViewportPanel.cpp`, `src/gui/editor/Selection.h`,
+  `src/app/Application.h`, `src/app/Application.cpp`, `AGENTS.md`

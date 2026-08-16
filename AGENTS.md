@@ -2665,9 +2665,10 @@ later, different one (e.g. closing an issue or cutting a release).
 | #57 | chore(ci): rewrite build-src.yml -- Node 24 actions, apt ninja on Linux, warning detection, artifact upload | closed | 2026-08-16 |
 | #58 | epic(src): FE analysis results visualization (deformed shape, force diagrams, tables) | open | 2026-08-16 |
 | #59 | feat(engine): expose joint displacements, member end forces, and support reactions for GUI consumption | ready-for-review (implemented + verified against a real run overnight, see CHANGE_HISTORY 2026-08-16) | 2026-08-16 |
-| #60 | feat(gui): deformed-shape overlay in the 3D viewport | open | 2026-08-16 |
+| #60 | feat(gui): deformed-shape overlay in the 3D viewport | ready-for-review (implemented overnight; live rendering during a run blocked by #63, see CHANGE_HISTORY 2026-08-16) | 2026-08-16 |
 | #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | open | 2026-08-16 |
 | #62 | feat(gui): joint displacement / member force / reaction tables + global equilibrium check | open | 2026-08-16 |
+| #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open | 2026-08-16 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
@@ -2697,6 +2698,70 @@ from last best result (engine-level change, empirically verified — see
 its own "read before touching" section above), the Regenerate Seed
 button, and AutoCAD-style click-to-place guidance for Add Joint/Connect
 Joints.
+
+**Deformed-shape viewport overlay (issue #60, part of epic #58) — read
+before touching `SceneModel::has_deformation`/`MemberVisual::disp_a`/
+`disp_b`/`JointVisual::displacement_m`, `SceneRenderer::
+DrawDeformedShape()`, or `EditorOptions::show_deformed_shape`/
+`deformation_scale`:**
+- **`BuildSceneModel()` gained a 5th, optional `const engine::
+  AnalysisResults*` parameter (issue #59's new type)** -- when non-null,
+  each `MemberVisual`/`JointVisual` gets its endpoints'/its own
+  translational displacement (meters, unscaled) copied in by joint-id
+  lookup (an `unordered_map`, not an assumed 0-based index, even though
+  `ComputeAnalysisResults()` currently always builds `displacements` in
+  `1..NJ` order) and `SceneModel::has_deformation` is set true.
+  `Application::OnRunResult()` computes `engine::ComputeAnalysisResults(sd)`
+  right alongside the existing `ComputeMemberResults(sd)` call and threads
+  it through `LoadStructure()` the same way `results` already was.
+- **The scale factor is applied at *draw* time, in `SceneRenderer::
+  DrawDeformedShape()`, never baked into `SceneModel`** -- `disp_a`/
+  `disp_b`/`displacement_m` are always the raw, unscaled meter values;
+  `Render()`'s new `deformation_scale` parameter multiplies them fresh
+  every frame, so dragging the overlay's scale slider needs no scene
+  rebuild.
+- **Rendered as thin `DrawBox` lines + small `DrawCube` joint markers in
+  bright cyan `{0.30, 0.95, 0.95}`**, a color used nowhere else in this
+  renderer's palette (cross-check any new viewport color against the
+  full list here: grid = dark cobalt, restrained joints = orange,
+  selection highlight = gold, loads = red/green/blue/purple, satisfied/
+  violated = green/red) -- drawn *in addition to* the always-drawn
+  undeformed structure, not a replacement, so both are visible at once
+  per the issue's acceptance criteria.
+- **Only translational DOFs are visualized** (`ux,uy,uz` from
+  `engine::JointDisplacement`) -- rotational DOFs would require actually
+  rotating/bending each member's rendered box, which this renderer's
+  existing schematic (straight-box-between-two-points) member geometry
+  has never supported for any purpose (see the `gui/viewport/` section's
+  note on cross-section approximation being schematic, not
+  local-axis-accurate).
+- **The overlay control (toggle + scale slider, top-left corner of the
+  viewport) is a real ImGui widget block (`SetCursorScreenPos` within
+  the "Viewport" window), not `GetForegroundDrawList()`** -- same
+  issue #51 compositing-layer lesson the plane-offset control (#24)
+  already applies: a foreground-draw-list overlay always composites
+  *after* every window, so it would incorrectly draw on top of an open
+  menu. Disabled (via `ImGui::BeginDisabled`, with a hover tooltip
+  explaining why) whenever `scene.has_deformation` is false, rather than
+  silently no-op'd -- same "has_run_results_"-gating philosophy issues
+  #9/#25 already established. Its hover/active state feeds a
+  `deform_overlay_capturing` bool, OR'd into the same orbit/pan/zoom
+  input gates the plane-offset overlay's `offset_overlay_capturing`
+  already uses, so interacting with either overlay never also starts an
+  orbit-drag underneath it.
+- **Verification status: compiled cleanly (zero warnings); engine-level
+  data path (issue #59's `ComputeAnalysisResults`) independently verified
+  correct and fast via `orcisf_cli`; GUI launch confirmed (no crash, the
+  disabled overlay control renders correctly with no dataset loaded).
+  The overlay's actual on-screen appearance during a completed run was
+  NOT confirmed this session** -- attempting to do so surfaced a
+  separate, apparently pre-existing bug (issue #63: RunPanel hangs after
+  reporting "Converged" for a small dataset, filed separately since it
+  doesn't touch any code #60 changed -- `orcisf_cli optimize` against the
+  identical dataset/parameters completed correctly 6/6 times, isolating
+  the problem to the GUI's Run path, not the engine or this issue's own
+  code). Re-verify #60's actual rendering once #63 is fixed or otherwise
+  unblocked (details: `CHANGE_HISTORY.md`, 2026-08-16, issues #60/#63).
 
 **Epic #20 complete (#21, #22, #23 all landed):** the Joints/Members
 list panel (editable, cascade-delete-with-warning), 2D plane-locked

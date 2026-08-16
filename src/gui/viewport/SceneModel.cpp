@@ -7,14 +7,17 @@
 
 namespace orcisf::gui {
 
+using engine::AnalysisResults;
 using engine::MemberResult;
 using engine::StructureData;
 using math3d::Vec3;
 
 SceneModel BuildSceneModel(const StructureData& sd, const std::vector<MemberResult>* results,
-                            std::string dataset_path, const std::array<int, engine::kMak>* type_overrides) {
+                            std::string dataset_path, const std::array<int, engine::kMak>* type_overrides,
+                            const AnalysisResults* analysis) {
     SceneModel scene;
     scene.dataset_path = std::move(dataset_path);
+    scene.has_deformation = (analysis != nullptr);
 
     std::unordered_map<int, const MemberResult*> result_by_batang;
     if (results) {
@@ -22,6 +25,21 @@ SceneModel BuildSceneModel(const StructureData& sd, const std::vector<MemberResu
             result_by_batang[r.no_batang] = &r;
         }
     }
+
+    // Issue #60: joint no_joint -> translational displacement (meters),
+    // looked up by id rather than assumed-index (0-based vector position)
+    // to stay correct even if a future caller ever supplies a
+    // differently-ordered/partial AnalysisResults.
+    std::unordered_map<int, Vec3> disp_by_joint;
+    if (analysis) {
+        for (const engine::JointDisplacement& d : analysis->displacements) {
+            disp_by_joint[d.no_joint] = Vec3{d.ux, d.uy, d.uz};
+        }
+    }
+    auto joint_disp = [&](int no_joint) -> Vec3 {
+        auto it = disp_by_joint.find(no_joint);
+        return it != disp_by_joint.end() ? it->second : Vec3{0.f, 0.f, 0.f};
+    };
 
     Vec3 min_pt{std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
                 std::numeric_limits<float>::max()};
@@ -33,6 +51,7 @@ SceneModel BuildSceneModel(const StructureData& sd, const std::vector<MemberResu
         JointVisual jv;
         jv.no_joint = j;
         jv.pos = Vec3{sd.X[j], sd.Y[j], sd.Z[j]};
+        jv.displacement_m = joint_disp(j);
         for (int dof = 0; dof < 6; ++dof) {
             if (sd.JRL[6 * j - 5 + dof] == 1) {
                 jv.restrained = true;
@@ -50,6 +69,8 @@ SceneModel BuildSceneModel(const StructureData& sd, const std::vector<MemberResu
         mv.no_batang = i;
         mv.a = Vec3{sd.X[sd.JJ[i]], sd.Y[sd.JJ[i]], sd.Z[sd.JJ[i]]};
         mv.b = Vec3{sd.X[sd.JK[i]], sd.Y[sd.JK[i]], sd.Z[sd.JK[i]]};
+        mv.disp_a = joint_disp(sd.JJ[i]);
+        mv.disp_b = joint_disp(sd.JK[i]);
 
         // Beam-vs-column classification, mirroring PeriksaBatang's CXZ
         // check (Optimizer.cpp: CXZ > 0.001f = beam) so geometry-only
