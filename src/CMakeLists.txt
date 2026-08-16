@@ -55,6 +55,7 @@ add_executable(orcisf_gui WIN32
     gui/MembersPanel.cpp
     gui/DetailingPanel.cpp
     gui/ForceDiagramPanel.cpp
+    gui/ResultsPanel.cpp
     gui/diagrams/ForceDiagram.cpp
     gui/viewport/Camera.cpp
     gui/viewport/SceneModel.cpp
@@ -64,6 +65,7 @@ add_executable(orcisf_gui WIN32
     gui/detailing/DetailingLayout.cpp
     report/TextExport.cpp
     report/PdfExport.cpp
+    report/ResultsCsvExport.cpp
 )
 
 # Issue #26: per-platform app icon wiring.

@@ -78,6 +78,16 @@ void DrawLogIcon(ImDrawList* dl, ImVec2 o, ImU32 c, float size) {
     }
 }
 
+void DrawResultsIcon(ImDrawList* dl, ImVec2 o, ImU32 c, float size) {
+    // Issue #62: a small spreadsheet/table grid -- distinct from
+    // DrawLogIcon's plain text lines (no vertical dividers there) and
+    // DrawPropertiesIcon's sliders (no dots here).
+    dl->AddRect(P(o, 0.15f, 0.18f, size), P(o, 0.85f, 0.82f, size), c, 0.f, 0, 1.1f);
+    dl->AddLine(P(o, 0.15f, 0.42f, size), P(o, 0.85f, 0.42f, size), c, 1.f);
+    dl->AddLine(P(o, 0.15f, 0.62f, size), P(o, 0.85f, 0.62f, size), c, 1.f);
+    dl->AddLine(P(o, 0.5f, 0.18f, size), P(o, 0.5f, 0.82f, size), c, 1.f);
+}
+
 void DrawForceDiagramIcon(ImDrawList* dl, ImVec2 o, ImU32 c, float size) {
     // Issue #61: a schematic bending-moment diagram -- baseline + a
     // triangular bump above/below it, distinct at a glance from
@@ -115,6 +125,7 @@ void DrawPanelIcon(PanelIcon icon, ImDrawList* dl, ImVec2 origin, ImU32 color, f
         case PanelIcon::Run: DrawRunIcon(dl, origin, color, size); break;
         case PanelIcon::Log: DrawLogIcon(dl, origin, color, size); break;
         case PanelIcon::ForceDiagram: DrawForceDiagramIcon(dl, origin, color, size); break;
+        case PanelIcon::Results: DrawResultsIcon(dl, origin, color, size); break;
     }
 }
 

@@ -1,5 +1,7 @@
 #include "engine/AnalysisResults.h"
 
+#include <cmath>
+
 #include "engine/LegacyIO.h"
 
 namespace orcisf::engine {
@@ -71,6 +73,32 @@ AnalysisResults ComputeAnalysisResults(const StructureData& sd) {
         r.my = sd.AR[6 * j - 1];
         r.mz = sd.AR[6 * j];
         out.reactions.push_back(r);
+    }
+
+    // Issue #62: total applied load, all 6 DOF -- see the header comment
+    // on total_applied_load for why only dof=1 (Y) gets a beam-self-weight
+    // term.
+    for (int j = 1; j <= sd.NJ; ++j) {
+        for (int dof = 0; dof < 6; ++dof) {
+            out.total_applied_load[dof] += sd.AJ[6 * j - 5 + dof];
+        }
+    }
+    for (int i = 1; i <= sd.M; ++i) {
+        // Geometry-only beam/column classification (mirrors PeriksaBatang's
+        // CXZ>0.001 check without needing a mutable StructureData& to call
+        // it -- the same inline approach gui::BuildSceneModel() already
+        // uses, see SceneModel.cpp).
+        float dx = sd.X[sd.JK[i]] - sd.X[sd.JJ[i]];
+        float dy = sd.Y[sd.JK[i]] - sd.Y[sd.JJ[i]];
+        float dz = sd.Z[sd.JK[i]] - sd.Z[sd.JJ[i]];
+        float len = std::sqrt(dx * dx + dy * dy + dz * dz);
+        if (len > 1e-6f) {
+            float cx = dx / len, cz = dz / len;
+            bool is_beam = std::fabs(std::sqrt(cx * cx + cz * cz)) > 0.001f;
+            if (is_beam) {
+                out.total_applied_load[1] += -sd.W[i] * sd.EL[i];
+            }
+        }
     }
 
     return out;

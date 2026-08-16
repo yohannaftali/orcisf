@@ -64,6 +64,7 @@ void Toolbar::SetOnSaveLoads(std::function<void()> callback) { on_save_loads_ = 
 void Toolbar::SetOnExportText(std::function<void()> callback) { on_export_text_ = std::move(callback); }
 void Toolbar::SetOnExportPdf(std::function<void()> callback) { on_export_pdf_ = std::move(callback); }
 void Toolbar::SetOnExportInf(std::function<void()> callback) { on_export_inf_ = std::move(callback); }
+void Toolbar::SetOnExportResultsCsv(std::function<void()> callback) { on_export_results_csv_ = std::move(callback); }
 void Toolbar::SetOnViewLayout(std::function<void(ViewLayoutPreset)> callback) { on_view_layout_ = std::move(callback); }
 void Toolbar::SetTitleBarDrawer(std::function<void()> drawer) { on_title_bar_drawer_ = std::move(drawer); }
 
@@ -104,6 +105,9 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
             if (ImGui::MenuItem("Export INF Preview (Koordinat/Batang/Pengekang)...", nullptr, false,
                                  can_export_inf)) {
                 if (on_export_inf_) on_export_inf_();
+            }
+            if (ImGui::MenuItem("Export Results CSV...", nullptr, false, can_export_pdf)) {
+                if (on_export_results_csv_) on_export_results_csv_();
             }
             ImGui::EndMenu();
         }
@@ -214,6 +218,7 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
                 if (panel_visibility.detailing) ImGui::MenuItem("Detailing", nullptr, panel_visibility.detailing);
                 if (panel_visibility.force_diagram)
                     ImGui::MenuItem("Force Diagrams", nullptr, panel_visibility.force_diagram);
+                if (panel_visibility.results) ImGui::MenuItem("Results", nullptr, panel_visibility.results);
                 if (panel_visibility.properties) ImGui::MenuItem("Properties", nullptr, panel_visibility.properties);
                 if (panel_visibility.optimization)
                     ImGui::MenuItem("Optimization", nullptr, panel_visibility.optimization);

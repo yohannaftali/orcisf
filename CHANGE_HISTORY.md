@@ -4234,3 +4234,65 @@ against real `.opt`/CLI-dumped numbers, independent of the GUI.
   `src/app/Application.cpp`, `src/app/main.cpp`,
   `src/engine/include/engine/AnalysisResults.h`,
   `src/engine/src/AnalysisResults.cpp`, `src/CMakeLists.txt`, `AGENTS.md`
+
+## [2026-08-16] — feat(gui): results tables + CSV export (#62)
+
+Fourth and last of epic #58's 4 sub-issues, implemented autonomously
+overnight (same `/coder` session as #59/#60/#61) -- concludes the
+overnight run per the user's explicit "resolve all... without asking
+anything... merge and push tonight" instruction.
+
+New `ResultsPanel` (one panel, three stacked `TableView` sections --
+Joint Displacements, Member End Forces (all 12 raw values/member),
+Support Reactions -- plus a Global Equilibrium Check table, rather than
+three independently-dockable panels, a scope call made given the
+overnight time budget) reads `engine::AnalysisResults` directly, same
+gating as Force Diagrams. New `engine::AnalysisResults::
+total_applied_load[6]` sums applied joint loads + beam self-weight
+resultant (Y only) -- `orcisf_cli equilibrium` refactored to use it
+instead of its own inline sum (residual reconfirmed unchanged, ~0, after
+the refactor). New `report::WriteResultsCsv()` (new file, same
+`report::` namespace as TextExport/PdfExport) exports all three tables +
+the equilibrium check as CSV, wired to a new `Toolbar` "Export Results
+CSV..." menu item gated on the same `has_run_results_` precondition PDF
+export already uses.
+
+**Validation**: `src/build.ps1` built cleanly, zero warnings. `orcisf_cli
+equilibrium` against the same scratch `Apl1-1` dataset used all night:
+residual unchanged (~0) after switching to `total_applied_load`. GUI
+launched without crashing; the "Results" dock tab (new table-grid icon)
+renders correctly, showing the right disabled-state placeholder with no
+completed run's results loaded (screenshotted). **Populated tables and
+the CSV export itself were not interactively confirmed** -- blocked by
+issue #63, the same RunPanel-hang blocker #60/#61 hit all night.
+
+**Overnight session summary (issues #59-#63, all filed/implemented this
+session):** #59 (engine data exposure) is fully implemented and
+numerically verified end-to-end against a real run. #60 (deformed-shape
+overlay) and #62 (results tables/CSV) are implemented and code-reviewed
+against established patterns but not exercised with live run data. #61
+(force diagrams) is implemented with one specific, clearly-flagged
+open question (the M(x) interior-shape discrepancy). #63 is a newly
+discovered, separately-filed bug blocking live verification of #60/#61/
+#62's actual rendering -- **not fixed tonight**, left for tomorrow.
+Every commit was built and pushed to `main` individually as it
+completed, per the user's explicit instruction to merge and push
+without waiting for confirmation. None of #59-#62 were closed on
+GitHub -- left open for tomorrow's `tester`/`reviewer` pass per this
+project's normal workflow (planner -> coder -> builder -> tester ->
+reviewer), which should prioritize: (1) fixing or at least reproducing
+#63, since it blocks everything else's live verification, (2)
+re-deriving/checking #61's M(x) formula against `StructuralAnalysis.cpp`'s
+actual local-axis convention, (3) a full interactive pass on #60/#62
+once #63 no longer blocks it.
+
+- Issue #62 addressed on GitHub (not yet closed)
+- Files: `src/gui/ResultsPanel.h`, `src/gui/ResultsPanel.cpp`,
+  `src/gui/PanelIcons.h`, `src/gui/PanelIcons.cpp`, `src/gui/PanelTitles.h`,
+  `src/gui/PanelVisibility.h`, `src/gui/Toolbar.h`, `src/gui/Toolbar.cpp`,
+  `src/app/DockTabIcons.cpp`, `src/app/Application.h`,
+  `src/app/Application.cpp`, `src/report/ResultsCsvExport.h`,
+  `src/report/ResultsCsvExport.cpp`,
+  `src/engine/include/engine/AnalysisResults.h`,
+  `src/engine/src/AnalysisResults.cpp`,
+  `src/engine/tools/orcisf_cli.cpp`, `src/CMakeLists.txt`, `AGENTS.md`

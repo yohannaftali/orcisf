@@ -16,6 +16,7 @@
 #include "engine/LegacyIO.h"
 #include "engine/MemberResults.h"
 #include "report/PdfExport.h"
+#include "report/ResultsCsvExport.h"
 #include "report/TextExport.h"
 
 namespace orcisf::app {
@@ -87,6 +88,7 @@ Application::Application() {
     toolbar_.SetOnExportText([this]() { OnExportTextRequested(); });
     toolbar_.SetOnExportPdf([this]() { OnExportPdfRequested(); });
     toolbar_.SetOnExportInf([this]() { OnExportInfRequested(); });
+    toolbar_.SetOnExportResultsCsv([this]() { OnExportResultsCsvRequested(); });
     toolbar_.SetOnViewLayout([this](gui::ViewLayoutPreset preset) { current_layout_ = preset; });
     toolbar_.SetTitleBarDrawer([this]() {
         if (window_) title_bar_.Draw(window_, "ORCISF - Optimasi Beton Bertulang Pada Struktur Portal Ruang");
@@ -369,6 +371,31 @@ void Application::OnExportInfRequested() {
     }
 }
 
+void Application::OnExportResultsCsvRequested() {
+    if (!has_run_results_) return; // same precondition as PDF export -- see current_analysis_'s own comment
+
+    nfdu8filteritem_t filter{"CSV", "csv"};
+    nfdu8char_t* out_path = nullptr;
+    nfdsavedialogu8args_t args{};
+    args.filterList = &filter;
+    args.filterCount = 1;
+    args.defaultName = "hasil.csv";
+    nfdresult_t result = NFD_SaveDialogU8_With(&out_path, &args);
+    if (result != NFD_OKAY) {
+        if (result == NFD_ERROR) log_panel_.AddLine(std::string("Save dialog error: ") + NFD_GetError());
+        return;
+    }
+    std::string csv_path = out_path;
+    NFD_FreePathU8(out_path);
+
+    std::string err = report::WriteResultsCsv(current_analysis_, csv_path);
+    if (err.empty()) {
+        log_panel_.AddLine("Exported results CSV to: " + csv_path);
+    } else {
+        log_panel_.AddLine("Results CSV export failed: " + err);
+    }
+}
+
 namespace {
 
 // Issue #15's "Default" preset -- exactly the single fixed layout this app
@@ -392,6 +419,7 @@ void BuildDefaultLayout(ImGuiID dock_main) {
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kPropertiesId).c_str(), dock_right);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kRunOptimizationId).c_str(), dock_right);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLogId).c_str(), dock_right);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kResultsId).c_str(), dock_right); // issue #62
     // Issue #36: tab order (Joints, Members, Loads) comes from OnFrame().
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kJointsId).c_str(), dock_bottom);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kMembersId).c_str(), dock_bottom);
@@ -417,6 +445,7 @@ void BuildDesignLayout(ImGuiID dock_main) {
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kPropertiesId).c_str(), dock_right);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kRunOptimizationId).c_str(), dock_right);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLogId).c_str(), dock_right);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kResultsId).c_str(), dock_right); // issue #62
     // Issue #36: tab order (Joints, Members, Loads) comes from OnFrame().
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kJointsId).c_str(), dock_bottom);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kMembersId).c_str(), dock_bottom);
@@ -443,6 +472,7 @@ void BuildOptimizationLayout(ImGuiID dock_main) {
     // Issue #36: tab order (Properties, Joints, Members, Loads) comes
     // from OnFrame(), not from the order these are listed below.
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kPropertiesId).c_str(), dock_right_bottom);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kResultsId).c_str(), dock_right_bottom); // issue #62
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kJointsId).c_str(), dock_right_bottom);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kMembersId).c_str(), dock_right_bottom);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLoadsId).c_str(), dock_right_bottom);
@@ -515,6 +545,7 @@ void Application::OnFrame() {
     panel_visibility.loads = &loads_open_;
     panel_visibility.log = &log_open_;
     panel_visibility.force_diagram = &force_diagram_open_; // issue #61
+    panel_visibility.results = &results_open_;              // issue #62
 
     toolbar_.Draw(undo_stack_.CanUndo(), undo_stack_.CanRedo(), can_save, can_export_text, can_export_pdf,
                   can_export_inf, current_layout_, editor_options_, icon_visibility_, panel_visibility);
@@ -595,6 +626,9 @@ void Application::OnFrame() {
         // current_results_ -- see LoadStructure()/RebuildSceneAfterEdit()).
         force_diagram_panel_.Draw(&force_diagram_open_, scene_, selection_,
                                    has_run_results_ ? &current_analysis_ : nullptr);
+    }
+    if (results_open_) {
+        results_panel_.Draw(&results_open_, scene_, selection_, has_run_results_ ? &current_analysis_ : nullptr);
     }
     if (run_open_) {
         run_panel_.Draw(&run_open_);

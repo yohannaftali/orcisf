@@ -10,6 +10,7 @@
 #include "gui/ForceDiagramPanel.h"
 #include "gui/IconToolbar.h"
 #include "gui/IconVisibility.h"
+#include "gui/ResultsPanel.h"
 #include "gui/JointsPanel.h"
 #include "gui/LoadsPanel.h"
 #include "gui/LogPanel.h"
@@ -61,6 +62,7 @@ private:
     void OnExportTextRequested();
     void OnExportPdfRequested();
     void OnExportInfRequested();
+    void OnExportResultsCsvRequested(); // issue #62
 
     // Common load path for both OnOpenFolderRequested (view-only, no
     // results yet) and OnRunResult (results available): replaces
@@ -88,6 +90,7 @@ private:
     gui::MembersPanel members_panel_;
     gui::DetailingPanel detailing_panel_;
     gui::ForceDiagramPanel force_diagram_panel_; // issue #61
+    gui::ResultsPanel results_panel_;            // issue #62
     gui::LogPanel log_panel_;
     gui::RunPanel run_panel_;
 
@@ -143,6 +146,7 @@ private:
     bool members_open_ = true;
     bool detailing_open_ = true;
     bool force_diagram_open_ = true; // issue #61
+    bool results_open_ = true;       // issue #62
     bool log_open_ = true;
     bool run_open_ = true;
     bool dockspace_initialized_ = false;

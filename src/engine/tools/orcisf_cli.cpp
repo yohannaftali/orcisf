@@ -66,21 +66,14 @@ int CmdEquilibrium(const std::string& dataset) {
     // already folded column self-weight into) plus the resultant of every
     // beam's distributed self-weight/applied load (W) must balance the sum
     // of support reactions.
-    double sum_AJ = 0.0, sum_beam_resultant = 0.0;
-    for (int j = 1; j <= sd.NJ; ++j) {
-        sum_AJ += sd.AJ[6 * j - 4]; // arah 2 = Y
-    }
-    for (int i = 1; i <= sd.M; ++i) {
-        PeriksaBatang(sd, i);
-        if (sd.CXZ > 0.001f) { // beams only; column self-weight is in AJ
-            sum_beam_resultant += -static_cast<double>(sd.W[i]) * sd.EL[i]; // W acts downward (-Y)
-        }
-    }
-    // issue #59: reactions now read via AnalysisResults::TotalReaction()
-    // instead of a second, independent AR summation loop.
-    double sum_reactions = ComputeAnalysisResults(sd).TotalReaction(1); // arah 2 = Y
+    //
+    // issue #59/#62: both totals now read via AnalysisResults instead of
+    // independent summation loops -- one source of truth for "the applied
+    // load"/"the reactions".
+    AnalysisResults analysis = ComputeAnalysisResults(sd);
+    double applied_total = analysis.total_applied_load[1]; // arah 2 = Y
+    double sum_reactions = analysis.TotalReaction(1);       // arah 2 = Y
 
-    double applied_total = sum_AJ + sum_beam_resultant;
     std::cout << "Sum applied load, arah Y (joint AJ + beam self-weight resultant): " << applied_total << "\n";
     std::cout << "Sum support reactions, arah Y:                                    " << sum_reactions << "\n";
     double diff = applied_total + sum_reactions; // reactions oppose applied load, should cancel to ~0

@@ -85,6 +85,18 @@ struct AnalysisResults {
     // restrained-joint set -- orcisf_cli.cpp now calls this directly
     // rather than summing AR a second, independent way).
     float TotalReaction(int dof_0based) const;
+
+    // Issue #62: total applied load per global DOF (same 0..5 "arah 1..6"
+    // indexing as TotalReaction above) -- sum of every joint's AJ plus,
+    // for dof=1 (Y, this port's vertical axis) only, every beam member's
+    // self-weight/UDL resultant (-W*EL, downward) -- matching
+    // orcisf_cli's `equilibrium` command's "Sum applied load, arah Y"
+    // computation exactly, generalized to all 6 DOF (no distributed load
+    // ever acts in the other 5 directions in this port's load model, see
+    // AGENTS.md's `gui/editor/` note). Compare against TotalReaction(dof)
+    // for the same dof for a global-equilibrium check -- the two should
+    // be equal and opposite (sum to ~0).
+    float total_applied_load[6] = {0.f, 0.f, 0.f, 0.f, 0.f, 0.f};
 };
 
 // Captures sd.AM/DJ/AR into GUI-friendly structs.

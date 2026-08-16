@@ -2663,11 +2663,11 @@ later, different one (e.g. closing an issue or cutting a release).
 | #55 | feat(src): show all 6 per-DOF restraint checkboxes in the Joints table, not one summary checkbox | closed (tester: source-verified, no FAILs; live sync UNVERIFIED this pass -- see AGENTS.md #55 note) | 2026-08-13 |
 | #56 | chore(ci): Linux build-src job fails intermittently on flaky ninja download (ECONNRESET) | closed | 2026-08-13 |
 | #57 | chore(ci): rewrite build-src.yml -- Node 24 actions, apt ninja on Linux, warning detection, artifact upload | closed | 2026-08-16 |
-| #58 | epic(src): FE analysis results visualization (deformed shape, force diagrams, tables) | open | 2026-08-16 |
+| #58 | epic(src): FE analysis results visualization (deformed shape, force diagrams, tables) | open (all 4 sub-issues #59-#62 implemented overnight, pending tester/reviewer -- #61's M(x) formula and live GUI rendering of #60/#61/#62 still need verification, blocked by #63) | 2026-08-16 |
 | #59 | feat(engine): expose joint displacements, member end forces, and support reactions for GUI consumption | ready-for-review (implemented + verified against a real run overnight, see CHANGE_HISTORY 2026-08-16) | 2026-08-16 |
 | #60 | feat(gui): deformed-shape overlay in the 3D viewport | ready-for-review (implemented overnight; live rendering during a run blocked by #63, see CHANGE_HISTORY 2026-08-16) | 2026-08-16 |
 | #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | ready-for-review (implemented overnight; V(x)/endpoints verified, M(x) interior shape UNVERIFIED -- see AGENTS.md #61 note; rendering blocked by #63) | 2026-08-16 |
-| #62 | feat(gui): joint displacement / member force / reaction tables + global equilibrium check | open | 2026-08-16 |
+| #62 | feat(gui): joint displacement / member force / reaction tables + global equilibrium check | ready-for-review (implemented overnight; rendering/CSV export UNVERIFIED, blocked by #63 -- see AGENTS.md #62 note) | 2026-08-16 |
 | #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open | 2026-08-16 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
@@ -2808,6 +2808,48 @@ or trusting the moment diagram's interior shape:**
   session** -- blocked by issue #63 (RunPanel hang), the same blocker
   #60 hit. Re-verify both the rendering and the M(x) discrepancy above
   once #63 is fixed (details: `CHANGE_HISTORY.md`, 2026-08-16).
+
+**Results tables + CSV export (issue #62, part of epic #58) — read
+before touching `ResultsPanel.{h,cpp}` or
+`report::ResultsCsvExport.{h,cpp}`:**
+- **One panel, three stacked tables, not three separate dockable
+  panels.** The issue's "New docked panel(s)" wording allowed either;
+  given the overnight time budget, one `ResultsPanel` (Global Equilibrium
+  Check + Joint Displacements + Member End Forces + Support Reactions,
+  each its own `BeginTableView()` section under `ImGui::SeparatorText()`)
+  was chosen over wiring three independent panel identities/icons/dock
+  placements/View-menu entries -- revisit only if a future issue
+  specifically wants them independently dockable.
+- **`engine::AnalysisResults::total_applied_load[6]`** (new) sums every
+  joint's `AJ` plus, for `dof=1` (Y) only, each beam's self-weight/UDL
+  resultant (`-W*EL`) -- the same computation `orcisf_cli equilibrium`
+  already did inline, now shared (that command was refactored to read
+  `total_applied_load[1]`/`TotalReaction(1)` instead of its own summation
+  loops -- verified unchanged residual, ~0, after the refactor). Beam/
+  column classification for the `-W*EL` term can't reuse a stored
+  `sd.CXZ` (a scratch scalar `PeriksaBatang()` overwrites per-member, not
+  a per-member array) -- it re-derives the same geometry-only check
+  `gui::BuildSceneModel()` already uses, rather than calling
+  `PeriksaBatang()` (which would need a non-const `StructureData&`,
+  breaking `ComputeAnalysisResults()`'s deliberately read-only,
+  no-new-analysis-pass design from issue #59).
+- **Member End Forces table shows all 12 raw values per member** (both
+  ends), unlike Force Diagrams' single-member focus -- 13 columns,
+  horizontally scrollable/resizable like every other `TableView` table.
+- **CSV export (`report::WriteResultsCsv()`) is a new small file, not
+  folded into `TextExport.cpp`** -- different concern (analysis-result
+  tables vs. the legacy input/output file set), same `report::` namespace
+  and NFD-save-dialog wiring pattern (`Toolbar`'s new "Export Results
+  CSV..." menu item, gated on the same `can_export_pdf`/
+  `has_run_results_` precondition PDF export already uses).
+- **Verification status:** compiled cleanly (zero warnings).
+  `total_applied_load`-based equilibrium residual reconfirmed unchanged
+  (~0) via `orcisf_cli equilibrium` after the refactor. GUI launch
+  confirmed; "Results" dock tab (with its own table-grid icon) renders
+  and shows the correct disabled-state placeholder with no completed
+  run's results loaded. **Populated tables + CSV export were not
+  interactively confirmed** -- blocked by issue #63 (RunPanel hang), the
+  same blocker #60/#61 hit.
 
 **Epic #20 complete (#21, #22, #23 all landed):** the Joints/Members
 list panel (editable, cascade-delete-with-warning), 2D plane-locked

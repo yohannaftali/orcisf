@@ -53,6 +53,10 @@ public:
     // Issue #11: .inf preview generated directly from the in-GUI dataset,
     // independent of a completed optimization run.
     void SetOnExportInf(std::function<void()> callback);
+    // Issue #62: joint displacement/member force/reaction tables as CSV,
+    // via an NFD save dialog -- gated the same as can_export_pdf (a
+    // completed run's results, not since edited).
+    void SetOnExportResultsCsv(std::function<void()> callback);
     // Issue #15: fires when the user picks a View menu layout preset.
     void SetOnViewLayout(std::function<void(ViewLayoutPreset)> callback);
     // Issue #19: called right-aligned inside the still-open main menu bar,
@@ -77,6 +81,7 @@ private:
     std::function<void()> on_export_text_;
     std::function<void()> on_export_pdf_;
     std::function<void()> on_export_inf_;
+    std::function<void()> on_export_results_csv_;
     std::function<void(ViewLayoutPreset)> on_view_layout_;
     std::function<void()> on_title_bar_drawer_;
 };
