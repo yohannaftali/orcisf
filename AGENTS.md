@@ -2666,7 +2666,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #58 | epic(src): FE analysis results visualization (deformed shape, force diagrams, tables) | open | 2026-08-16 |
 | #59 | feat(engine): expose joint displacements, member end forces, and support reactions for GUI consumption | ready-for-review (implemented + verified against a real run overnight, see CHANGE_HISTORY 2026-08-16) | 2026-08-16 |
 | #60 | feat(gui): deformed-shape overlay in the 3D viewport | ready-for-review (implemented overnight; live rendering during a run blocked by #63, see CHANGE_HISTORY 2026-08-16) | 2026-08-16 |
-| #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | open | 2026-08-16 |
+| #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | ready-for-review (implemented overnight; V(x)/endpoints verified, M(x) interior shape UNVERIFIED -- see AGENTS.md #61 note; rendering blocked by #63) | 2026-08-16 |
 | #62 | feat(gui): joint displacement / member force / reaction tables + global equilibrium check | open | 2026-08-16 |
 | #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open | 2026-08-16 |
 
@@ -2762,6 +2762,52 @@ DrawDeformedShape()`, or `EditorOptions::show_deformed_shape`/
   the problem to the GUI's Run path, not the engine or this issue's own
   code). Re-verify #60's actual rendering once #63 is fixed or otherwise
   unblocked (details: `CHANGE_HISTORY.md`, 2026-08-16, issues #60/#63).
+
+**Force diagrams panel (issue #61, part of epic #58) — read before
+touching `gui/diagrams/ForceDiagram.{h,cpp}`, `ForceDiagramPanel.{h,cpp}`,
+or trusting the moment diagram's interior shape:**
+- **New `gui/diagrams/` module (no ImGui/ImPlot dependency)**, following
+  the `DetailingLayout`/`DetailingPanel` (#8) split: `ComputeForceDiagram()`
+  samples N/V/M/T along a member's span from `engine::MemberForces` (#59,
+  extended here with a new `w_total_n_per_m` field -- `sd.W[i]` captured
+  at the same instant as the end forces, since `Application::
+  OnRunResult()` zeroes `sd.W` shortly after for the load editor's sake)
+  using standard beam-diagram relations: `N`/`T` constant, `V(x) =
+  V_start - w*x`, `M(x) = M_start + V_start*x - w*x^2/2`.
+- **`ImPlot` needed its own context** (`ImPlot::CreateContext()`/
+  `DestroyContext()` in `main.cpp`, alongside ImGui's) -- it was already
+  an installed `vcpkg.json` dependency (chosen in #2, never previously
+  used) but nothing called `ImPlot::CreateContext()` before this issue.
+- **KNOWN UNVERIFIED GAP, found during this session's own verification,
+  not resolved -- read `gui/diagrams/ForceDiagram.h`'s header comment for
+  the full numeric trail before trusting the moment diagram's *interior*
+  shape.** Against one real run (`Apl1-1` scratch copy, batang 5): `V(x)`
+  is exactly verified (`V(length_m)` computed via the formula above
+  matched `-shear_y_b`/`GESER_KA` precisely), and the two moment
+  endpoints taken directly from `moment_z_a`/`moment_z_b` independently
+  match `MTUM_KI`/`MTUM_KA` exactly (both confirmed via a real `.opt`
+  file) -- but integrating the *verified* `V(x)` from the *verified*
+  `M_start` does **not** reproduce the *verified* `M_end` (off by roughly
+  25x, not a rounding-scale gap). Every sign-convention permutation
+  (`+V`/`-V`, `+w`/`-w`) was tried by hand against the same real numbers;
+  none matched, ruling out a simple sign flip as the explanation. Not
+  root-caused tonight -- candidates worth checking first: whether `sd.W`
+  at the moment `WriteFinalResults()`'s frozen-slot `Struktur()` call
+  captures it is genuinely the same `w` the *local* Vy/Mz pair's bending
+  plane sees (vs. some resolved/rotated component), or a subtlety in how
+  `BeratSendiri()`'s self-weight timing interacts with a re-analyzed
+  frozen slot. **N(x)/T(x) (direct constant copies) and V(x) are solid;
+  only M(x)'s point-to-point interior shape is in question** -- do not
+  remove this flag without a fresh numeric re-check against a real run.
+- **Verification status:** compiled cleanly (zero warnings). GUI launch
+  confirmed, "Force Diagrams" dock tab (with its own hand-drawn icon)
+  renders correctly and shows the right disabled-state placeholder text
+  with no dataset loaded and with no completed run's results loaded.
+  **The actual populated ImPlot rendering (BeginPlot/PlotShaded/PlotLine/
+  DragLineX with real diagram data) was not visually confirmed this
+  session** -- blocked by issue #63 (RunPanel hang), the same blocker
+  #60 hit. Re-verify both the rendering and the M(x) discrepancy above
+  once #63 is fixed (details: `CHANGE_HISTORY.md`, 2026-08-16).
 
 **Epic #20 complete (#21, #22, #23 all landed):** the Joints/Members
 list panel (editable, cascade-delete-with-warning), 2D plane-locked

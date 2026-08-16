@@ -384,6 +384,7 @@ void BuildDefaultLayout(ImGuiID dock_main) {
 
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kViewportId).c_str(), dock_main);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kDetailingId).c_str(), dock_main);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kForceDiagramId).c_str(), dock_main); // issue #61
     // Issue #38: Properties, Optimization, Log tabbed together here -- tab
     // order (Properties -> Optimization -> Log) comes from OnFrame()'s
     // Draw() call order, not from the order they're listed below (see the
@@ -410,6 +411,7 @@ void BuildDesignLayout(ImGuiID dock_main) {
 
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kViewportId).c_str(), dock_main);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kDetailingId).c_str(), dock_main);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kForceDiagramId).c_str(), dock_main); // issue #61
     // Issue #38: tab order (Properties -> Optimization -> Log) comes from
     // OnFrame()'s Draw() call order, same convention as #36 below.
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kPropertiesId).c_str(), dock_right);
@@ -437,6 +439,7 @@ void BuildOptimizationLayout(ImGuiID dock_main) {
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLogId).c_str(), dock_main);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kViewportId).c_str(), dock_right);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kDetailingId).c_str(), dock_right);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kForceDiagramId).c_str(), dock_right); // issue #61
     // Issue #36: tab order (Properties, Joints, Members, Loads) comes
     // from OnFrame(), not from the order these are listed below.
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kPropertiesId).c_str(), dock_right_bottom);
@@ -511,6 +514,7 @@ void Application::OnFrame() {
     panel_visibility.members = &members_open_;
     panel_visibility.loads = &loads_open_;
     panel_visibility.log = &log_open_;
+    panel_visibility.force_diagram = &force_diagram_open_; // issue #61
 
     toolbar_.Draw(undo_stack_.CanUndo(), undo_stack_.CanRedo(), can_save, can_export_text, can_export_pdf,
                   can_export_inf, current_layout_, editor_options_, icon_visibility_, panel_visibility);
@@ -583,6 +587,14 @@ void Application::OnFrame() {
     }
     if (detailing_open_) {
         detailing_panel_.Draw(&detailing_open_, scene_, selection_);
+    }
+    if (force_diagram_open_) {
+        // issue #61: nullptr when the loaded scene has no completed
+        // run's results (current_analysis_ is default-constructed/empty
+        // in that state, same has_run_results_-gated lifetime as
+        // current_results_ -- see LoadStructure()/RebuildSceneAfterEdit()).
+        force_diagram_panel_.Draw(&force_diagram_open_, scene_, selection_,
+                                   has_run_results_ ? &current_analysis_ : nullptr);
     }
     if (run_open_) {
         run_panel_.Draw(&run_open_);

@@ -7,6 +7,7 @@
 #include "engine/AnalysisResults.h"
 #include "engine/MemberResults.h"
 #include "gui/DetailingPanel.h"
+#include "gui/ForceDiagramPanel.h"
 #include "gui/IconToolbar.h"
 #include "gui/IconVisibility.h"
 #include "gui/JointsPanel.h"
@@ -86,6 +87,7 @@ private:
     gui::JointsPanel joints_panel_;
     gui::MembersPanel members_panel_;
     gui::DetailingPanel detailing_panel_;
+    gui::ForceDiagramPanel force_diagram_panel_; // issue #61
     gui::LogPanel log_panel_;
     gui::RunPanel run_panel_;
 
@@ -140,6 +142,7 @@ private:
     bool joints_open_ = true;
     bool members_open_ = true;
     bool detailing_open_ = true;
+    bool force_diagram_open_ = true; // issue #61
     bool log_open_ = true;
     bool run_open_ = true;
     bool dockspace_initialized_ = false;

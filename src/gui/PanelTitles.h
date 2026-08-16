@@ -18,6 +18,7 @@ inline constexpr const char* kJointsId = "Joints";
 inline constexpr const char* kMembersId = "Members";
 inline constexpr const char* kLoadsId = "Loads";
 inline constexpr const char* kLogId = "Log";
+inline constexpr const char* kForceDiagramId = "ForceDiagram"; // issue #61
 
 // Issue #35: the literal string every panel now passes to `ImGui::Begin()`
 // is `<N leading spaces><display label>###<stable_id>`, not a plain label.

@@ -212,6 +212,8 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
             if (ImGui::BeginMenu("Subwindows")) {
                 if (panel_visibility.viewport) ImGui::MenuItem("Viewport", nullptr, panel_visibility.viewport);
                 if (panel_visibility.detailing) ImGui::MenuItem("Detailing", nullptr, panel_visibility.detailing);
+                if (panel_visibility.force_diagram)
+                    ImGui::MenuItem("Force Diagrams", nullptr, panel_visibility.force_diagram);
                 if (panel_visibility.properties) ImGui::MenuItem("Properties", nullptr, panel_visibility.properties);
                 if (panel_visibility.optimization)
                     ImGui::MenuItem("Optimization", nullptr, panel_visibility.optimization);

@@ -28,6 +28,20 @@ struct MemberForces {
 
     float axial_b = 0.f, shear_y_b = 0.f, shear_z_b = 0.f;
     float torsion_b = 0.f, moment_y_b = 0.f, moment_z_b = 0.f;
+
+    // Issue #61: this member's total distributed transverse load (N/m,
+    // self-weight-inclusive -- the same value WriteFinalResults()'s
+    // "Beban Total" line prints), read from sd.W[no_batang] at the same
+    // moment the end forces above are captured. Needed to derive N(x)/
+    // V(x)/M(x) force diagrams along the span analytically from the end
+    // forces + this single uniform load (this port's load model never
+    // has more than one distributed load per member -- see AGENTS.md's
+    // `gui/editor/` note on the legacy `.bbn` format's two load
+    // categories) without a second, separately-timed StructureData read
+    // (sd.W is zeroed by Application::OnRunResult() shortly after a run,
+    // for the load editor's sake -- see LegacyIO.h's ReadLoads() comment
+    // -- so this must be captured here, not read again later).
+    float w_total_n_per_m = 0.f;
 };
 
 // One joint's 6-DOF displacement, read from sd.DJ[6*no_joint-5+dof], dof

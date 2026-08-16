@@ -38,6 +38,7 @@ AnalysisResults ComputeAnalysisResults(const StructureData& sd) {
         f.torsion_b = sd.AM[i][10];
         f.moment_y_b = sd.AM[i][11];
         f.moment_z_b = sd.AM[i][12];
+        f.w_total_n_per_m = sd.W[i];
         out.member_forces.push_back(f);
     }
 

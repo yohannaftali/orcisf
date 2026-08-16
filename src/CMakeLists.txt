@@ -54,6 +54,8 @@ add_executable(orcisf_gui WIN32
     gui/JointsPanel.cpp
     gui/MembersPanel.cpp
     gui/DetailingPanel.cpp
+    gui/ForceDiagramPanel.cpp
+    gui/diagrams/ForceDiagram.cpp
     gui/viewport/Camera.cpp
     gui/viewport/SceneModel.cpp
     gui/viewport/SceneRenderer.cpp

@@ -4175,3 +4175,62 @@ consumes was already independently verified under #59.
   `src/gui/viewport/SceneRenderer.h`, `src/gui/viewport/SceneRenderer.cpp`,
   `src/gui/ViewportPanel.cpp`, `src/gui/editor/Selection.h`,
   `src/app/Application.h`, `src/app/Application.cpp`, `AGENTS.md`
+
+## [2026-08-16] — feat(gui): internal force diagrams N/V/M/T (#61)
+
+Third of epic #58's 4 sub-issues, implemented autonomously overnight
+(same `/coder` session as #59/#60).
+
+New `gui/diagrams/ForceDiagram.{h,cpp}` (pure geometry, no ImGui/ImPlot
+dependency, following the `DetailingLayout` split pattern) computes
+N(x)/V(x)/M(x)/T(x) along a member's span from its two end-force sets
+(`engine::MemberForces`, extended with a new `w_total_n_per_m` field
+captured at the same instant as the end forces) plus standard
+beam-diagram relations. New `gui/ForceDiagramPanel.{h,cpp}` renders it
+via ImPlot (four stacked line plots + a draggable station cursor) with a
+station slider readout showing N/V/M/T plus extreme-fiber axial+bending
+stress (`sigma = N/A +- M/S`, rectangular section from the member's
+final design dimensions). Wired in as a full docked panel: new
+`PanelIcon::ForceDiagram` glyph, `kForceDiagramId`, `PanelVisibility::
+force_diagram`, a View > Subwindows entry, a dock-tab-icon table row, and
+placement alongside Viewport/Detailing in all three layout presets.
+`main.cpp` now calls `ImPlot::CreateContext()`/`DestroyContext()` --
+ImPlot was already a `vcpkg.json` dependency (#2) but never previously
+initialized.
+
+**A numeric discrepancy was found and NOT resolved while trying to
+verify the moment diagram against a real run** -- documented in detail
+in `ForceDiagram.h`'s header comment and AGENTS.md's #61 notes, since
+it's a real open question, not swept under the rug: `V(x)` is exactly
+verified against real `GESER_KI`/`GESER_KA` values from a completed run
+(`Apl1-1` scratch copy); the two moment endpoints (`M_start`/`M_end`)
+independently match `MTUM_KI`/`MTUM_KA` exactly; but integrating the
+verified `V(x)` from the verified `M_start` does not reproduce the
+verified `M_end` (off by ~25x). Every sign-convention permutation was
+tried by hand against the same real numbers -- none matched, ruling out
+a simple sign error. Root cause not identified tonight; flagged
+prominently in code and docs as an open item rather than either hidden
+or falsely claimed as verified. `N(x)`/`T(x)` (constant, direct copies)
+and `V(x)` are solid; only `M(x)`'s interior shape (not its two
+endpoints) is in question.
+
+**Validation**: `src/build.ps1` built cleanly, zero warnings. GUI
+launched without crashing; the "Force Diagrams" dock tab (with its new
+hand-drawn icon) renders correctly, showing the right disabled-state
+placeholder text with no dataset/no completed-run-results loaded
+(screenshotted). The actual populated ImPlot rendering was not visually
+confirmed -- blocked by issue #63 (RunPanel hang), the same blocker #60
+hit; the M(x) discrepancy above was investigated via hand-calculation
+against real `.opt`/CLI-dumped numbers, independent of the GUI.
+
+- Issue #61 addressed on GitHub (not yet closed -- left for tomorrow's
+  `tester`/`reviewer` pass, which should specifically re-check the M(x)
+  discrepancy above before treating this as done)
+- Files: `src/gui/diagrams/ForceDiagram.h`, `src/gui/diagrams/ForceDiagram.cpp`,
+  `src/gui/ForceDiagramPanel.h`, `src/gui/ForceDiagramPanel.cpp`,
+  `src/gui/PanelIcons.h`, `src/gui/PanelIcons.cpp`, `src/gui/PanelTitles.h`,
+  `src/gui/PanelVisibility.h`, `src/gui/Toolbar.cpp`,
+  `src/app/DockTabIcons.cpp`, `src/app/Application.h`,
+  `src/app/Application.cpp`, `src/app/main.cpp`,
+  `src/engine/include/engine/AnalysisResults.h`,
+  `src/engine/src/AnalysisResults.cpp`, `src/CMakeLists.txt`, `AGENTS.md`

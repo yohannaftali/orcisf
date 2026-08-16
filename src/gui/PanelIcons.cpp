@@ -78,6 +78,16 @@ void DrawLogIcon(ImDrawList* dl, ImVec2 o, ImU32 c, float size) {
     }
 }
 
+void DrawForceDiagramIcon(ImDrawList* dl, ImVec2 o, ImU32 c, float size) {
+    // Issue #61: a schematic bending-moment diagram -- baseline + a
+    // triangular bump above/below it, distinct at a glance from
+    // DrawPropertiesIcon's flat horizontal sliders.
+    dl->AddLine(P(o, 0.1f, 0.5f, size), P(o, 0.9f, 0.5f, size), c, 1.f);
+    ImVec2 pts[4] = {P(o, 0.1f, 0.5f, size), P(o, 0.35f, 0.15f, size), P(o, 0.65f, 0.82f, size),
+                      P(o, 0.9f, 0.5f, size)};
+    dl->AddPolyline(pts, 4, c, 0, 1.5f);
+}
+
 } // namespace
 
 // Issue #54: lid + handle + can body with two rib lines -- a standard
@@ -104,6 +114,7 @@ void DrawPanelIcon(PanelIcon icon, ImDrawList* dl, ImVec2 origin, ImU32 color, f
         case PanelIcon::Loads: DrawLoadsIcon(dl, origin, color, size); break;
         case PanelIcon::Run: DrawRunIcon(dl, origin, color, size); break;
         case PanelIcon::Log: DrawLogIcon(dl, origin, color, size); break;
+        case PanelIcon::ForceDiagram: DrawForceDiagramIcon(dl, origin, color, size); break;
     }
 }
 
