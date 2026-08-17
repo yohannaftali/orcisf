@@ -5476,3 +5476,27 @@ tests already covered.
   `src/gui/RunPanel.cpp` (set/clear `has_finished_`, Progress display
   logic), `AGENTS.md` (#63 section rewritten as solved, Tracked Issues
   table updated, #58 epic note updated), `CHANGE_HISTORY.md`
+
+## [2026-08-17] — chore(test): independent tester pass on #63 fix + unblocked #72 post-Run check
+- Independently re-verified #63's fix (implemented earlier the same
+  night by coder) against a fresh build (`ninja: no work to do`,
+  confirming the binary already matched HEAD `f4a694f`). Used
+  deliberately different run parameters than coder's own verification
+  (`worker_threads=1`, `Max generations=25` vs. coder's `15`/`40`)
+  against the same `DatasetWithStr` scratch dataset to avoid just
+  repeating the exact same check. Result: Progress panel correctly
+  showed "100% / Generation 25 of 25 / Run complete." within seconds of
+  clicking Run, `engine::DebugLog()` confirmed the same ~200ms
+  completion timing as before, and `Get-Process`'s `Responding` stayed
+  `True` throughout (screenshot: `tester63_running_immediate.png`).
+  PASS.
+- With #63 now fixed, re-attempted #72's previously-blocked post-Run
+  Loads panel check (the prior tester pass could only confirm the
+  pre-run state, since a live #63 hang blocked reaching a completed run
+  state that night). Recorded the Loads panel before Run (batang 5-8,
+  all 35000.000 N/m) and again after a completed run (Progress showing
+  "100%/Run complete.") -- identical values, confirming loads no longer
+  disappear after a completed optimization run. PASS, both halves of
+  the criterion now confirmed live.
+- Files: `AGENTS.md` (#63 and #72 Tracked Issues rows updated),
+  `CHANGE_HISTORY.md`
