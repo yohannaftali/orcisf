@@ -4,6 +4,7 @@
 #include <cfloat>
 #include <cstdio>
 #include <string>
+#include <utility>
 
 #include <imgui.h>
 
@@ -58,13 +59,56 @@ bool DesignVarCombo(const char* str_id, int& index, const engine::LegacyArray<fl
 
 void DrawInputTable(const engine::StructureData& sd, const SceneModel& scene,
                      std::unordered_map<int, std::array<int, 12>>& beam_choices,
-                     std::unordered_map<int, std::array<int, 5>>& column_choices) {
+                     std::unordered_map<int, std::array<int, 5>>& column_choices, bool same_lap_tum) {
+    // Slot table indexed by the beam's own 12-slot layout (see
+    // AGENTS.md's "Discrete design variables"). `is_tumpuan` marks the 4
+    // slots [74]'s "same" toggle hides/mirrors -- kept as a plain lookup
+    // (not a lambda capturing `sd`) so it can stay a compile-time table.
+    struct SlotSpec {
+        int table_id; // 0=sisi_d_B,1=sisi_d_H,2=DIA_d,3=NL_d,4=DIAS_d,5=JS_d
+        const char* fmt;
+        bool is_tumpuan;
+    };
+    static constexpr SlotSpec kBeamSlots[12] = {
+        {0, "%.0f", false},  // B
+        {1, "%.0f", false},  // H
+        {2, "D%.0f", false}, // DIA1lap (tarik)
+        {3, "%.0f", false},  // NL1lap
+        {2, "D%.0f", false}, // DIA2lap (tekan)
+        {3, "%.0f", false},  // NL2lap
+        {2, "D%.0f", true},  // DIA1tum (tarik)
+        {3, "%.0f", true},   // NL1tum
+        {2, "D%.0f", true},  // DIA2tum (tekan)
+        {3, "%.0f", true},   // NL2tum
+        {4, "D%.0f", false}, // DIAS
+        {5, "%.0f", false},  // Jarak_S
+    };
+    auto slot_table = [&](int table_id) -> std::pair<const engine::LegacyArray<float>*, int> {
+        switch (table_id) {
+            case 0: return {&sd.sisi_d_B, sd.nsisi_B};
+            case 1: return {&sd.sisi_d_H, sd.nsisi_H};
+            case 2: return {&sd.DIA_d, sd.nDIA};
+            case 3: return {&sd.NL_d, sd.nNL};
+            case 4: return {&sd.DIAS_d, sd.nDIAS};
+            default: return {&sd.JS_d, sd.nJS};
+        }
+    };
+
     ImGui::TextUnformatted("Beams");
-    if (BeginTableView("analyze_beams", 13)) {
+    // Issue #74: hiding the 4 tumpuan columns is the whole point of the
+    // "same" toggle ("number of column become shorter") -- an ImGui table's
+    // column count is fixed for the whole table, so this has to be a
+    // table-wide column count, not a per-row thing.
+    const int visible_slots = same_lap_tum ? 8 : 12; // B,H,Dia+,N+,Dia-,N-,DiaS,S vs. all 12
+    if (BeginTableView("analyze_beams", visible_slots + 1)) {
         ImGui::TableSetupColumn("Batang", ImGuiTableColumnFlags_WidthFixed, 55.f);
-        for (const char* h : {"B", "H", "DiaLap+", "NLap+", "DiaLap-", "NLap-", "DiaTum+", "NTum+", "DiaTum-",
-                               "NTum-", "DiaS", "S"}) {
-            ImGui::TableSetupColumn(h);
+        if (same_lap_tum) {
+            for (const char* h : {"B", "H", "Dia+", "N+", "Dia-", "N-", "DiaS", "S"}) ImGui::TableSetupColumn(h);
+        } else {
+            for (const char* h : {"B", "H", "DiaLap+", "NLap+", "DiaLap-", "NLap-", "DiaTum+", "NTum+", "DiaTum-",
+                                   "NTum-", "DiaS", "S"}) {
+                ImGui::TableSetupColumn(h);
+            }
         }
         ImGui::TableHeadersRow();
 
@@ -76,22 +120,13 @@ void DrawInputTable(const engine::StructureData& sd, const SceneModel& scene,
             ImGui::TableSetColumnIndex(0);
             ImGui::Text("%d", mv.no_batang);
 
-            static const struct {
-                const engine::LegacyArray<float>* table;
-                int count;
-                const char* fmt;
-            } kSlots[12] = {
-                {&sd.sisi_d_B, sd.nsisi_B, "%.0f"}, {&sd.sisi_d_H, sd.nsisi_H, "%.0f"},
-                {&sd.DIA_d, sd.nDIA, "D%.0f"},      {&sd.NL_d, sd.nNL, "%.0f"},
-                {&sd.DIA_d, sd.nDIA, "D%.0f"},      {&sd.NL_d, sd.nNL, "%.0f"},
-                {&sd.DIA_d, sd.nDIA, "D%.0f"},      {&sd.NL_d, sd.nNL, "%.0f"},
-                {&sd.DIA_d, sd.nDIA, "D%.0f"},      {&sd.NL_d, sd.nNL, "%.0f"},
-                {&sd.DIAS_d, sd.nDIAS, "D%.0f"},    {&sd.JS_d, sd.nJS, "%.0f"},
-            };
+            int col = 1;
             for (int j = 0; j < 12; ++j) {
-                ImGui::TableSetColumnIndex(j + 1);
+                if (same_lap_tum && kBeamSlots[j].is_tumpuan) continue; // hidden -- Run Analyze mirrors these
+                ImGui::TableSetColumnIndex(col++);
                 ImGui::PushID(j);
-                DesignVarCombo("##v", c[static_cast<size_t>(j)], *kSlots[j].table, kSlots[j].count, kSlots[j].fmt);
+                auto [table, count] = slot_table(kBeamSlots[j].table_id);
+                DesignVarCombo("##v", c[static_cast<size_t>(j)], *table, count, kBeamSlots[j].fmt);
                 ImGui::PopID();
             }
             ImGui::PopID();
@@ -241,7 +276,14 @@ void AnalyzePanel::Draw(bool* open, const engine::StructureData* sd, const Scene
     ImGui::InputFloat("Beam cover (mm)", &selimut_balok_);
 
     ImGui::SeparatorText("Design Input");
-    DrawInputTable(*sd, scene, beam_choices_, column_choices_);
+    ImGui::Checkbox("Same bars at lapangan (midspan) and tumpuan (support)", &same_lap_tum_);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(
+            "Practical default: real construction almost always runs the same bar diameter/count through "
+            "both regions. Uncheck only for the rare/theoretical case of independently-chosen lapangan and "
+            "tumpuan reinforcement.");
+    }
+    DrawInputTable(*sd, scene, beam_choices_, column_choices_, same_lap_tum_);
 
     ImGui::Spacing();
     bool has_members = !scene.members.empty();
@@ -256,7 +298,18 @@ void AnalyzePanel::Draw(bool* open, const engine::StructureData* sd, const Scene
         std::vector<int> var_b, var_k;
         for (const MemberVisual& mv : scene.members) {
             if (!mv.is_beam) continue;
-            const std::array<int, 12>& c = beam_choices_[mv.no_batang];
+            std::array<int, 12> c = beam_choices_[mv.no_batang]; // copy -- may be mirrored below
+            // Issue #74: when "same" is on, tumpuan reinforcement always
+            // mirrors lapangan at Run time, regardless of whatever the
+            // (hidden) tumpuan slots currently hold -- this is what makes
+            // toggling back to "same" a clean re-sync rather than reviving
+            // stale independent values.
+            if (same_lap_tum_) {
+                c[6] = c[2]; // DIA1tum = DIA1lap
+                c[7] = c[3]; // NL1tum  = NL1lap
+                c[8] = c[4]; // DIA2tum = DIA2lap
+                c[9] = c[5]; // NL2tum  = NL2lap
+            }
             for (int v : c) var_b.push_back(v);
         }
         for (const MemberVisual& mv : scene.members) {

@@ -57,9 +57,26 @@ private:
     // choices survive geometry edits/undo naturally (a member that no
     // longer exists just stops being read; a new member gets an inserted
     // default the next Draw() call) without any explicit staleness
-    // tracking.
+    // tracking. `idx` slots [2..5] are lapangan tension/compression
+    // dia+count, [6..9] the tumpuan equivalents -- the legacy 12-slot
+    // layout (see AGENTS.md's "Discrete design variables" section).
     std::unordered_map<int, std::array<int, 12>> beam_choices_;
     std::unordered_map<int, std::array<int, 5>> column_choices_;
+
+    // Issue #74: one table-wide toggle (not per-beam -- an ImGui table's
+    // column count is fixed for the whole table, so a genuinely per-row
+    // "shorter table" as first specified isn't representable; a single
+    // switch for the whole Design Input table achieves the same practical
+    // goal -- "the same bars run continuously, don't make me enter them
+    // twice" -- without that constraint). Defaults true (matching real
+    // construction practice: lapangan/tumpuan almost always share the same
+    // bar diameter/count). When true, the table hides the 4 tumpuan
+    // reinforcement columns and Run Analyze mirrors idx[2..5] into
+    // idx[6..9] for every beam regardless of whatever idx[6..9] currently
+    // holds -- so re-checking after unchecking always cleanly re-syncs
+    // rather than reviving stale values. When false, all 12 slots are
+    // shown/edited independently per beam (the rare/theoretical case).
+    bool same_lap_tum_ = true;
 
     // Run configuration -- mirrors RunPanel's own fields/defaults (unit
     // prices, cover thickness) since ComputeMemberResults()'s cost/design

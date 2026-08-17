@@ -162,6 +162,15 @@ void RunPanel::Draw(bool* open) {
     ImGui::InputInt("Max generations", &j_iterasi_mak_);
     ImGui::InputInt("fak_plus", &fak_plus_);
     ImGui::InputInt("fak_kali", &fak_kali_);
+    // Issue #65: JSTD = JVD*fak_kali + fak_plus must stay > JVD, or
+    // RunOptimization()'s convergence check reads fitstr[JSTD-JVD-1] out of
+    // bounds (fak_kali=1, fak_plus=0 -> index -1). fak_kali=1/fak_plus=0
+    // is the one combination that violates this; clamp it here so it can
+    // never reach the engine via the GUI (engine::RunOptimization() also
+    // guards this itself for non-GUI callers, e.g. orcisf_cli).
+    fak_kali_ = std::max(1, fak_kali_);
+    fak_plus_ = std::max(0, fak_plus_);
+    if (fak_kali_ == 1 && fak_plus_ == 0) fak_plus_ = 1;
 
     ImGui::SeparatorText("Performance");
     int max_threads = static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));

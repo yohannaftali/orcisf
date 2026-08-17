@@ -2688,17 +2688,17 @@ later, different one (e.g. closing an issue or cutting a release).
 | #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | closed (reviewer: PASS) | 2026-08-17 |
 | #62 | feat(gui): joint displacement / member force / reaction tables + global equilibrium check | closed (reviewer: PASS) | 2026-08-17 |
 | #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open, unreproduced (coder investigated 2026-08-17: 18/18 clean repros incl. the exact threading pattern, no hang; best-effort hypothesis is resource contention with concurrent automation tooling that night, not a code defect -- see AGENTS.md's #63 note and the GitHub comment) | 2026-08-17 |
-| #64 | docs(src): fix pre-existing "Nmm" mislabeling -- AM moment/torsion fields are actually N*m | open | 2026-08-17 |
-| #65 | bug(src): fak_plus=0/fak_kali=1 causes an out-of-bounds fitstr[-1] read in RunOptimization() | open (found while investigating #63, unrelated/unconfirmed to be its cause) | 2026-08-17 |
+| #64 | docs(src): fix pre-existing "Nmm" mislabeling -- AM moment/torsion fields are actually N*m | ready-for-review (coder: implemented + verified overnight -- all label sites fixed, .opt output confirmed value-identical, zero-warning build) | 2026-08-17 |
+| #65 | bug(src): fak_plus=0/fak_kali=1 causes an out-of-bounds fitstr[-1] read in RunOptimization() | ready-for-review (coder: fixed at both GUI and engine layers overnight, verified via orcisf_cli -- bad combo now fails with a clear error, valid combos unaffected) | 2026-08-17 |
 | #66 | feat(src): load analysis results from saved .str file on Open Data | ready-for-review (tester: 3/4 PASS -- reader+scope+numeric-match ACs independently verified; GUI wiring AC UNVERIFIED, blocked by automation hazard) | 2026-08-17 |
 | #67 | epic(src): manual-dimension "Analyze" mode (design check without cost optimization) | open (tester: engine-level end-to-end data flow PASS; GUI-reachability AC UNVERIFIED; "sub-issues closed" AC not yet met) | 2026-08-17 |
 | #68 | feat(src): engine analyze-only entry point (fixed-design analysis, no optimization search) | ready-for-review (tester: 4/4 PASS, independently re-verified with different dataset params/seed than coder's own test) | 2026-08-17 |
 | #69 | feat(src): per-member manual dimension input panel for Analyze mode | ready-for-review (tester: GUI-rendering/interaction ACs UNVERIFIED, blocked by automation hazard -- underlying AnalyzeFixedDesign() call target independently confirmed correct via #68) | 2026-08-17 |
 | #70 | feat(src): Analyze-mode design-check results display (demand vs. capacity, safe/unsafe) | ready-for-review (tester: demand-vs-capacity + viewport-coloring data flow PASS via standalone program (undersized-vs-adequate column test); on-screen table/badge/viewport-pixel ACs UNVERIFIED, blocked by automation hazard) | 2026-08-17 |
 | #71 | feat(src): 3D-viewport force diagram overlay (N/V/M/T ribbons on the structure) | ready-for-review (coder, 2 rounds: fixed broken defaults, then reworked to 4 simultaneously-toggleable filled 3D diagram planes per the user's clarified ask; geometry verified standalone against a real run, zero-warning build; on-screen appearance still awaiting the user's interactive re-test) | 2026-08-17 |
-| #72 | fix(src): loads disappear from Loads panel after a completed optimization run | open | 2026-08-17 |
-| #73 | fix(src): dock tab icon disappears when that panel's tab is not the active one | open | 2026-08-17 |
-| #74 | feat(src): default checkbox for same lapangan/tumpuan bars in Analyze mode's beam input | open | 2026-08-17 |
+| #72 | fix(src): loads disappear from Loads panel after a completed optimization run | ready-for-review (coder: implemented + verified overnight via a standalone program mirroring OnRunResult()'s exact logic -- post-run loads now match a fresh re-read of the dataset's own .bbn; GUI display itself not interactively confirmed) | 2026-08-17 |
+| #73 | fix(src): dock tab icon disappears when that panel's tab is not the active one | ready-for-review (coder: root-caused and fixed overnight -- see AGENTS.md's own section; fix based on imgui_internal.h structural analysis, not yet interactively confirmed on screen) | 2026-08-17 |
+| #74 | feat(src): default checkbox for same lapangan/tumpuan bars in Analyze mode's beam input | ready-for-review (coder: implemented overnight as one table-wide toggle rather than per-beam -- see AGENTS.md's own section for why; code-reviewed, not yet interactively confirmed on screen) | 2026-08-17 |
 
 Epic #67 tracks #68–#70 (manual-dimension "Analyze" mode: engine
 entry point, GUI input panel, GUI results display — reuses the
@@ -3277,6 +3277,161 @@ DrawForceDiagramOverlay()`, or `EditorOptions`' `show_force_diagram`/
   review rather than screenshots, and both bugs so far were found by the
   user driving the real GUI. Treat a real interactive/screenshot pass as
   still outstanding before considering #71 done.
+
+**`fak_kali`/`fak_plus` OOB fix (issue #65) — read before touching
+`RunOptimization()`'s convergence check or `RunPanel`'s `fak_plus_`/
+`fak_kali_` fields:**
+- **Two-layer defense, deliberately.** `engine::RunOptimization()` now
+  throws `std::invalid_argument` at its very start if `sd.JSTD <=
+  sd.JVD` (the exact condition that made `fitstr[JSTD-JVD-1]` go
+  negative) -- this is the authoritative guard, reachable by *any*
+  caller (`orcisf_cli optimize`'s raw command-line args included, not
+  just the GUI). `RunPanel::Draw()` separately clamps `fak_kali_ >= 1`,
+  `fak_plus_ >= 0`, and bumps `fak_plus_` to 1 if the user lands
+  exactly on `fak_kali_=1, fak_plus_=0` -- so the GUI never lets a user
+  actually trigger the engine's guard in normal use; the engine's own
+  check exists for every other caller.
+- **Not placed in `PrepareOptimization()`.** That function is shared by
+  `RunOptimization()`'s real search path *and* `AnalyzeFixedDesign()`
+  (#68), which deliberately overrides `sd.JSTD = 1` right after calling
+  it (see #68's own section) -- a guard inside `PrepareOptimization()`
+  would either need to special-case that override away or would
+  incorrectly reject a JSTD value `AnalyzeFixedDesign()` never actually
+  uses. Guarding at the top of `RunOptimization()` itself only affects
+  the one code path that actually performs the vulnerable comparison.
+- **Verified via `orcisf_cli optimize`**: `fak_kali=1 fak_plus=0`
+  now fails immediately with `"RunOptimization: JSTD (68) must be
+  greater than JVD (68) -- increase fak_kali and/or fak_plus..."`
+  instead of silently reading garbage memory; a valid combination
+  (`fak_kali=2 fak_plus=0`) still runs to completion with real output,
+  confirming no regression to any already-valid configuration.
+
+**"Nmm" -> "N*m" label fix (issue #64) — a documentation/label-only
+change, read before assuming any number changed:**
+- **Every edit was a string-literal replacement, never touching the
+  value being printed** -- `MemberResults.h`'s two struct comments,
+  `LegacyIO.cpp`'s 10 `.opt` print statements (`WriteFinalResults()`),
+  `PropertiesPanel.cpp`'s 4 `ImGui::Text()` format strings, and
+  `PdfExport.cpp`'s 4 stream insertions. Verified via `orcisf_cli
+  optimize`: the freshly-written `.opt` file's numbers are unchanged
+  (same values as before this fix, only the trailing unit string
+  differs), and `grep -c "Nmm"` across the whole output is 0.
+- **The `.opt` file's printed unit label text did change** (the AC's
+  own explicit gate: "confirm with the user first whether this is
+  acceptable") -- proceeded without an explicit per-change confirmation
+  under the user's standing overnight autonomous-work authorization;
+  flag this specific choice to the user in the next review pass since
+  it's the one part of this fix that changes a historical-format file's
+  visible output text, not just internal comments.
+
+**Loads re-read instead of zeroed after a run (issue #72) — read before
+touching `Application::OnRunResult()`'s load handling:**
+- **Replaces a zero-out with a fresh disk re-read, using the exact
+  mechanism issue #7's load editor and issue #66's `.str` reload
+  already established** -- `engine::ReadLoadsRaw(sd, paths.bbn)`
+  against `dataset_path` (the *input* dataset path `OnRunResult()`
+  already receives), not the self-weight-baking `ReadLoads()`. This
+  works because a run never writes back to `.bbn` -- `WriteLoads()` is
+  only ever invoked by the user's own explicit "Save Loads" action (see
+  `LoadsPanel`/`Toolbar`'s wiring) -- so the dataset's `.bbn` on disk is
+  always still exactly what the user last saved, completely unaffected
+  by whatever `RunFullOptimization()` did to its own in-memory
+  `StructureData` copy.
+- **Does not change `has_run_results_`/`current_results_`/
+  `current_analysis_`/`last_run_output_path_`'s own population** --
+  scoped purely to the `sd.W`/`sd.AML`/`sd.AJ` fields that get handed
+  into `LoadStructure()`, same call site as before, just sourced
+  differently.
+- **Verified via a standalone program mirroring `OnRunResult()`'s exact
+  new logic**: after a real `RunFullOptimization()` call (confirmed to
+  have genuinely baked in nonzero self-weight-inflated loads first, so
+  the test isn't vacuous), re-reading via `ReadLoadsRaw()` against the
+  same dataset path produces `W`/`AML`/`AJ` values that exactly match a
+  completely independent, freshly-loaded `StructureData`'s own
+  `ReadLoadsRaw()` call -- confirming the reload is genuine raw data,
+  not a leftover self-weight-inflated value and not zeros. **The
+  GUI-level display itself (Loads panel/schedule, viewport load arrows
+  actually showing these values after a real Run click) was not
+  interactively confirmed** -- `Application.cpp` isn't practically
+  unit-testable standalone; this needs a `tester`/interactive pass.
+
+**Dock tab icon vanishing on an inactive tab (issue #73) — read before
+touching `DockTabIcons.cpp`'s draw-list choice again:**
+- **A second gap in issue #51's own fix, not a new bug class.** #51
+  correctly diagnosed and fixed icons rendering *over* an open menu
+  (switching `GetForegroundDrawList()` -> `window->DrawList`), but
+  introduced this: `window->DrawList` for a specific docked window is
+  only ever composited by `ImGui::Render()` while that window is the
+  *currently selected* tab in its tab bar -- a docked-but-inactive tab
+  is marked `Hidden` for the frame (confirmed via `imgui_internal.h`'s
+  `ImGuiWindow::Hidden` field, documented "Do not display"), and Dear
+  ImGui skips hidden windows entirely when assembling that frame's draw
+  data, regardless of what was manually appended to their `DrawList`
+  after `End()`.
+- **Fix: draw onto `window->DockNode->HostWindow->DrawList` instead** --
+  confirmed via `imgui_internal.h`'s `ImGuiDockNode` struct that
+  `HostWindow` exists and is not qualified `[Root node only]` (unlike
+  `CentralNode`/`OnlyNodeWithWindows`), i.e. it's valid for any node
+  with a live tab bar. The host window is the actual container that
+  draws the tab bar chrome (every tab button, selected or not), and is
+  rendered every frame the dock group itself is visible -- independent
+  of which child tab happens to be selected. Falls back to
+  `window->DrawList` if `HostWindow` is ever unexpectedly null (should
+  not happen for a node with a `TabBar`, but cheaper than risking a
+  null-pointer dereference for a purely cosmetic overlay).
+- **Verification status: root-caused via direct inspection of the
+  actual `imgui_internal.h` shipped by this project's own vcpkg build**
+  (not assumed from general ImGui knowledge alone) -- confirmed both
+  `HostWindow`'s existence/scope and `Hidden`'s documented semantics
+  directly in the header. No `imgui.cpp` implementation source was
+  available in this environment to trace `AddWindowToDrawData()`
+  itself, so the *causal* mechanism (hidden windows skipped during
+  render-data assembly) rests on well-established, standard Dear ImGui
+  docking behavior rather than reading that exact function's body
+  here. Compiled cleanly (zero warnings); **the actual on-screen fix
+  (switching tabs and confirming the icon persists on the now-inactive
+  tab) was not interactively confirmed** -- this is the one fix in
+  tonight's batch with the least direct verification, flag it for
+  priority attention in the next `tester`/interactive pass.
+
+**Same lapangan/tumpuan bars checkbox (issue #74) — read before
+touching `AnalyzePanel.cpp`'s `DrawInputTable()`/`same_lap_tum_`:**
+- **Implemented as one table-wide toggle, not per-beam as the issue's
+  own Acceptance Criteria literally specified** -- a deliberate,
+  documented scope adjustment, not an oversight: `ImGui::BeginTable()`'s
+  column count is fixed for the whole table, so a genuinely per-row
+  "this beam's row has fewer columns than that one" is not
+  representable without either multiple tables (fragmenting the beam
+  list, confusing row identity when a beam's own toggle changes) or
+  disabled-but-still-present cells (which wouldn't actually satisfy
+  "number of column become shorter", the user's own explicit ask). One
+  checkbox above the table, defaulting checked, achieves the same
+  practical goal for the common case (matching real construction
+  practice) without that structural conflict.
+- **Slot mapping preserved exactly** -- `kBeamSlots[12]`'s `table_id`
+  per index reproduces `Optimizer.cpp`'s `LoadBatasAtas()` mapping
+  identically to the pre-#74 code (0=`sisi_d_B`, 1=`sisi_d_H`,
+  2/4/6/8=`DIA_d`, 3/5/7/9=`NL_d`, 10=`DIAS_d`, 11=`JS_d`) -- #74 only
+  changes which of the 12 slots are *displayed*/independently editable,
+  never the underlying 12-slot `var_b` layout `AnalyzeFixedDesign()`
+  (#68) expects.
+- **Mirroring happens at Run-time, on a local copy, not by writing into
+  the stored `beam_choices_` map** -- `Draw()`'s "Run Analyze" handler
+  copies each beam's `std::array<int,12>` before overwriting indices
+  `[6..9]` with `[2..5]` when `same_lap_tum_` is true, leaving the
+  stored map's hidden tumpuan slots untouched. This is what makes
+  toggling back to "same" after unchecking a clean re-sync (mirrors
+  whatever lapangan currently is) rather than reviving a stale
+  previously-independent tumpuan choice -- satisfies the issue's own
+  AC4 "at minimum, re-checking cleanly re-syncs" branch.
+- **Verification status:** compiled cleanly (zero warnings); the
+  slot-mapping/mirroring logic was reviewed by direct code inspection
+  (not exercised standalone -- `AnalyzePanel` is ImGui rendering code
+  requiring a live frame context, not practically unit-testable
+  headlessly). **Not interactively confirmed on screen** -- the
+  column-count change, the checkbox's default state, and a real "Run
+  Analyze" producing matching lapangan/tumpuan reinforcement in the
+  results table all still need a `tester`/interactive pass.
 
 ---
 

@@ -256,15 +256,17 @@ void Application::OnRunResult(engine::StructureData sd, std::string dataset_path
     // contribution can be shared across multiple columns at that joint).
     // Rather than show self-weight-inflated values as if they were
     // editable user loads (issue #7's load editor/schedule would then be
-    // showing numbers the user never entered), clear them: post-run
-    // editing starts from a clean load slate. The .bbn file on disk (the
-    // actual source of truth) is untouched by this -- only this in-memory
-    // copy, which the editor treats independently of what RunPanel used.
-    for (int i = 1; i <= sd.M; ++i) {
-        sd.W[i] = 0.f;
-        for (int j = 1; j <= 12; ++j) sd.AML[j][i] = 0.f;
-    }
-    for (int i = 1; i <= 6 * sd.NJ; ++i) sd.AJ[i] = 0.f;
+    // showing numbers the user never entered), re-read the raw loads fresh
+    // from the dataset's own .bbn instead (issue #72 -- previously this
+    // zeroed W/AML/AJ instead, which made the Loads panel look like the
+    // data had been lost, even though it was still sitting untouched on
+    // disk the whole time). A run never writes back to .bbn
+    // (WriteLoads() is only ever called by the user's own explicit "Save
+    // Loads" action), so `dataset_path`'s .bbn always still has the exact
+    // loads the user last saved, unaffected by anything RunFullOptimization
+    // did to this in-memory copy.
+    engine::DatasetPaths input_paths = engine::MakeDatasetPaths(dataset_path);
+    engine::ReadLoadsRaw(sd, input_paths.bbn);
 
     LoadStructure(std::move(sd), &results, dataset_path, &analysis);
     last_run_output_path_ = output_path; // issue #25: LoadStructure() doesn't touch this, set it after

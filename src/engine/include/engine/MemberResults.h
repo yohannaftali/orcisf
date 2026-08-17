@@ -20,7 +20,7 @@ struct MemberResult {
 
     float harga = 0.f; // cost contribution (Rp.)
 
-    // Beam only: moment demand/capacity (Nmm) and constraint value for
+    // Beam only: moment demand/capacity (N*m) and constraint value for
     // each design region -- lapangan (midspan) and tumpuan (support).
     // kendala_* is 0 when every check in that region is satisfied, >0
     // when violated (same convention as the optimizer's fitness formula).
@@ -28,7 +28,7 @@ struct MemberResult {
     float tumpuan_MU = 0.f, tumpuan_FMU = 0.f, tumpuan_kendala = 0.f;
     float kendala_lendutan = 0.f;
 
-    // Column only: axial force + biaxial moment demand/capacity (N, Nmm)
+    // Column only: axial force + biaxial moment demand/capacity (N, N*m)
     // and the aggregate constraint value across every column check
     // (gaya/rasio-penulangan/jarak-tulangan/sengkang/kelangsingan).
     float axial_demand = 0.f, axial_capacity = 0.f;

@@ -831,6 +831,24 @@ AnalyzeResult AnalyzeFixedDesign(StructureData& sd, const OptimizationOptions& o
 
 void RunOptimization(StructureData& sd, const OptimizationOptions& options, const ProgressCallback& on_progress,
                       const DetailLogCallback& on_detail, const std::atomic<bool>* cancel) {
+    // Issue #65: the convergence check below reads sd.fitstr[sd.JSTD -
+    // sd.JVD - 1] -- with fak_kali=1/fak_plus=0 (both reachable via the Run
+    // panel's plain ImGui::InputInt fields, and via orcisf_cli's optimize
+    // command-line args), JSTD == JVD, making that index -1 -- an
+    // out-of-bounds LegacyArray access (UB, size_t-cast from -1). The
+    // legacy algorithm's convergence check itself assumes a population
+    // strictly larger than JVD (comparing the best candidate against the
+    // one JVD+1 slots below it), so this isn't just an index guard: JSTD
+    // <= JVD is genuinely too small a population for optimasi() to
+    // function as designed. Fail loudly and early instead of reading
+    // garbage memory -- RunPanel/orcisf_cli both already catch
+    // std::exception around this call.
+    if (sd.JSTD <= sd.JVD) {
+        throw std::invalid_argument("RunOptimization: JSTD (" + std::to_string(sd.JSTD) + ") must be greater than "
+                                     "JVD (" + std::to_string(sd.JVD) +
+                                     ") -- increase fak_kali and/or fak_plus (JSTD = JVD*fak_kali + fak_plus).");
+    }
+
     Rng rng(options.rng_seed != 0 ? options.rng_seed : std::random_device{}());
     AcakVariabel(sd, rng, options);
 

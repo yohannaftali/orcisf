@@ -90,16 +90,33 @@ void DrawDockTabIcons() {
             // ImGui::GetForegroundDrawList() composites *after every
             // window*, popups included, by Dear ImGui's own layering --
             // no clip rect or position clamp changes which layer a draw
-            // call belongs to. The fix here is the same one: draw onto
-            // the *owning panel's own* window draw list (`window->
-            // DrawList`) instead. This is valid even though this
-            // function runs after that window's Begin()/End() cycle for
-            // the frame -- ImGui doesn't finalize/copy per-window draw
-            // data until ImGui::Render(), called after this function --
-            // and it makes the icon participate in normal per-window
-            // z-order, so a popup opened later the same frame correctly
-            // draws over it, exactly like a real docked-tab icon should.
-            ImDrawList* dl = window->DrawList;
+            // call belongs to. The fix (at the time) was to draw onto the
+            // *owning panel's own* window draw list (`window->DrawList`)
+            // instead.
+            //
+            // Issue #73 (found later): that #51 fix had its own gap --
+            // `window->DrawList` only ever gets composited by
+            // ImGui::Render() while `window` is the *currently selected*
+            // tab in its tab bar (a docked-but-inactive tab is marked
+            // `Hidden` for the frame, and Hidden windows are skipped
+            // entirely when Render() assembles draw data -- see
+            // `ImGuiWindow::Hidden`'s own doc comment in
+            // imgui_internal.h: "Do not display"). So a panel's icon
+            // vanished the moment its tab stopped being the active one,
+            // even though the tab *button* itself (owned by the dock
+            // node's host window, not by `window`) stayed fully visible.
+            // Fix: draw onto `window->DockNode->HostWindow->DrawList`
+            // instead -- the host window is the actual container that
+            // draws the tab bar chrome, and it's rendered every frame the
+            // dock group itself is visible, independent of which child
+            // tab is currently selected. Confirmed via imgui_internal.h's
+            // `ImGuiDockNode::HostWindow` field (present on any node with
+            // a tab bar, not just the [Root node only]-qualified fields).
+            // Falls back to `window->DrawList` if `HostWindow` is ever
+            // null (shouldn't happen for a node with a live TabBar, but
+            // cheaper than risking a null dereference for a purely
+            // cosmetic overlay).
+            ImDrawList* dl = window->DockNode->HostWindow ? window->DockNode->HostWindow->DrawList : window->DrawList;
             dl->PushClipRect(tab_bar->BarRect.Min, tab_bar->BarRect.Max, true);
             gui::DrawPanelIcon(entry.icon, dl, origin, color, icon_size);
             dl->PopClipRect();

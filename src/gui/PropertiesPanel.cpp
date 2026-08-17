@@ -250,11 +250,11 @@ void DrawMemberProperties(const SceneModel& scene, Selection& selection, Editabl
 
     if (mv.is_beam) {
         ImGui::SeparatorText("Daerah Lapangan");
-        ImGui::Text("Momen: %.4g / %.4g Nmm%s", mv.result.lapangan_MU, mv.result.lapangan_FMU,
+        ImGui::Text("Momen: %.4g / %.4g Nm%s", mv.result.lapangan_MU, mv.result.lapangan_FMU,
                     mv.result.lapangan_MU > mv.result.lapangan_FMU ? "  (!)" : "");
         ImGui::Text("Kendala: %.4g", mv.result.lapangan_kendala);
         ImGui::SeparatorText("Daerah Tumpuan");
-        ImGui::Text("Momen: %.4g / %.4g Nmm%s", mv.result.tumpuan_MU, mv.result.tumpuan_FMU,
+        ImGui::Text("Momen: %.4g / %.4g Nm%s", mv.result.tumpuan_MU, mv.result.tumpuan_FMU,
                     mv.result.tumpuan_MU > mv.result.tumpuan_FMU ? "  (!)" : "");
         ImGui::Text("Kendala: %.4g", mv.result.tumpuan_kendala);
         ImGui::SeparatorText("Lendutan");
@@ -264,8 +264,8 @@ void DrawMemberProperties(const SceneModel& scene, Selection& selection, Editabl
         ImGui::Text("%.4g / %.4g N%s", mv.result.axial_demand, mv.result.axial_capacity,
                     std::fabs(mv.result.axial_demand) > mv.result.axial_capacity ? "  (!)" : "");
         ImGui::SeparatorText("Momen Biaksial");
-        ImGui::Text("Mx: %.4g Nmm   My: %.4g Nmm", mv.result.moment_x_demand, mv.result.moment_y_demand);
-        ImGui::Text("Kapasitas momen: %.4g Nmm", mv.result.moment_capacity);
+        ImGui::Text("Mx: %.4g Nm   My: %.4g Nm", mv.result.moment_x_demand, mv.result.moment_y_demand);
+        ImGui::Text("Kapasitas momen: %.4g Nm", mv.result.moment_capacity);
         ImGui::SeparatorText("Kendala");
         ImGui::Text("%.4g", mv.result.kendala_kolom);
     }

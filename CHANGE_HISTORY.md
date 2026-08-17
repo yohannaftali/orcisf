@@ -5155,3 +5155,111 @@ remains outstanding.
   `src/gui/viewport/SceneModel.{h,cpp}`,
   `src/gui/viewport/SceneRenderer.{h,cpp}`, `src/gui/ViewportPanel.cpp`,
   `AGENTS.md`
+
+## [2026-08-17] — coder (autonomous overnight): implement #64, #65, #72, #73, #74
+
+User asked to autonomously resolve all remaining open issues overnight,
+merge/push without further confirmation, then hand off to `tester` for
+everything untested -- same standing authorization as the two earlier
+overnight sessions this project. Fetched the live open-issue list from
+GitHub first (13 open: #58, #63-#74) rather than trusting memory.
+Implemented the 5 that were genuinely unstarted (#64/#65/#72/#73/#74);
+#66-#71 were already implemented from earlier sessions (ready-for-review,
+pending tester/interactive confirmation); #58 (epic) and #63 (RunPanel
+hang, extensively investigated and unreproduced in an earlier session)
+were deliberately left untouched -- see their own reasoning below.
+
+**#65 -- `fak_kali`/`fak_plus` OOB fix**: two-layer defense.
+`engine::RunOptimization()` now throws `std::invalid_argument` at its
+start if `sd.JSTD <= sd.JVD` (the authoritative guard, catches
+`orcisf_cli`'s raw CLI args too); `RunPanel::Draw()` separately clamps
+`fak_kali_`/`fak_plus_` so the GUI can never actually trigger it.
+Deliberately not placed in the shared `PrepareOptimization()`, since
+`AnalyzeFixedDesign()` (#68) also calls that and then legitimately
+overrides `JSTD=1` itself. Verified via `orcisf_cli optimize`: the exact
+bad combo (`fak_kali=1 fak_plus=0`) now fails with a clear message
+instead of reading garbage memory; a valid combo (`fak_kali=2
+fak_plus=0`) still completes normally.
+
+**#64 -- "Nmm" -> "N*m" label fix**: pure string-literal changes across
+`MemberResults.h` (2 comments), `LegacyIO.cpp` (10 `.opt` print
+statements), `PropertiesPanel.cpp` (4 format strings), `PdfExport.cpp`
+(4 stream insertions) -- no value computation touched anywhere.
+Verified via a fresh `orcisf_cli optimize` run: the written `.opt`
+file's numbers are unchanged, `grep -c "Nmm"` across all output is 0.
+Per the issue's own explicit gate ("confirm with the user first" on the
+`.opt` file's printed text changing), proceeded under the standing
+overnight autonomous-work authorization rather than pausing -- flagged
+explicitly in `AGENTS.md`'s own section for next review.
+
+**#72 -- loads no longer zeroed after a run**: `Application::
+OnRunResult()` now re-reads raw loads fresh via `engine::ReadLoadsRaw()`
+against the run's own input dataset path, instead of zeroing
+`sd.W`/`AML`/`AJ` -- safe because a run never writes back to `.bbn`
+(`WriteLoads()` is only ever called by the user's own "Save Loads"
+action). Verified via a standalone program mirroring `OnRunResult()`'s
+exact new logic: post-run reloaded values exactly match an independent
+fresh `ReadLoadsRaw()` read of the same dataset, and are confirmed
+genuinely nonzero (not the old zeroed behavior, not the run's
+self-weight-inflated values).
+
+**#73 -- dock tab icon disappearing on an inactive tab**: root-caused
+as a second gap in issue #51's own fix -- `window->DrawList` (what #51
+switched to) is only composited by `ImGui::Render()` while that
+specific window is the *currently selected* tab (an inactive docked
+tab is marked `Hidden` for the frame and skipped entirely during
+render-data assembly, confirmed via `imgui_internal.h`'s
+`ImGuiWindow::Hidden` field). Fixed by drawing onto `window->
+DockNode->HostWindow->DrawList` instead -- the dock node's host window
+draws the tab bar chrome itself and renders every frame the dock group
+is visible, independent of which child tab is selected. Confirmed
+`ImGuiDockNode::HostWindow`'s existence/scope directly from this
+project's own vcpkg-shipped `imgui_internal.h` rather than assuming.
+**Least-verified fix in this batch** -- no `imgui.cpp` implementation
+source was available to trace the render-assembly function itself, and
+the actual on-screen behavior (switching tabs, watching the icon
+persist) was not interactively confirmed.
+
+**#74 -- same lapangan/tumpuan bars checkbox**: implemented as *one*
+table-wide toggle rather than literally per-beam as first specified --
+an ImGui table's column count is fixed for the whole table, so a
+genuinely per-row "shorter table" isn't representable; a single switch
+achieves the same practical goal without that conflict, and is
+explicitly documented as a scope adjustment in `AGENTS.md`, not a
+silent deviation. Defaults checked (matching real construction
+practice). Mirrors lapangan into the hidden tumpuan slots at Run-time
+on a local copy (not by mutating the stored per-beam choices), so
+toggling back to "same" always cleanly re-syncs. Slot-to-discrete-table
+mapping verified by direct comparison against the pre-existing code and
+`Optimizer.cpp`'s `LoadBatasAtas()` -- unchanged. Not exercised
+standalone (`AnalyzePanel` needs a live ImGui frame context); reviewed
+by direct code inspection instead.
+
+**Deliberately not touched:**
+- **#58** (epic) -- stays open; its own closing condition (#59-#62's
+  live GUI confirmation) is blocked on #63, unchanged tonight.
+- **#63** (RunPanel hang) -- already investigated exhaustively in an
+  earlier session (18/18 clean reproductions, no repro found -- see
+  that session's own `CHANGE_HISTORY.md` entry and `AGENTS.md`'s
+  `engine/` section). Re-attempting without new information would risk
+  a false-confidence "fix" for a bug that was never actually
+  reproduced; left open with its existing investigation notes standing.
+
+**Build/validation**: `src/build.ps1` run once after all 5 changes
+landed together -- clean, **zero warnings**. Non-interactive
+`orcisf_gui.exe` launch smoke-tested (no crash) both mid-batch and
+after the final build. `orcisf_cli`-based and standalone-program
+verification performed for #65/#64/#72 as described above; #73/#74
+verified by code review + successful compilation only -- both are
+flagged in `AGENTS.md` as needing a real interactive/`tester` pass,
+same as #66/#69/#70/#71 already were.
+
+- Issues #64, #65, #72, #73, #74 implemented, built, and (where
+  practical) standalone-verified; not closed on GitHub (awaiting
+  tester/reviewer per this project's standard workflow)
+- Files: `src/engine/src/Optimizer.cpp`, `src/gui/RunPanel.cpp`,
+  `src/engine/include/engine/MemberResults.h`,
+  `src/engine/src/LegacyIO.cpp`, `src/gui/PropertiesPanel.cpp`,
+  `src/report/PdfExport.cpp`, `src/app/Application.cpp`,
+  `src/app/DockTabIcons.cpp`, `src/gui/AnalyzePanel.{h,cpp}`,
+  `AGENTS.md`

@@ -544,9 +544,9 @@ void WriteFinalResults(StructureData& sd, const DatasetPaths& paths) {
         hopt << "Panjang Bentang : " << sd.L << " m\n";
         hopt << "Beban Total : " << sd.W[sd.no_balok[oio]] << " N/m\n";
         hopt << "Berat Sendiri : " << sd.W_Balok[sd.no_balok[oio]] << " N/m\n";
-        hopt << "Momen kiri : " << (sd.MTUM_KI[sd.no_balok[oio]] / 0.8f) << " Nmm\n";
-        hopt << "Momen tengah : " << (sd.MLAP[sd.no_balok[oio]] / 0.8f) << " Nmm\n";
-        hopt << "Momen kanan : " << (sd.MTUM_KA[sd.no_balok[oio]] / 0.8f) << " Nmm\n";
+        hopt << "Momen kiri : " << (sd.MTUM_KI[sd.no_balok[oio]] / 0.8f) << " Nm\n";
+        hopt << "Momen tengah : " << (sd.MLAP[sd.no_balok[oio]] / 0.8f) << " Nm\n";
+        hopt << "Momen kanan : " << (sd.MTUM_KA[sd.no_balok[oio]] / 0.8f) << " Nm\n";
         hopt << "Geser kiri : " << (sd.GESER_KI[sd.no_balok[oio]] / 0.8f) << " N\n";
         hopt << "Geser kanan : " << (sd.GESER_KA[sd.no_balok[oio]] / 0.8f) << " N\n";
 
@@ -566,8 +566,8 @@ void WriteFinalResults(StructureData& sd, const DatasetPaths& paths) {
         hopt << "Berat Tulangan utama : " << sd.berat_besi << " kg\n";
         hopt << "Berat Tulangan geser : " << sd.berat_sengkang << " kg\n";
         hopt << "Harga balok daerah lapangan : " << sd.harga << "\n";
-        hopt << "Momen yang membebani : " << sd.MU << " Nmm\n";
-        hopt << "Momen yang dapat ditahan : " << sd.FMU << " Nmm\n\n";
+        hopt << "Momen yang membebani : " << sd.MU << " Nm\n";
+        hopt << "Momen yang dapat ditahan : " << sd.FMU << " Nm\n\n";
 
         hkdl << "\nBalok " << (oio + 1) << "\n";
         hkdl << "Nomor Batang : " << sd.no_balok[oio] << "\n";
@@ -588,8 +588,8 @@ void WriteFinalResults(StructureData& sd, const DatasetPaths& paths) {
         hopt << "Berat Tulangan utama : " << sd.berat_besi << " kg\n";
         hopt << "Berat Tulangan geser : " << sd.berat_sengkang << " kg\n";
         hopt << "Harga balok pada tumpuan kiri + kanan : " << sd.harga << "\n";
-        hopt << "Momen yang membebani : " << sd.MU << " Nmm\n";
-        hopt << "Momen yang dapat ditahan : " << sd.FMU << " Nmm\n\n";
+        hopt << "Momen yang membebani : " << sd.MU << " Nm\n";
+        hopt << "Momen yang dapat ditahan : " << sd.FMU << " Nm\n\n";
 
         hkdl << "\nDaerah Tumpuan\n";
         hkdl << "Kendala rasio penulangan " << sd.kendala_rho << "\n";
@@ -617,9 +617,9 @@ void WriteFinalResults(StructureData& sd, const DatasetPaths& paths) {
         hopt << "Berat Kolom : " << (-sd.P_Kolom[sd.no_kolom[oio]]) << " N\n";
         hopt << "Gaya aksial : " << (sd.PK[sd.no_kolom[oio]] / 0.8f) << " N\n";
         hopt << "Gaya aksial yang dapat ditahan = " << sd.FPU << " N\n";
-        hopt << "Momen arah X : " << (sd.MKX[sd.no_kolom[oio]] / 0.8f) << " Nmm\n";
-        hopt << "Momen arah Y : " << (sd.MKY[sd.no_kolom[oio]] / 0.8f) << " Nmm\n";
-        hopt << "Momen yang dapat ditahan : " << sd.FMU << " Nmm\n";
+        hopt << "Momen arah X : " << (sd.MKX[sd.no_kolom[oio]] / 0.8f) << " Nm\n";
+        hopt << "Momen arah Y : " << (sd.MKY[sd.no_kolom[oio]] / 0.8f) << " Nm\n";
+        hopt << "Momen yang dapat ditahan : " << sd.FMU << " Nm\n";
         hopt << "Geser pada kolom : " << (sd.GK[sd.no_kolom[oio]] / 0.8f) << " N\n\n";
 
         hkdl << "\nKolom " << (oio + 1) << "\n";

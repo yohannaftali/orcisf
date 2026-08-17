@@ -226,9 +226,9 @@ void DrawMemberDetailPage(HPDF_Doc pdf, HPDF_Font font, HPDF_Font font_bold, con
     if (r.is_beam) {
         std::ostringstream lap, tum, lend;
         lap << "Lapangan  -  Momen: " << r.lapangan_MU << " / " << r.lapangan_FMU
-            << " Nmm   Kendala: " << r.lapangan_kendala;
+            << " Nm   Kendala: " << r.lapangan_kendala;
         tum << "Tumpuan   -  Momen: " << r.tumpuan_MU << " / " << r.tumpuan_FMU
-            << " Nmm   Kendala: " << r.tumpuan_kendala;
+            << " Nm   Kendala: " << r.tumpuan_kendala;
         lend << "Lendutan  -  Kendala: " << r.kendala_lendutan;
         Line(page, font, 9.f, kMargin, ty, lap.str());
         Line(page, font, 9.f, kMargin, ty, tum.str());
@@ -236,8 +236,8 @@ void DrawMemberDetailPage(HPDF_Doc pdf, HPDF_Font font, HPDF_Font font_bold, con
     } else {
         std::ostringstream ax, mo, kd;
         ax << "Gaya aksial: " << r.axial_demand << " / " << r.axial_capacity << " N";
-        mo << "Momen biaksial - Mx: " << r.moment_x_demand << " Nmm  My: " << r.moment_y_demand
-           << " Nmm  Kapasitas: " << r.moment_capacity << " Nmm";
+        mo << "Momen biaksial - Mx: " << r.moment_x_demand << " Nm  My: " << r.moment_y_demand
+           << " Nm  Kapasitas: " << r.moment_capacity << " Nm";
         kd << "Kendala: " << r.kendala_kolom;
         Line(page, font, 9.f, kMargin, ty, ax.str());
         Line(page, font, 9.f, kMargin, ty, mo.str());
