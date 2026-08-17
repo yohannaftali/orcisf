@@ -106,6 +106,27 @@ private:
     std::string result_dataset_path_; // dataset_path_ at the time result_sd_ was captured
     std::string result_output_path_;  // issue #25: the generic output path that run actually wrote to
     bool reoptimize_from_last_ = false;
+
+    // Issue #63: true only for the one-shot completion transition (set in
+    // the was_running_->!running edge, cleared the moment a new run starts)
+    // -- see Draw()'s Progress section for why this exists. `progress_`
+    // itself is only ever written by the engine's progress callback *during*
+    // a run (see engine::RunFullOptimization's progress_wrapper), which can
+    // legitimately stop issuing callbacks one generation before
+    // max_generation on early convergence (the loop detects convergence
+    // using the *previous* generation's state and breaks before emitting
+    // that generation's own callback) -- without this flag, a finished run
+    // left the Progress section frozen on that last mid-run snapshot
+    // (e.g. "98% / Generation 39 of 40") forever, with no visual signal
+    // that the run had actually completed. This was the real, complete
+    // root cause of issue #63's "hang": the engine and every completion
+    // step (LoadStructure, on_result_, ...) had already finished --
+    // confirmed via engine::DebugLog() timestamps -- the GUI was never
+    // actually stuck, it was just displaying stale progress text
+    // indefinitely, which read exactly like a hang to a human watching it
+    // (Cancel appearing unresponsive was likewise just it being correctly
+    // disabled once running_ was already false, not evidence of a freeze).
+    bool has_finished_ = false;
 };
 
 } // namespace orcisf::gui

@@ -46,6 +46,7 @@ void RunPanel::StartRun() {
 
     has_error_ = false;
     has_progress_ = false;
+    has_finished_ = false;
     cancel_.store(false);
     running_.store(true);
 
@@ -143,6 +144,7 @@ void RunPanel::Draw(bool* open) {
         } else {
             if (log_sink_) log_sink_("Optimization run finished. Output: " + result_output_path_);
             has_result_ = true;
+            has_finished_ = true; // issue #63: see RunPanel.h's comment on this field
             result_dataset_path_ = dataset_path_;
             engine::DebugLog("RunPanel::Draw", "about to call on_result_ (Application::OnRunResult)");
             if (on_result_) on_result_(result_sd_, dataset_path_, result_output_path_);
@@ -281,16 +283,31 @@ void RunPanel::Draw(bool* open) {
 
     if (running || has_progress_snapshot) {
         ImGui::SeparatorText("Progress");
-        float frac = progress_snapshot.max_generation > 0
-                         ? static_cast<float>(progress_snapshot.generation) /
-                               static_cast<float>(progress_snapshot.max_generation)
-                         : 0.f;
+        // Issue #63: once has_finished_ is set, always show 100%/max_generation
+        // rather than whatever mid-run snapshot progress_ last held -- the
+        // engine's progress callback can legitimately stop one generation
+        // short of max_generation on early convergence (see RunPanel.h's
+        // comment on has_finished_), and without this override the bar and
+        // generation count would freeze on that stale snapshot forever,
+        // looking exactly like a hang even though the run is genuinely done.
+        float frac = has_finished_
+                         ? 1.f
+                         : (progress_snapshot.max_generation > 0
+                                ? static_cast<float>(progress_snapshot.generation) /
+                                      static_cast<float>(progress_snapshot.max_generation)
+                                : 0.f);
         ImGui::ProgressBar(std::clamp(frac, 0.f, 1.f));
-        ImGui::Text("Generation: %d / %d", progress_snapshot.generation, progress_snapshot.max_generation);
+        if (has_finished_) {
+            ImGui::Text("Generation: %d / %d", progress_snapshot.max_generation, progress_snapshot.max_generation);
+        } else {
+            ImGui::Text("Generation: %d / %d", progress_snapshot.generation, progress_snapshot.max_generation);
+        }
         ImGui::Text("Best fitness: %.6g  harga: %.6g  kendala: %.6g", progress_snapshot.best_fitness,
                     progress_snapshot.best_harga, progress_snapshot.best_kendala);
         ImGui::Text("Elapsed: %.1fs", progress_snapshot.elapsed_seconds);
-        if (progress_snapshot.converged) {
+        if (has_finished_) {
+            ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.4f, 1.f), "Run complete.");
+        } else if (progress_snapshot.converged) {
             ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.4f, 1.f), "Converged.");
         }
     }

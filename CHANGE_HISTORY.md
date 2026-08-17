@@ -5435,3 +5435,44 @@ tests already covered.
   `src/app/Application.cpp` (instrumentation), `AGENTS.md` (#63 section
   rewritten with the #75 finding + instrumentation notes, Tracked
   Issues table updated for #63 and new row for #75)
+
+## [2026-08-17] — fix(src): #63 RunPanel "hang" root-caused and fixed -- stale Progress display, not an actual freeze
+- Continued the same night's #63 investigation (see the entry above) by
+  actually driving the live GUI with `engine::DebugLog()` instrumentation
+  active, reproducing the exact scenario from the prior tester pass
+  (`DatasetWithStr` scratch dataset, `worker_threads=15`,
+  `j_iterasi_mak=40`, matching the original report).
+- The `DebugLog` trail proved every completion step -- engine search
+  loop, `his`/`log_detail` close, `WriteFinalResults`, the worker
+  thread's `running_.store(false)`, the UI thread's `was_running_` edge,
+  `Application::OnRunResult()`, `LoadStructure()`/`BuildSceneModel()` --
+  completed within ~200ms of clicking Run, every time. The 3D viewport
+  visibly updated immediately. Yet the Optimization panel's Progress
+  section stayed frozen on "98% / Generation 39 of 40 / Elapsed: 0.1s"
+  indefinitely (confirmed via two screenshots roughly a minute apart,
+  pixel-identical). **Issue #63 was never an actual hang** -- root
+  cause: `progress_` (driving the Progress display) is written only by
+  the engine's progress callback during a run, and the search loop can
+  legitimately stop one generation short of `max_generation` on early
+  convergence (it checks convergence using the *previous* generation's
+  state and breaks before ever emitting that final generation's own
+  callback) -- so the last-ever snapshot is a real, accurate mid-run
+  value that nothing afterward ever updates or clears, and it renders
+  forever, indistinguishable from a freeze to a human watching it.
+- Fixed with a new `RunPanel::has_finished_` flag (set in the
+  `was_running_ && !running` completion branch, cleared at the top of
+  `StartRun()`): once true, `Draw()`'s Progress section forces the bar
+  to 100%, shows `max_generation / max_generation`, and prints a new
+  green "Run complete." line instead of freezing on the stale snapshot.
+- Verified live with the identical repro both before and after the fix
+  (screenshots + `DebugLog` timestamps for each): pre-fix, "98% /
+  Generation 39 of 40" stuck for over a minute; post-fix, "100% /
+  Generation 40 of 40 / Run complete." within seconds of clicking Run.
+- The earlier Windows-Defender-file-close-stall hypothesis is now a
+  confirmed dead end (the real completion path takes ~200ms, nowhere
+  near "over a minute") -- documented in `AGENTS.md`'s #63 section so a
+  future agent doesn't re-investigate it.
+- Files: `src/gui/RunPanel.h` (new `has_finished_` field + comment),
+  `src/gui/RunPanel.cpp` (set/clear `has_finished_`, Progress display
+  logic), `AGENTS.md` (#63 section rewritten as solved, Tracked Issues
+  table updated, #58 epic note updated), `CHANGE_HISTORY.md`

@@ -2100,133 +2100,87 @@ things every future agent touching it must know:
   the fallback threshold temporarily forced low to actually exercise the
   parallel merge path rather than only the sequential fallback) — see
   `engine/README.md`'s Validation section for the exact commands.
-- **Issue #63 (RunPanel hang) — READ THIS before assuming it's
-  unreproducible: a `tester` pass (2026-08-17 night) genuinely
-  reproduced it live, twice in a row, and narrowed the root-cause space
-  significantly.** An earlier `coder` investigation the same day ran the
-  engine's own threading path 18 times under two harnesses (`orcisf_cli`
-  and a standalone program mirroring `RunPanel::StartRun()`'s exact
-  pattern) with no hang, and reasoned the evidence pointed at
-  concurrent screenshot-automation tooling competing for CPU rather than
-  a code defect (see below for what's now believed wrong about that
-  theory) — that reasoning is now **superseded**, not just unconfirmed:
-  - **Both reproductions happened through the real GUI** (File > Open
-    Data, switch to the Optimization panel, click Run — no automation
-    tooling running concurrently this time), with `worker_threads=15`
-    matching the original report the first time, and again with
-    `worker_threads=1` the second time — **ruling out worker-thread
-    count as a necessary condition**. Both hangs looked identical:
-    progress frozen at "98% / Generation 39 of 40 / Elapsed: 0.1s" for
-    over a minute, `Get-Process`'s `Responding` stayed `True` the whole
-    time, and clicking **Cancel had no effect** (matching the original
-    report's own "Cancel appears unresponsive" symptom exactly).
-  - **The critical new finding: the engine had already fully finished.**
-    Both hung runs' output directories contained complete, correctly-sized
-    `.opt`/`.str`/`.kdl`/`.inf`/`.his`/`.log.txt` files (`.log.txt` ~690KB
-    each) — meaning `RunFullOptimization()` (the search loop *and*
-    `WriteFinalResults()`) had already returned. This flatly rules out
-    the optimizer/convergence loop, the fork-join threading path, and
-    file *writing* itself as the hang's location — all of that
-    demonstrably already completed. `RunPanel::StartRun()`'s worker
-    lambda (`RunPanel.cpp` ~line 92-110) has nothing between the
-    `RunFullOptimization()` call returning and `running_.store(false)`
-    that could itself hang, which makes the UI staying stuck at 98%
-    (rather than flipping to "finished" on the very next frame) hard to
-    explain from that code alone.
-  - **Leading hypothesis, not yet confirmed**: something in the OS-level
-    tail of file I/O (e.g. `std::ofstream::close()`/handle release for
-    the freshly-written, unusually large `.log.txt`) blocking the
-    worker thread *after* the bytes are already fully on disk but
-    *before* the call frame actually returns -- Windows Defender
-    real-time protection was confirmed **enabled** on this machine
-    (`Get-MpComputerStatus`), and real-time AV scanning a large
-    freshly-created file on close is a well-known source of exactly
-    this kind of "file is done, but closing/releasing it takes a long
-    time" stall. This would explain every symptom: CPU climbed only
-    very slowly on the whole process (~0.3-0.5 CPU-seconds per 8
-    wall-seconds -- consistent with the *main* thread's own idle
-    per-frame render overhead while the *worker* thread sits blocked in
-    a syscall consuming ~0% of its own CPU), the window stayed
-    `Responding` (the UI thread was never blocked, only the worker
-    was), and Cancel did nothing (there's no cancellation point inside
-    a blocked OS file-close call). **Not yet verified** -- this needs
-    either a repro with real-time AV temporarily disabled, or adding a
-    timestamp log immediately before/after the `his->close()`/
-    `log_detail->close()` calls in `Engine.cpp` to see exactly which
-    line the thread is stuck on.
-  - **Both scratch-dataset runs used a path under
-    `AppData\Local\Temp\...\scratchpad\...`** (this session's own
-    scratchpad convention) -- if AV scanning is confirmed as the cause,
-    it's worth checking whether the original report's dataset path had
-    similar properties (a location Defender scans more aggressively,
-    e.g. a Downloads/Temp-adjacent folder) vs. a location it doesn't
-    (excluded folder, or a location already scanned/trusted).
-  - A genuine, separate, unrelated bug *was* found while investigating
-    this issue earlier the same day and filed as #65
-    (`sd.fitstr[sd.JSTD - sd.JVD - 1]` out-of-bounds when
-    `fak_plus=0`/`fak_kali=1`) — already fixed as of this same night's
-    batch; don't confuse the two.
-  - **Diagnostic instrumentation added (`engine::DebugLog()`,
-    `src/engine/include/engine/DebugLog.h` + `src/engine/src/DebugLog.cpp`)
-    — a millisecond-timestamped append-only logger writing to
-    `<temp dir>/orcisf_run_debug.log`** (the GUI build has no console,
-    issue #12, so `std::cerr` goes nowhere). Calls are placed at every
-    candidate stall point along the completion path: `Engine.cpp`'s
-    `RunFullOptimization()` (around `RunOptimization()`,
-    `his->close()`, `log_detail->close()`, `WriteFinalResults()`),
-    `RunPanel.cpp`'s worker lambda (entering/leaving
-    `RunFullOptimization()`, around `running_.store(false)`) and
-    `Draw()`'s `was_running_`-edge detection, and
-    `Application::OnRunResult()`/`LoadStructure()` (around
-    `ComputeMemberResults()`, `ComputeAnalysisResults()`,
-    `ReadLoadsRaw()`, `BuildSceneModel()`, `Validate()`,
-    `FrameScene()`). **Left in place, not removed** — cheap
+- **Issue #63 (RunPanel "hang") — SOLVED 2026-08-17 night: it was never
+  actually a hang.** `engine::DebugLog()` instrumentation (millisecond
+  timestamps written to `<temp dir>/orcisf_run_debug.log`, since the GUI
+  build has no console for `std::cerr` to reach -- see `DebugLog.h`/
+  `.cpp`) traced the *exact same* live-GUI repro a `tester` pass used the
+  night before (`DatasetWithStr` scratch copy, `worker_threads=15`,
+  `j_iterasi_mak=40`, matching the original report) and proved every
+  completion step -- `RunFullOptimization()` returning, `his->close()`/
+  `log_detail->close()`/`WriteFinalResults()`, the worker thread's
+  `running_.store(false)`, the UI thread's `was_running_` edge,
+  `Application::OnRunResult()`, `LoadStructure()`/`BuildSceneModel()` --
+  all completed within **~200ms** of clicking Run. The 3D viewport
+  visibly updated with the finished structure immediately. Yet the
+  Optimization panel's own Progress section stayed frozen on
+  "98% / Generation 39 of 40 / Elapsed: 0.1s" indefinitely (confirmed via
+  two screenshots roughly a minute apart, pixel-identical stale text) --
+  reproducing the "hang" symptom exactly, including Cancel appearing to
+  do nothing (it's correctly `BeginDisabled`'d once `running_` is false;
+  it was never actually stuck, just inert because there was nothing left
+  to cancel).
+  - **Root cause**: `RunPanel::Draw()`'s Progress section
+    (`ImGui::ProgressBar`/`"Generation: %d / %d"`/`"Converged."`) is
+    driven entirely by `progress_`, which is written *only* by the
+    engine's progress callback *during* a run
+    (`Engine.cpp`'s `progress_wrapper`) and never touched again once the
+    run completes. `RunOptimization()`'s convergence check can
+    legitimately stop the search loop one generation before
+    `max_generation` (it evaluates convergence using the *previous*
+    generation's state and breaks before ever emitting that final
+    generation's own progress callback) -- so the very last `progress_`
+    snapshot a finished run leaves behind is a genuine, accurate,
+    *mid-run* value, not a bug in the engine at all. With nothing to
+    ever update or clear it afterward, `has_progress_snapshot` (which
+    never resets to false post-run) kept that same stale snapshot
+    rendering forever, looking indistinguishable from an actual freeze
+    to a human watching it -- even though the whole app was fully alive
+    and responsive the entire time.
+  - **Fix**: a new `RunPanel::has_finished_` bool (`RunPanel.h`), set
+    true only in the `was_running_ && !running` completion branch
+    (alongside the existing `has_result_ = true`) and cleared at the top
+    of `StartRun()`. `Draw()`'s Progress section now checks it: when
+    true, the bar is forced to 100%, the generation text shows
+    `max_generation / max_generation` instead of the stale
+    `generation`, and a new green **"Run complete."** line replaces
+    (or supplements, if it also happened to converge cleanly)
+    `"Converged."`. This makes a finished run visually unambiguous
+    regardless of which generation the engine's last progress callback
+    happened to land on.
+  - **Verified live, with the exact same repro that hung before the fix
+    and completed correctly after it** (screenshots + `DebugLog`
+    timestamps both captured for each): before the fix, Progress stayed
+    on "98% / Generation 39 of 40" for over a minute post-completion;
+    after rebuilding with the fix, an identical run showed "100% /
+    Generation 40 of 40 / Run complete." within seconds of clicking Run,
+    with the `DebugLog` trail confirming the same near-instant
+    completion timing in both cases -- the only change was what the UI
+    displayed afterward.
+  - **A genuine, separate, unrelated bug was found while adding the
+    instrumentation and filed+fixed as #75** (`JSTD` -- population size
+    -- had no upper bound against `kMak`=825, causing a real,
+    deterministic segfault for a large `fak_kali`; see `Optimizer.cpp`'s
+    `RunOptimization()` guard next to #65's existing lower-bound check).
+    Confirmed unrelated to #63's actual cause (RunPanel's own defaults
+    keep `JSTD` far under the limit) -- don't confuse the two, but both
+    came out of the same investigation session.
+  - **The earlier AV-file-close-stall hypothesis was a plausible but
+    ultimately wrong lead** -- kept here as a documented dead end so a
+    future agent doesn't re-investigate it: the actual completion path
+    (including both file `close()` calls) takes ~200ms even for the
+    ~690KB `.log.txt` case, nowhere near "over a minute". The symptom
+    that made AV scanning look plausible (CPU climbing very slowly,
+    window staying `Responding`) was actually just the ordinary idle
+    per-frame render cost of an ImGui app sitting still, misread as
+    "worker thread blocked in a syscall".
+  - **`engine::DebugLog()` instrumentation is left in the codebase**
+    (`DebugLog.h`/`.cpp`, plus the call sites in `Engine.cpp`/
+    `RunPanel.cpp`/`Application.cpp`) rather than reverted -- it's cheap
     (a handful of mutex-guarded file appends, only on the run-completion
-    path, never per-generation) and exactly what the next live-GUI
-    repro attempt needs to pinpoint the stuck line; remove the call
-    sites once #63 is confirmed fixed and no longer needs live
-    diagnosis, not before.
-  - **A second, genuinely distinct, more serious bug was found and
-    fixed while adding this instrumentation — filed and closed as
-    #75.** `JSTD = JVD*fak_kali + fak_plus` (`Optimizer.cpp`'s
-    `PrepareOptimization()`) had no upper-bound check against `kMak`
-    (825), the fixed size of `var_b`/`var_k`/`fitstr`/`kendalastr`/
-    `hargastr`. This is the *opposite* failure mode from #65's guard
-    (population too *large*, not too small): the very first CLI repro
-    attempt with this instrumentation (`fak_kali=20` on Apl1-1's
-    8-member dataset, `JVD=68` → `JSTD=1365 > 825`) **segfaulted
-    deterministically**, confirmed via `DebugLog`'s own trail --
-    the log showed entry into `RunOptimization()` and nothing after,
-    i.e. the crash happened *inside* the search loop from an
-    out-of-bounds heap write, not in any completion-path code. Fixed
-    with a matching guard (`if (sd.JSTD > kMak) throw
-    std::invalid_argument(...)`, right next to #65's existing
-    `JSTD <= JVD` check in `RunOptimization()`) plus a best-effort
-    `RunPanel.cpp` clamp (`fak_kali_` capped at 100, `fak_plus_` at
-    `kMak`) -- the panel has no loaded dataset to compute the real
-    `JVD` from, so the engine-level throw is the authoritative guard;
-    the GUI clamp is only a courtesy against an obviously-mistyped
-    value. Re-ran the identical repro parameters after the fix: clean
-    `std::invalid_argument` message instead of a crash. **Confirmed
-    unrelated to #63's actual hang** — RunPanel's own defaults
-    (`fak_kali=1`, `fak_plus=3`) keep `JSTD` far under 825 for any
-    realistic dataset, and a follow-up CLI run with those exact
-    defaults plus `worker_threads=15` (matching the original #63
-    report) completed cleanly in 0.4s with no hang and a fully
-    populated `DebugLog` trail — but it was a real, easily
-    user-triggerable crash in its own right (any GUI user raising
-    `fak_kali` past a few dozen on a modestly-sized dataset), well
-    worth finding regardless of #63.
-  - **Do not close #63 or claim it's fixed** — the #75 crash is fixed,
-    but #63's own hang has still not been reproduced with the new
-    instrumentation in place (the CLI can't reproduce the GUI-specific
-    "window stays Responding but frozen" symptom at all -- it has no
-    message pump to freeze -- so a real repro still needs the live GUI,
-    ideally with a run long/slow enough to produce a `.log.txt` in the
-    same size range as the two hung runs, ~690KB, to meaningfully test
-    the AV-file-close hypothesis). Route back to `coder`/`tester` with
-    this section (now including the instrumentation and the ruled-out
-    #75 lead) as the starting point for the next attempt.
+    path, never per-generation) and proved directly useful for finding
+    this bug; a future timing-sensitive investigation in this same area
+    can reuse it as-is. Not a cleanup debt, a kept diagnostic tool.
 - **Never point the CLI/GUI's output at `Optimasi Beton/Example/` directly**
   — output filenames are case-insensitive-colliding with the checked-in
   reference files on Windows (`GEDUNG.opt` == `gedung.opt`). Always use a
@@ -2790,12 +2744,12 @@ later, different one (e.g. closing an issue or cutting a release).
 | #55 | feat(src): show all 6 per-DOF restraint checkboxes in the Joints table, not one summary checkbox | closed (tester: source-verified, no FAILs; live sync UNVERIFIED this pass -- see AGENTS.md #55 note) | 2026-08-13 |
 | #56 | chore(ci): Linux build-src job fails intermittently on flaky ninja download (ECONNRESET) | closed | 2026-08-13 |
 | #57 | chore(ci): rewrite build-src.yml -- Node 24 actions, apt ninja on Linux, warning detection, artifact upload | closed | 2026-08-16 |
-| #58 | epic(src): FE analysis results visualization (deformed shape, force diagrams, tables) | open (all 4 sub-issues #59-#62 closed 2026-08-17, v0.0.8-alpha cut -- live GUI pixel rendering of #60/#61/#62 still unconfirmed, blocked by #63; epic stays open until that's closed out) | 2026-08-17 |
+| #58 | epic(src): FE analysis results visualization (deformed shape, force diagrams, tables) | open (all 4 sub-issues #59-#62 closed 2026-08-17, v0.0.8-alpha cut -- #63 (the blocker) is now fixed, and #60's deformed-shape overlay was incidentally visually confirmed live during #63's own repro screenshots (green filled deformed members rendering correctly); #61/#62's own dedicated live checks still worth a follow-up pass, but nothing left blocking them) | 2026-08-17 |
 | #59 | feat(engine): expose joint displacements, member end forces, and support reactions for GUI consumption | closed (reviewer: PASS, no findings) | 2026-08-17 |
 | #60 | feat(gui): deformed-shape overlay in the 3D viewport | closed (reviewer: PASS WITH NOTES -- `GetForegroundDrawList()` overlay-compositing finding tracked as a follow-up, see AGENTS.md's #60 section; live interactive spot-check still UNVERIFIED) | 2026-08-17 |
 | #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | closed (reviewer: PASS) | 2026-08-17 |
 | #62 | feat(gui): joint displacement / member force / reaction tables + global equilibrium check | closed (reviewer: PASS) | 2026-08-17 |
-| #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open, `coder` added `DebugLog()` timestamp instrumentation across the full completion path (Engine.cpp/RunPanel.cpp/Application.cpp) but has not yet reproduced the hang with it in place -- CLI can't reproduce the GUI-freeze symptom at all, so a live GUI repro is still needed; found+fixed an unrelated crash bug along the way (#75), ruled out as #63's cause; see AGENTS.md's #63 section for full detail | 2026-08-17 |
+| #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | ready-for-review (coder: root-caused + fixed + verified live -- it was never a real hang, just a stale Progress display after early convergence; DebugLog instrumentation proved the engine/completion path finishes in ~200ms every time; RunPanel.h's has_finished_ flag now shows 100%/"Run complete." instead of freezing on the last mid-run snapshot; reproduced the bug pre-fix and confirmed the fix post-fix with the exact same live-GUI repro, screenshots + DebugLog timestamps for both; see AGENTS.md's #63 section) | 2026-08-17 |
 | #64 | docs(src): fix pre-existing "Nmm" mislabeling -- AM moment/torsion fields are actually N*m | ready-for-review (coder: implemented + verified -- all label sites fixed, .opt output confirmed value-identical, zero-warning build) | 2026-08-17 |
 | #65 | bug(src): fak_plus=0/fak_kali=1 causes an out-of-bounds fitstr[-1] read in RunOptimization() | ready-for-review (coder: fixed at both GUI and engine layers, verified via orcisf_cli -- bad combo now fails with a clear error, valid combos unaffected) | 2026-08-17 |
 | #66 | feat(src): load analysis results from saved .str file on Open Data | ready-for-review (tester: 4/4 PASS -- interactively confirmed live: Open Data loaded a real .str with zero Run clicks, Results panel's Support Reactions matched orcisf_cli's ANALYSIS_RESULTS exactly) | 2026-08-17 |
