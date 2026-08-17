@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 
 #include <imgui.h>
 #include <ImGuizmo.h>
@@ -149,6 +150,65 @@ void DrawEntityLabels(ImDrawList* dl, const SceneModel& scene, const Camera& cam
         if (!project((m.a + m.b) * 0.5f, screen)) continue;
         std::string label = "M" + std::to_string(m.no_batang);
         dl->AddText(ImVec2(screen.x + dx, screen.y - dy), member_color, label.c_str());
+    }
+}
+
+// Issue #71: numeric value labels for the 3D force-diagram overlay
+// (SceneRenderer draws the GL geometry; it has no text capability, so the
+// labels are an ImGui overlay here -- the same split DrawGridLabels() below
+// already uses for the ground grid).
+//
+// Labels only the *peak* |value| station of each enabled component on each
+// qualifying member, not every sampled station: with 4 components x N
+// members x 21 stations, labelling everything would be an unreadable wall
+// of text, and the peak is the value an engineer actually reads off a
+// diagram. Placement reuses ComputeForceDiagramPlacement() -- the exact
+// same shared helper SceneRenderer uses for the ribbon -- so a label always
+// sits on its own curve.
+void DrawForceDiagramValueLabels(ImDrawList* dl, const SceneModel& scene, const Camera& camera, float aspect,
+                                  ImVec2 image_min, ImVec2 image_size, const Selection& selection,
+                                  const ForceDiagramOptions& options) {
+    if (!options.values || !options.AnyEnabled()) return;
+
+    Mat4 vp = Mat4::Multiply(camera.ProjectionMatrix(aspect), camera.ViewMatrix());
+    const float dx = Scaled(4.f);
+
+    for (const MemberVisual& mv : scene.members) {
+        if (mv.force_diagram.samples.empty()) continue;
+        if (!options.all_members &&
+            !(selection.kind == SelectionKind::Member && selection.id == mv.no_batang)) {
+            continue;
+        }
+
+        for (ForceComponent component : kAllForceComponents) {
+            if (!options.Enabled(component)) continue;
+            ForceDiagramPlacement placement = ComputeForceDiagramPlacement(mv, component);
+            if (!placement.valid) continue;
+
+            const ForceDiagramSample* peak = nullptr;
+            float peak_abs = -1.f;
+            for (const ForceDiagramSample& s : mv.force_diagram.samples) {
+                float v = std::fabs(ForceComponentValue(s, component));
+                if (v > peak_abs) {
+                    peak_abs = v;
+                    peak = &s;
+                }
+            }
+            if (!peak) continue;
+
+            float value = ForceComponentValue(*peak, component);
+            Vec3 world = mv.a + placement.axis_x * peak->x_m + placement.offset_dir * (value * options.scale);
+            ImVec2 screen;
+            if (!ProjectWorldToScreen(vp, image_min, image_size, world, screen)) continue;
+
+            const float* c = ForceComponentColor(component);
+            ImU32 col = IM_COL32(static_cast<int>(c[0] * 255.f), static_cast<int>(c[1] * 255.f),
+                                  static_cast<int>(c[2] * 255.f), 255);
+            char text[64];
+            std::snprintf(text, sizeof(text), "%s %.4g %s", ForceComponentLabel(component), value,
+                           ForceComponentUnit(component));
+            dl->AddText(ImVec2(screen.x + dx, screen.y), col, text);
+        }
     }
 }
 
@@ -413,9 +473,7 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
 
     unsigned int texture =
         renderer_.Render(scene, camera_, width, height, selection.kind == SelectionKind::Member ? selection.id : -1,
-                          options.show_deformed_shape, options.deformation_scale, options.show_force_diagram,
-                          options.force_diagram_component, options.force_diagram_scale,
-                          options.force_diagram_all_members);
+                          options.show_deformed_shape, options.deformation_scale, options.force_diagram);
     ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(texture)), avail, ImVec2(0, 1), ImVec2(1, 0));
 
     ImVec2 image_min = ImGui::GetItemRectMin();
@@ -468,6 +526,12 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
     // scene). Drawn every frame regardless of view_plane -- the grid is
     // visible in both perspective and the X-Z locked orthographic view.
     DrawGridLabels(overlay_dl, scene, camera_, image_size.x / image_size.y, image_min, image_size);
+
+    // Issue #71: force-diagram peak-value labels (the diagram geometry
+    // itself is GL, drawn inside renderer_.Render() above) -- no-ops unless
+    // the "Values" toggle is on and at least one component is enabled.
+    DrawForceDiagramValueLabels(overlay_dl, scene, camera_, image_size.x / image_size.y, image_min, image_size,
+                                 selection, options.force_diagram);
 
     overlay_dl->PopClipRect();
 
@@ -591,11 +655,21 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
         ImGui::PopID();
     }
 
-    // Issue #71: force-diagram (N/V/M/T) ribbon overlay toggle + component
-    // selector + scale slider, stacked directly below the deformed-shape
-    // overlay in the same top-left corner (same technique/reasoning as
-    // that block above -- real ImGui widgets on this window's own draw
-    // list, not GetForegroundDrawList()).
+    // Issue #71: force-diagram overlay controls -- one independent checkbox
+    // per component (all four can be on at once, each drawn in its own
+    // plane/color), plus Fill/Values/All-members toggles and a magnitude
+    // slider. Stacked directly below the deformed-shape overlay in the same
+    // top-left corner, same technique/reasoning as that block above (real
+    // ImGui widgets on this window's own draw list, not
+    // GetForegroundDrawList() -- see issue #51).
+    //
+    // Unlike the two overlay blocks above, this one lets ImGui's normal
+    // vertical layout flow position each widget after a single
+    // SetCursorScreenPos, rather than hand-computing a y for every row --
+    // there are too many rows here for that to stay readable. The
+    // background rect's height is derived from the same
+    // GetFrameHeight()/GetTextLineHeight()/ItemSpacing.y values the flow
+    // itself uses, so the two can't disagree.
     bool force_diagram_overlay_capturing = false;
     {
         bool scene_has_force_diagram = false;
@@ -610,42 +684,72 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
         const float gap = Scaled(4.f);
         const float text_h = ImGui::GetTextLineHeight();
         const float frame_h = ImGui::GetFrameHeight();
-        ImVec2 pos(image_min.x + Scaled(8.f), image_min.y + Scaled(8.f) + text_h + gap + frame_h + gap +
-                                                   frame_h + gap + Scaled(10.f));
-        const float combo_y = pos.y + text_h + gap;
-        const float checkbox_y = combo_y + frame_h + gap;
-        const float slider_y = checkbox_y + frame_h + gap;
+        const float spacing_y = ImGui::GetStyle().ItemSpacing.y;
+        ImVec2 pos(image_min.x + Scaled(8.f), image_min.y + Scaled(8.f) + text_h + gap + frame_h + gap + frame_h +
+                                                   gap + Scaled(10.f));
 
+        // Rows: title, N, V, M, T, Fill+Values, All, scale slider.
+        const float content_h = text_h + 7.f * (frame_h + spacing_y);
         ImDrawList* wdl = ImGui::GetWindowDrawList();
         ImVec2 bg_min(pos.x - Scaled(6.f), pos.y - gap);
-        ImVec2 bg_max(pos.x + control_width + Scaled(6.f), slider_y + frame_h + gap);
+        ImVec2 bg_max(pos.x + control_width + Scaled(6.f), pos.y + content_h + gap);
         wdl->AddRectFilled(bg_min, bg_max, IM_COL32(20, 20, 24, 200), Scaled(4.f));
 
         ImGui::SetCursorScreenPos(pos);
         ImGui::PushID("force_diagram_overlay");
-        ImGui::TextColored(ImVec4(0.95f, 0.70f, 0.15f, 1.f), "Force Diagram");
+        ImGui::TextColored(ImVec4(0.90f, 0.90f, 0.95f, 1.f), "Force Diagram");
 
         // Same "disabled with a tooltip, not silently ignored" convention
         // as the deformed-shape overlay above -- no analysis results means
         // nothing here would render anyway.
         ImGui::BeginDisabled(!scene_has_force_diagram);
-        static const char* kComponents[4] = {"N (axial)", "V (shear)", "M (moment)", "T (torsion)"};
-        ImGui::SetCursorScreenPos(ImVec2(pos.x, combo_y));
-        ImGui::SetNextItemWidth(control_width);
-        ImGui::Combo("##force_diagram_component", &options.force_diagram_component, kComponents, 4);
-        force_diagram_overlay_capturing |= ImGui::IsItemHovered() || ImGui::IsItemActive();
-        ImGui::SetCursorScreenPos(ImVec2(pos.x, checkbox_y));
-        ImGui::Checkbox("Show##force_diagram_toggle", &options.show_force_diagram);
-        if (!scene_has_force_diagram && ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Run an optimization first to compute member forces.");
+
+        // Each component's checkbox is tinted with the exact color its own
+        // diagram renders in (ForceComponentColor(), shared with
+        // SceneRenderer and the value labels), so the control doubles as
+        // the overlay's legend -- no separate legend needed.
+        struct Row {
+            ForceComponent component;
+            const char* label;
+            bool* flag;
+        };
+        const Row rows[4] = {
+            {ForceComponent::Axial, "N  axial", &options.force_diagram.show_axial},
+            {ForceComponent::Shear, "V  shear", &options.force_diagram.show_shear},
+            {ForceComponent::Moment, "M  moment", &options.force_diagram.show_moment},
+            {ForceComponent::Torsion, "T  torsion", &options.force_diagram.show_torsion},
+        };
+        for (const Row& row : rows) {
+            const float* c = ForceComponentColor(row.component);
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(c[0], c[1], c[2], 1.f));
+            ImGui::Checkbox(row.label, row.flag);
+            ImGui::PopStyleColor();
+            if (!scene_has_force_diagram && ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Run an optimization first to compute member forces.");
+            }
+            force_diagram_overlay_capturing |= ImGui::IsItemHovered() || ImGui::IsItemActive();
+        }
+
+        ImGui::Checkbox("Fill", &options.force_diagram.filled);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Filled 3D diagram plane (off = outline curve only)");
         }
         force_diagram_overlay_capturing |= ImGui::IsItemHovered() || ImGui::IsItemActive();
         ImGui::SameLine();
-        ImGui::Checkbox("All##force_diagram_all", &options.force_diagram_all_members);
+        ImGui::Checkbox("Values", &options.force_diagram.values);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Label each diagram's peak value");
+        }
         force_diagram_overlay_capturing |= ImGui::IsItemHovered() || ImGui::IsItemActive();
-        ImGui::SetCursorScreenPos(ImVec2(pos.x, slider_y));
+
+        ImGui::Checkbox("All members", &options.force_diagram.all_members);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Off = only the selected member");
+        }
+        force_diagram_overlay_capturing |= ImGui::IsItemHovered() || ImGui::IsItemActive();
+
         ImGui::SetNextItemWidth(control_width);
-        ImGui::SliderFloat("##force_diagram_scale", &options.force_diagram_scale, 1e-6f, 1e-2f, "x%.6f",
+        ImGui::SliderFloat("##force_diagram_scale", &options.force_diagram.scale, 1e-7f, 1e-3f, "x%.7f",
                             ImGuiSliderFlags_Logarithmic);
         force_diagram_overlay_capturing |= ImGui::IsItemHovered() || ImGui::IsItemActive();
         ImGui::EndDisabled();

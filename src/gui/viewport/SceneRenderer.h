@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "gui/viewport/Camera.h"
 #include "gui/viewport/SceneModel.h"
 
@@ -25,14 +27,15 @@ public:
     // `show_deformed_shape` (only meaningful when `scene.has_deformation`
     // -- caller gates this, see ViewportPanel::Draw) overlays a
     // `deformation_scale`-exaggerated deformed shape alongside the
-    // (always-drawn) undeformed structure. Issue #71: `show_force_diagram`
-    // overlays a `force_diagram_scale`-exaggerated N/V/M/T ribbon
-    // (`force_diagram_component`: 0=N,1=V,2=M,3=T) for `selected_member`
-    // alone, or every member with force_diagram data when
-    // `force_diagram_all_members` is true.
+    // (always-drawn) undeformed structure. Issue #71: `force_diagram`
+    // overlays every *enabled* N/V/M/T component's own 3D diagram plane --
+    // all four can be on simultaneously, each in its own plane/color (see
+    // ComputeForceDiagramPlacement()) -- on `selected_member` alone, or on
+    // every member with force_diagram data when
+    // `force_diagram.all_members` is true.
     unsigned int Render(const SceneModel& scene, const Camera& camera, int width, int height, int selected_member,
-                         bool show_deformed_shape, float deformation_scale, bool show_force_diagram,
-                         int force_diagram_component, float force_diagram_scale, bool force_diagram_all_members);
+                         bool show_deformed_shape, float deformation_scale,
+                         const ForceDiagramOptions& force_diagram);
 
 private:
     void EnsureGLObjects();
@@ -58,21 +61,30 @@ private:
     // undeformed structure already drawn in Render(), in a color used
     // nowhere else in this renderer so it always reads as overlay data.
     void DrawDeformedShape(const SceneModel& scene, float scale, const float* view_proj);
-    // Issue #71: N/V/M/T ribbon overlay -- an offset polyline (DrawBox
-    // segments, same idiom) tracing `component`'s value along each
-    // qualifying member's span, offset perpendicular to the member's own
-    // local axis (the same axis_y DrawBox() derives internally) by
-    // `value * scale`, plus a short stem at each end connecting the
-    // ribbon back to the member's baseline so it reads as a diagram
-    // anchored to the structure rather than a floating line. `component`:
-    // 0=N,1=V,2=M,3=T, matching ForceDiagramSample's field order.
-    void DrawForceDiagramOverlay(const SceneModel& scene, int selected_member, bool all_members, int component,
-                                  float scale, const float* view_proj);
+    // Issue #71: draws every enabled component's 3D force-diagram plane for
+    // each qualifying member -- a filled surface (DrawTriangles) spanning
+    // between the member's own axis and the diagram curve, plus the curve
+    // itself and two end stems as thin boxes so it reads as anchored to the
+    // structure. Placement/color per component come from
+    // ComputeForceDiagramPlacement()/ForceComponentColor() (SceneModel.h),
+    // shared with ViewportPanel's text labels.
+    void DrawForceDiagramOverlay(const SceneModel& scene, int selected_member,
+                                  const ForceDiagramOptions& options, const float* view_proj);
+    // Uploads and draws an arbitrary world-space triangle list (interleaved
+    // position+normal, 6 floats per vertex) with an identity model matrix --
+    // needed because a force diagram's filled surface is a general
+    // trapezoid strip, which (unlike every other shape this renderer draws)
+    // is NOT an affine transform of the unit cube: an affine map preserves
+    // parallelism, so it can't turn a square into a trapezoid whose two
+    // parallel edges differ in length. Restores the cube VAO binding on
+    // exit, since Render() binds that once up front.
+    void DrawTriangles(const std::vector<float>& pos_normal, const float color[4], const float* view_proj);
 
     bool gl_objects_ready_ = false;
     unsigned int shader_program_ = 0;
     int u_model_ = -1, u_view_proj_ = -1, u_color_ = -1;
     unsigned int cube_vao_ = 0, cube_vbo_ = 0;
+    unsigned int dyn_vao_ = 0, dyn_vbo_ = 0;
 
     unsigned int fbo_ = 0, color_tex_ = 0, depth_rbo_ = 0;
     int fbo_w_ = 0, fbo_h_ = 0;

@@ -8,6 +8,7 @@
 #include "engine/MemberResults.h"
 #include "engine/StructureData.h"
 #include "gui/diagrams/ForceDiagram.h"
+#include "gui/editor/Selection.h"
 #include "gui/viewport/Math3D.h"
 
 // Render-ready snapshot of a loaded dataset, built once when a folder is
@@ -148,5 +149,47 @@ struct GroundGridLayout {
     int label_stride = 1;           // label every Nth line (1 = every line)
 };
 GroundGridLayout ComputeGroundGridLayout(const SceneModel& scene);
+
+// Issue #71: where a given member's force diagram for a given component
+// sits in 3D. Shared by `SceneRenderer::DrawForceDiagramOverlay()` (the GL
+// ribbon/fill geometry) and `ViewportPanel`'s text-value labels -- exactly
+// the ComputeGroundGridLayout() split above, and for the same reason: two
+// renderers must never disagree about where a diagram actually is.
+struct ForceDiagramPlacement {
+    bool valid = false;         // false for a degenerate (zero-length) member
+    math3d::Vec3 axis_x;        // along the member, a -> b, normalized
+    math3d::Vec3 offset_dir;    // unit direction this component's diagram sticks out in
+    math3d::Vec3 plane_normal;  // normal of the diagram's own plane (for lighting the filled surface)
+};
+
+// Component -> which plane its diagram is drawn in:
+//   Shear/Moment  -> the member's local 1-2 plane. This is the physically
+//                    correct plane for both: `ForceDiagramSample::v_n` is
+//                    shear along local 2, and `m_nm` is bending about local
+//                    3 (which curves the member within the 1-2 plane).
+//   Axial/Torsion -> the local 1-3 plane. This one is a *display choice*,
+//                    not physics: an axial force acts along the member's own
+//                    axis and torsion twists about it, so neither has a
+//                    natural bending plane to be drawn in. Putting them in
+//                    the perpendicular plane keeps them from overlapping the
+//                    shear/moment diagrams when several are shown at once.
+// Sign is preserved in every case (a positive value offsets along
+// +offset_dir), so a diagram's side still reads as its sign.
+ForceDiagramPlacement ComputeForceDiagramPlacement(const MemberVisual& mv, ForceComponent component);
+
+// The value this component contributes at one sampled station -- N/V in
+// newtons, M/T in newton-metres (see ForceDiagram.h's unit note).
+float ForceComponentValue(const ForceDiagramSample& sample, ForceComponent component);
+
+// "N"/"V"/"M"/"T" and the matching unit string, for labels/legends.
+const char* ForceComponentLabel(ForceComponent component);
+const char* ForceComponentUnit(ForceComponent component);
+
+// Per-component RGBA, shared so a ribbon and its own text label always
+// match. Cross-checked against every other documented viewport color (see
+// AGENTS.md's viewport-palette list) -- this palette is now close to full,
+// so a future issue adding more overlay colors should probably add a
+// legend rather than keep hunting for unused hues.
+const float* ForceComponentColor(ForceComponent component); // -> float[4]
 
 } // namespace orcisf::gui

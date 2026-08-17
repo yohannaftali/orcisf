@@ -102,6 +102,8 @@ SceneRenderer::~SceneRenderer() {
     if (depth_rbo_) glDeleteRenderbuffers(1, &depth_rbo_);
     if (cube_vbo_) glDeleteBuffers(1, &cube_vbo_);
     if (cube_vao_) glDeleteVertexArrays(1, &cube_vao_);
+    if (dyn_vbo_) glDeleteBuffers(1, &dyn_vbo_);
+    if (dyn_vao_) glDeleteVertexArrays(1, &dyn_vao_);
     if (shader_program_) glDeleteProgram(shader_program_);
 }
 
@@ -145,6 +147,43 @@ void SceneRenderer::EnsureGLObjects() {
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), reinterpret_cast<void*>(3 * sizeof(float)));
     glBindVertexArray(0);
+
+    // Issue #71: a second, *dynamic* buffer for force-diagram fill surfaces
+    // (see DrawTriangles' header comment for why the static cube can't
+    // express those). Same interleaved position+normal vertex layout, so it
+    // reuses the same shader and attribute locations; contents are uploaded
+    // per draw call rather than once here.
+    glGenVertexArrays(1, &dyn_vao_);
+    glGenBuffers(1, &dyn_vbo_);
+    glBindVertexArray(dyn_vao_);
+    glBindBuffer(GL_ARRAY_BUFFER, dyn_vbo_);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), reinterpret_cast<void*>(0));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), reinterpret_cast<void*>(3 * sizeof(float)));
+    glBindVertexArray(0);
+}
+
+void SceneRenderer::DrawTriangles(const std::vector<float>& pos_normal, const float color[4],
+                                   const float* view_proj) {
+    if (pos_normal.empty() || dyn_vao_ == 0) return;
+
+    glBindVertexArray(dyn_vao_);
+    glBindBuffer(GL_ARRAY_BUFFER, dyn_vbo_);
+    // glBufferData (not glBufferSubData) re-specifies the whole buffer,
+    // which lets the driver orphan the previous contents instead of stalling
+    // on any in-flight draw still reading them -- the standard way to stream
+    // per-frame geometry without an explicit fence.
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(pos_normal.size() * sizeof(float)), pos_normal.data(),
+                 GL_DYNAMIC_DRAW);
+
+    Mat4 identity = Mat4::Identity(); // vertices are already in world space
+    glUniformMatrix4fv(u_model_, 1, GL_FALSE, identity.m);
+    glUniformMatrix4fv(u_view_proj_, 1, GL_FALSE, view_proj);
+    glUniform4fv(u_color_, 1, color);
+    glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(pos_normal.size() / 6));
+
+    glBindVertexArray(cube_vao_); // Render() binds this once up front; restore it
 }
 
 void SceneRenderer::EnsureFramebuffer(int width, int height) {
@@ -307,59 +346,89 @@ void SceneRenderer::DrawDeformedShape(const SceneModel& scene, float scale, cons
     }
 }
 
-// Issue #71: bright amber/gold-orange, used nowhere else in this renderer's
-// palette (grid = dark cobalt, deformed shape = cyan, restrained joints =
-// orange -- close but not identical; kRestraintColor is a warmer, more
-// saturated orange, see the values below) so a force-diagram ribbon always
-// reads as overlay data distinct from every other viewport element. See
-// AGENTS.md's viewport-color cross-check note before picking another one.
-void SceneRenderer::DrawForceDiagramOverlay(const SceneModel& scene, int selected_member, bool all_members,
-                                             int component, float scale, const float* view_proj) {
-    static constexpr float kDiagramColor[4] = {0.95f, 0.70f, 0.15f, 1.f};
-    constexpr float kLineThickness = 0.02f;
-    constexpr float kStemThickness = 0.015f;
+// Issue #71: every *enabled* component's diagram is drawn for every
+// qualifying member, so all four (N/V/M/T) can be visible simultaneously.
+// Per-component plane and color come from SceneModel.h's shared
+// ComputeForceDiagramPlacement()/ForceComponentColor(), which
+// ViewportPanel's text-value labels read too -- neither renderer derives
+// its own placement, so a ribbon and its own label can't drift apart.
+void SceneRenderer::DrawForceDiagramOverlay(const SceneModel& scene, int selected_member,
+                                             const ForceDiagramOptions& options, const float* view_proj) {
+    constexpr float kCurveThickness = 0.022f;
+    constexpr float kStemThickness = 0.014f;
+
+    std::vector<float> fill; // reused across members/components, not reallocated per draw
 
     for (const MemberVisual& mv : scene.members) {
         if (mv.force_diagram.samples.empty()) continue;
-        if (!all_members && mv.no_batang != selected_member) continue;
-
-        Vec3 delta = mv.b - mv.a;
-        float length = delta.Length();
-        if (length < 1e-5f) continue;
-        Vec3 axis_x = delta * (1.f / length);
-        Vec3 reference = (std::fabs(Dot(axis_x, Vec3{0, 1, 0})) > 0.99f) ? Vec3{0, 0, 1} : Vec3{0, 1, 0};
-        Vec3 axis_z = Cross(axis_x, reference).Normalized();
-        Vec3 axis_y = Cross(axis_z, axis_x).Normalized();
-
-        auto value_at = [component](const ForceDiagramSample& s) -> float {
-            switch (component) {
-                case 0: return s.n_n;
-                case 1: return s.v_n;
-                case 2: return s.m_nm;
-                default: return s.t_nm;
-            }
-        };
-        auto point_at = [&](const ForceDiagramSample& s) -> Vec3 {
-            return mv.a + axis_x * s.x_m + axis_y * (value_at(s) * scale);
-        };
+        if (!options.all_members && mv.no_batang != selected_member) continue;
 
         const std::vector<ForceDiagramSample>& samples = mv.force_diagram.samples;
-        for (size_t i = 0; i + 1 < samples.size(); ++i) {
-            DrawBox(point_at(samples[i]), point_at(samples[i + 1]), kLineThickness, kLineThickness, kDiagramColor,
-                    view_proj);
+        if (samples.size() < 2) continue;
+
+        for (ForceComponent component : kAllForceComponents) {
+            if (!options.Enabled(component)) continue;
+
+            ForceDiagramPlacement placement = ComputeForceDiagramPlacement(mv, component);
+            if (!placement.valid) continue;
+            const float* color = ForceComponentColor(component);
+
+            auto base_at = [&](const ForceDiagramSample& s) -> Vec3 { return mv.a + placement.axis_x * s.x_m; };
+            auto point_at = [&](const ForceDiagramSample& s) -> Vec3 {
+                return base_at(s) + placement.offset_dir * (ForceComponentValue(s, component) * options.scale);
+            };
+
+            // Filled diagram plane: one quad (2 triangles) per station
+            // interval, spanning from the member's own axis out to the
+            // diagram curve -- the "3D diagram plane sticking out from the
+            // line element" this issue asks for. A quad degenerates
+            // harmlessly where the value crosses zero.
+            if (options.filled) {
+                fill.clear();
+                fill.reserve((samples.size() - 1) * 6 * 6);
+                const Vec3& n = placement.plane_normal;
+                auto push = [&](const Vec3& p) {
+                    fill.push_back(p.x);
+                    fill.push_back(p.y);
+                    fill.push_back(p.z);
+                    fill.push_back(n.x);
+                    fill.push_back(n.y);
+                    fill.push_back(n.z);
+                };
+                for (size_t i = 0; i + 1 < samples.size(); ++i) {
+                    Vec3 p0 = base_at(samples[i]);
+                    Vec3 p1 = base_at(samples[i + 1]);
+                    Vec3 q0 = point_at(samples[i]);
+                    Vec3 q1 = point_at(samples[i + 1]);
+                    push(p0);
+                    push(p1);
+                    push(q1);
+                    push(p0);
+                    push(q1);
+                    push(q0);
+                }
+                DrawTriangles(fill, color, view_proj);
+            }
+
+            // The curve itself, always drawn -- it defines the diagram's
+            // shape crisply whether or not the fill is on, and with
+            // options.filled == false it *is* the whole diagram (the
+            // outline-only look this overlay originally had).
+            for (size_t i = 0; i + 1 < samples.size(); ++i) {
+                DrawBox(point_at(samples[i]), point_at(samples[i + 1]), kCurveThickness, kCurveThickness, color,
+                        view_proj);
+            }
+            // End stems back to the member's own axis, so the diagram reads
+            // as attached to the structure rather than floating beside it.
+            DrawBox(mv.a, point_at(samples.front()), kStemThickness, kStemThickness, color, view_proj);
+            DrawBox(mv.b, point_at(samples.back()), kStemThickness, kStemThickness, color, view_proj);
         }
-        // Stems anchoring the ribbon's two ends back to the member's own
-        // baseline, so it reads as a diagram attached to the structure
-        // rather than a disconnected floating line.
-        DrawBox(mv.a, point_at(samples.front()), kStemThickness, kStemThickness, kDiagramColor, view_proj);
-        DrawBox(mv.b, point_at(samples.back()), kStemThickness, kStemThickness, kDiagramColor, view_proj);
     }
 }
 
 unsigned int SceneRenderer::Render(const SceneModel& scene, const Camera& camera, int width, int height,
                                     int selected_member, bool show_deformed_shape, float deformation_scale,
-                                    bool show_force_diagram, int force_diagram_component, float force_diagram_scale,
-                                    bool force_diagram_all_members) {
+                                    const ForceDiagramOptions& force_diagram) {
     EnsureGLObjects();
     EnsureFramebuffer(width, height);
 
@@ -418,9 +487,8 @@ unsigned int SceneRenderer::Render(const SceneModel& scene, const Camera& camera
         DrawDeformedShape(scene, deformation_scale, view_proj.m);
     }
 
-    if (show_force_diagram) {
-        DrawForceDiagramOverlay(scene, selected_member, force_diagram_all_members, force_diagram_component,
-                                 force_diagram_scale, view_proj.m);
+    if (force_diagram.AnyEnabled()) {
+        DrawForceDiagramOverlay(scene, selected_member, force_diagram, view_proj.m);
     }
 
     glBindVertexArray(0);

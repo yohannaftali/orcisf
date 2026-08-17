@@ -299,4 +299,87 @@ GroundGridLayout ComputeGroundGridLayout(const SceneModel& scene) {
     return layout;
 }
 
+ForceDiagramPlacement ComputeForceDiagramPlacement(const MemberVisual& mv, ForceComponent component) {
+    ForceDiagramPlacement p;
+    Vec3 delta = mv.b - mv.a;
+    float length = delta.Length();
+    if (length < 1e-5f) return p;
+
+    p.axis_x = delta * (1.f / length);
+    // Same local-basis derivation SceneRenderer::DrawBox() uses internally
+    // for a member's own box mesh, so a diagram's plane lines up with the
+    // rendered member rather than an independently-chosen frame.
+    Vec3 reference = (std::fabs(Dot(p.axis_x, Vec3{0, 1, 0})) > 0.99f) ? Vec3{0, 0, 1} : Vec3{0, 1, 0};
+    Vec3 axis_z = Cross(p.axis_x, reference).Normalized();
+    Vec3 axis_y = Cross(axis_z, p.axis_x).Normalized();
+
+    // See the header's table: shear/moment get the physically-correct local
+    // 1-2 plane; axial/torsion get the perpendicular 1-3 plane purely so
+    // all four stay separately readable when shown together.
+    switch (component) {
+        case ForceComponent::Shear:
+        case ForceComponent::Moment: p.offset_dir = axis_y; break;
+        case ForceComponent::Axial:
+        case ForceComponent::Torsion: p.offset_dir = axis_z; break;
+    }
+    p.plane_normal = Cross(p.axis_x, p.offset_dir).Normalized();
+    p.valid = true;
+    return p;
+}
+
+float ForceComponentValue(const ForceDiagramSample& sample, ForceComponent component) {
+    switch (component) {
+        case ForceComponent::Axial: return sample.n_n;
+        case ForceComponent::Shear: return sample.v_n;
+        case ForceComponent::Moment: return sample.m_nm;
+        case ForceComponent::Torsion: return sample.t_nm;
+    }
+    return 0.f;
+}
+
+const char* ForceComponentLabel(ForceComponent component) {
+    switch (component) {
+        case ForceComponent::Axial: return "N";
+        case ForceComponent::Shear: return "V";
+        case ForceComponent::Moment: return "M";
+        case ForceComponent::Torsion: return "T";
+    }
+    return "?";
+}
+
+const char* ForceComponentUnit(ForceComponent component) {
+    // N/V are forces (N); M/T are moments (N*m) -- see ForceDiagram.h's
+    // unit-correction note, these are N*m and NOT Nmm.
+    switch (component) {
+        case ForceComponent::Axial:
+        case ForceComponent::Shear: return "N";
+        case ForceComponent::Moment:
+        case ForceComponent::Torsion: return "Nm";
+    }
+    return "";
+}
+
+const float* ForceComponentColor(ForceComponent component) {
+    // Four mutually very distinct hues (yellow / pink / lime / lavender).
+    // Each is near *one* existing palette entry (yellow~selection gold,
+    // lime~satisfied green, lavender~joint-moment purple, pink~violated
+    // red), but every one of those is drawn on different geometry (member
+    // bodies or joint markers) while these are offset ribbons, so they stay
+    // tellable apart in practice. Documented in AGENTS.md's palette list.
+    // Alpha must be 1.f, not omitted: the offscreen FBO is RGBA8 and
+    // ImGui::Image() blends that texture using its alpha channel, so a
+    // zero-alpha color renders as fully transparent (invisible), not opaque.
+    static constexpr float kAxial[4] = {1.00f, 0.90f, 0.30f, 1.f};
+    static constexpr float kShear[4] = {1.00f, 0.45f, 0.75f, 1.f};
+    static constexpr float kMoment[4] = {0.55f, 1.00f, 0.45f, 1.f};
+    static constexpr float kTorsion[4] = {0.70f, 0.55f, 1.00f, 1.f};
+    switch (component) {
+        case ForceComponent::Axial: return kAxial;
+        case ForceComponent::Shear: return kShear;
+        case ForceComponent::Moment: return kMoment;
+        case ForceComponent::Torsion: return kTorsion;
+    }
+    return kAxial;
+}
+
 } // namespace orcisf::gui

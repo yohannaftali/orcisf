@@ -2695,7 +2695,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #68 | feat(src): engine analyze-only entry point (fixed-design analysis, no optimization search) | ready-for-review (tester: 4/4 PASS, independently re-verified with different dataset params/seed than coder's own test) | 2026-08-17 |
 | #69 | feat(src): per-member manual dimension input panel for Analyze mode | ready-for-review (tester: GUI-rendering/interaction ACs UNVERIFIED, blocked by automation hazard -- underlying AnalyzeFixedDesign() call target independently confirmed correct via #68) | 2026-08-17 |
 | #70 | feat(src): Analyze-mode design-check results display (demand vs. capacity, safe/unsafe) | ready-for-review (tester: demand-vs-capacity + viewport-coloring data flow PASS via standalone program (undersized-vs-adequate column test); on-screen table/badge/viewport-pixel ACs UNVERIFIED, blocked by automation hazard) | 2026-08-17 |
-| #71 | feat(src): 3D-viewport force diagram overlay (N/V/M/T ribbons on the structure) | ready-for-review (coder: user re-tested and found it non-functional; root-caused to two broken default values (scale, all_members), fixed and rebuilt clean; awaiting user's own re-confirmation) | 2026-08-17 |
+| #71 | feat(src): 3D-viewport force diagram overlay (N/V/M/T ribbons on the structure) | ready-for-review (coder, 2 rounds: fixed broken defaults, then reworked to 4 simultaneously-toggleable filled 3D diagram planes per the user's clarified ask; geometry verified standalone against a real run, zero-warning build; on-screen appearance still awaiting the user's interactive re-test) | 2026-08-17 |
 | #72 | fix(src): loads disappear from Loads panel after a completed optimization run | open | 2026-08-17 |
 | #73 | fix(src): dock tab icon disappears when that panel's tab is not the active one | open | 2026-08-17 |
 | #74 | feat(src): default checkbox for same lapangan/tumpuan bars in Analyze mode's beam input | open | 2026-08-17 |
@@ -3121,34 +3121,99 @@ DrawForceDiagramOverlay()`, or `EditorOptions`' `show_force_diagram`/
   section that was never actually designed; `ForceDiagramPanel.cpp`
   already had this exact guard (`mv_it->has_results ? ... : 0.f`),
   copied here for consistency, not independently re-derived.
-- **Rendered as an offset polyline (`DrawBox` segments, the same "a line
-  is a thin box" idiom `DrawGrid`/`DrawDeformedShape` already use), not a
-  filled ribbon mesh** -- each sampled station's point is
-  `member_a + axis_x*x_m + axis_y*(value*scale)`, using the *same*
-  `axis_x`/`axis_y` basis `DrawBox()` derives internally for that
-  member, plus two short "stem" boxes connecting the diagram's two ends
-  back to the member's own baseline so it reads as attached to the
-  structure rather than a floating disconnected line. Color `{0.95,
-  0.70, 0.15, 1}` (amber/gold) -- cross-checked against every other
-  documented viewport color (grid = dark cobalt, deformed shape = cyan,
-  restrained joints = a more saturated orange) before picking it; add
-  any future overlay color to this same cross-check list.
-  `force_diagram_component` (0=N,1=V,2=M,3=T) selects which
-  `ForceDiagramSample` field drives the offset.
+- **All four components (N/V/M/T) are independently toggleable and render
+  simultaneously** -- `EditorOptions::force_diagram` is a
+  `ForceDiagramOptions` struct (`gui/editor/Selection.h`) with one bool
+  per component plus `filled`/`values`/`all_members`/`scale`. The first
+  implementation used a single-selection *combo box*, which structurally
+  could not show more than one component at once; that was the substance
+  of the user's follow-up report ("show 4 type force diagrams in 3d
+  drawed structure of each member, we can toggle each force"). If you
+  add a fifth diagram type, add a bool + a `kAllForceComponents` entry --
+  don't reintroduce a single-selection control.
+- **Each component is drawn as a filled 3D diagram plane, and each gets
+  its own plane + color so several at once stay readable.** Placement
+  comes from `ComputeForceDiagramPlacement()`
+  (`gui/viewport/SceneModel.h`): shear/moment use the member's local 1-2
+  plane (physically correct for both -- `v_n` acts along local 2, `m_nm`
+  bends within the 1-2 plane), while axial/torsion use the perpendicular
+  1-3 plane as a **deliberate display choice** (an axial force acts along
+  the member's own axis and torsion twists about it, so neither has a
+  natural bending plane; separating them just keeps the four from
+  overlapping). Sign is always preserved -- a positive value offsets
+  along `+offset_dir` -- so which side a diagram sits on still reads as
+  its sign.
+- **`ComputeForceDiagramPlacement()`/`ForceComponentValue()`/
+  `ForceComponentColor()`/`ForceComponentLabel()` live in `SceneModel.h`,
+  shared by `SceneRenderer` (GL geometry) and `ViewportPanel` (text-value
+  labels)** -- the exact `ComputeGroundGridLayout()` split (#50) and for
+  the same reason: two renderers must never derive the same placement
+  independently and drift apart.
+- **`SceneRenderer::DrawTriangles()` + a second, dynamic VBO
+  (`dyn_vao_`/`dyn_vbo_`) exist specifically because a filled diagram is
+  a trapezoid strip, which is NOT an affine transform of the unit cube** --
+  an affine map preserves parallelism, so no `Mat4::FromBasis()` scaling
+  of `DrawBox()`'s cube can produce a quad whose two parallel edges
+  differ in length. Every *other* shape this renderer draws is a
+  transformed cube; this is the one that genuinely needed new geometry.
+  It uploads world-space vertices with an identity model matrix and uses
+  `glBufferData` (not `glBufferSubData`) to let the driver orphan the
+  previous contents instead of stalling on an in-flight draw. It restores
+  the `cube_vao_` binding on exit, since `Render()` binds that once up
+  front.
+- **The outline curve is always drawn; `filled` only adds the surface** --
+  so `filled == false` degrades to exactly the pre-rework outline look,
+  and the curve keeps the diagram's shape crisp either way.
+- **Component colors (`ForceComponentColor()`): N = yellow `{1.00, 0.90,
+  0.30}`, V = pink `{1.00, 0.45, 0.75}`, M = lime `{0.55, 1.00, 0.45}`,
+  T = lavender `{0.70, 0.55, 1.00}`.** Mutually very distinct; each is
+  near *one* existing palette entry (yellow~selection gold, pink~violated
+  red, lime~satisfied green, lavender~joint-moment purple) but all of
+  those are drawn on member bodies or joint markers while these are
+  offset ribbons. **The viewport palette is now essentially full** -- a
+  future issue adding more overlay colors should add a legend rather than
+  keep hunting for unused hues. (The overlay's own control doubles as a
+  legend today: each component's checkbox label is tinted with that
+  component's exact render color.)
+- **Alpha must be `1.f` in any color handed to this renderer.** The
+  offscreen FBO is RGBA8 and `ImGui::Image()` blends the texture using
+  its alpha, so a color literal written as `{r, g, b}` into a `float[4]`
+  leaves alpha 0 and renders *fully transparent* -- caught while writing
+  `ForceComponentColor()`, and an easy mistake to repeat.
+- **Only the major-axis V/M are diagrammed, not SAP2000's full
+  V2/V3/M2/M3 set.** `engine::MemberForces` does carry the minor-axis
+  pair (`shear_z`/`moment_y`), but `gui::ComputeForceDiagram()` (#61,
+  whose V(x)/M(x) formulas were carefully unit-verified after a real
+  bug) only samples the major axis -- extending it is a deliberate
+  follow-up, not something to bolt on. Likewise **shell/area stress
+  contours (F11/F22/M11/M22) are not applicable at all**: ORCISF is a
+  space *frame*, line elements only, with no shell elements anywhere in
+  the engine or file format.
+- **`values` labels only each diagram's peak |value| station**, not every
+  sampled station -- 4 components x N members x 21 stations would be an
+  unreadable wall of text, and the peak is what's actually read off a
+  diagram. Drawn by `ViewportPanel`'s `DrawForceDiagramValueLabels()`
+  (inside the same clip-rect/window-draw-list block as the other
+  overlays), since `SceneRenderer` has no text capability.
 - **Additive, not a replacement** -- the existing 2D `ForceDiagramPanel`
   (#61) keeps its own separate on-demand `ComputeForceDiagram()` call
   for just the selected member; both call the identical function so they
   always agree on shape/magnitude for any member both happen to show,
   but neither was changed to depend on the other.
-- **Overlay control (toggle + N/V/M/T combo + "All members" checkbox +
-  log-scale magnitude slider)** is a real ImGui widget block
-  (`SetCursorScreenPos` within the "Viewport" window), stacked directly
-  below the existing deformed-shape overlay (#60) in the same top-left
-  corner -- same `..._overlay_capturing` bool pattern already
-  established for the plane-offset (#24) and deformed-shape (#60)
-  overlays, OR'd into all three orbit/pan/zoom input gates so
-  interacting with any of the three overlays never also starts a
-  camera drag underneath it.
+- **Overlay control (4 component checkboxes + Fill/Values/All-members +
+  log-scale magnitude slider)** is a real ImGui widget block within the
+  "Viewport" window, stacked directly below the existing deformed-shape
+  overlay (#60) in the same top-left corner -- same
+  `..._overlay_capturing` bool pattern already established for the
+  plane-offset (#24) and deformed-shape (#60) overlays, OR'd into all
+  three orbit/pan/zoom input gates so interacting with any of the three
+  overlays never also starts a camera drag underneath it. Unlike those
+  two blocks, this one calls `SetCursorScreenPos()` *once* and then lets
+  ImGui's normal vertical layout flow place each row -- there are too
+  many rows here for a hand-computed `y` per widget to stay readable --
+  with the background rect's height derived from the same
+  `GetFrameHeight()`/`GetTextLineHeight()`/`ItemSpacing.y` values that
+  flow uses, so rect and content can't disagree.
 - **Bonus fix, not part of this issue's own scope but caught while
   copying the deformed-shape overlay's pattern for a third time**: both
   the plane-offset overlay's (#24) and the deformed-shape overlay's
@@ -3162,12 +3227,19 @@ DrawForceDiagramOverlay()`, or `EditorOptions`' `show_force_diagram`/
   own background rect, which used the correct pattern from the start --
   copying the known-bad pattern a third time was judged worse than a
   same-day, one-line, low-risk fix to the two pre-existing instances.
-- **Real bug found on first re-test, fixed same day**: the overlay
-  compiled and ran but was, in practice, invisible/non-functional --
-  the user's own report was "I still found only 2D". Root cause was two
-  broken *default values* in `EditorOptions`, not the rendering logic
-  itself (`DrawForceDiagramOverlay()`/`BuildSceneModel()`/
-  `ComputeForceDiagram()` were all re-checked and are correct):
+- **Two rounds of real bugs found by the user re-testing, both fixed the
+  same day.** Worth reading as a pattern: a GUI feature that "compiles
+  and launches without crashing" can still be completely non-functional,
+  and this project's own validation conventions (compiled != ran !=
+  visually confirmed) exist precisely because that happened twice here.
+  **Round 2** was the substantive one: even with the defaults fixed
+  (round 1 below), the feature still didn't match the request, because a
+  single-selection combo box can't show four diagrams at once and a thin
+  offset polyline isn't a "3D diagram plane". That's what the
+  simultaneous-toggles + filled-plane rework above addresses.
+  **Round 1** was two broken *default values* in `EditorOptions`, not the
+  rendering logic (`DrawForceDiagramOverlay()`/`BuildSceneModel()`/
+  `ComputeForceDiagram()` were all re-checked and correct):
   1. `force_diagram_scale` defaulted to `1e-4f` -- for this project's
      real moment magnitudes (tens of thousands of N*m) and axial forces
      (hundreds of thousands of N), that produces a multi-meter offset on
@@ -3187,19 +3259,24 @@ DrawForceDiagramOverlay()`, or `EditorOptions`' `show_force_diagram`/
   N/Nm ranges) before picking a round number -- this is exactly how the
   original `1e-4f` went unnoticed through compilation and a non-crash
   launch check.
-- **Verification status:** compiled cleanly (zero warnings) both before
-  and after the defaults fix; `orcisf_gui` launch confirmed (no crash)
-  each time. The overlay's actual on-screen appearance (ribbon shape/
-  position, component switching, All-members mode, a side-by-side
-  comparison against the 2D `ForceDiagramPanel` for the same member)
-  still has **not** been visually confirmed by an agent in this
-  environment -- the original implementation was overnight autonomous
-  work (per explicit user request, no interactive GUI automation used),
-  and the defaults fix was diagnosed and applied the same way (careful
-  code/data review, not a screenshot). The user found the original bug
-  by testing the real GUI themselves and is expected to re-test the fix
-  the same way; treat this as still needing that confirmation (or a
-  `tester` pass) before considering #71 fully verified.
+- **Verification status:** compiled cleanly (zero warnings) at every
+  round; `orcisf_gui` launch confirmed (no crash) each time, including
+  after the new dynamic-VBO code landed. The *geometry* of the rework was
+  verified against a real `Apl1-1` run by a standalone program linking
+  the real `SceneModel.cpp`/`ForceDiagram.cpp` + `orcisf_engine` (no
+  ImGui/GL in that chain): every member gets a populated diagram; all
+  four placements are valid right-handed orthonormal frames;
+  shear/moment share one plane, axial/torsion share the perpendicular
+  one; `ForceComponentValue()` maps each component to its own sample
+  field (a switch-typo would otherwise silently alias two components);
+  all four colors are distinct and opaque; and the default scale puts
+  the largest peak offset at **2.19 m** (vs. ~20 m at the old buggy
+  1e-4), comfortably visible but member-sized. **The on-screen
+  appearance still has not been visually confirmed by an agent in this
+  environment** -- every round of this issue was diagnosed by code/data
+  review rather than screenshots, and both bugs so far were found by the
+  user driving the real GUI. Treat a real interactive/screenshot pass as
+  still outstanding before considering #71 done.
 
 ---
 

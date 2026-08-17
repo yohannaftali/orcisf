@@ -25,6 +25,75 @@ enum class LoadPlacementMode { None, MemberLoad, JointLoad };
 // alongside editor-facing code in this project's layering.
 enum class ViewPlane { Free, XY, XZ, YZ };
 
+// Issue #71: the four internal-force components this port can diagram --
+// same four (and the same order) `ForceDiagramSample`/`ForceDiagramPanel`'s
+// stacked 2D plots already use. Lives here, alongside ViewPlane/
+// LoadPlacementMode, for the same reason those do: `EditorOptions` below
+// needs it, and this header is deliberately dependency-free so both the
+// editor and viewport layers can include it (see ViewPlane's comment).
+//
+// Deliberately NOT six components: `engine::MemberForces` does carry the
+// minor-axis pair too (`shear_z`/`moment_y`, i.e. SAP2000's V3/M2), but
+// `gui::ComputeForceDiagram()` (#61, whose V(x)/M(x) formulas were
+// carefully unit-verified) only samples the major axis. Adding V3/M2 means
+// extending that verified sampling code, so it's a deliberate follow-up,
+// not something to bolt on here.
+enum class ForceComponent { Axial, Shear, Moment, Torsion };
+
+inline constexpr ForceComponent kAllForceComponents[4] = {ForceComponent::Axial, ForceComponent::Shear,
+                                                           ForceComponent::Moment, ForceComponent::Torsion};
+
+// Issue #71: 3D-viewport force-diagram overlay state. All four components
+// are independently toggleable and render *simultaneously* -- that was the
+// core of the issue's follow-up report ("show 4 type force diagrams in 3d
+// drawed structure of each member, we can toggle each force"): the first
+// implementation had a single-selection combo box, which structurally
+// couldn't show more than one at a time. Each component is drawn in its own
+// plane/color so several at once stay readable -- see
+// gui/viewport/SceneModel.h's ComputeForceDiagramPlacement().
+struct ForceDiagramOptions {
+    bool show_axial = false;
+    bool show_shear = false;
+    bool show_moment = false;
+    bool show_torsion = false;
+
+    // Filled 3D diagram plane (SAP2000-style, the default) vs. outline
+    // curve only. The outline is always drawn; this adds the filled
+    // surface between the curve and the member's own axis.
+    bool filled = true;
+
+    // Draw each diagram's peak numeric value as a text label in the
+    // viewport (ViewportPanel's overlay, since SceneRenderer has no text
+    // capability). Off by default -- with several components and members
+    // enabled at once, labels get dense fast.
+    bool values = false;
+
+    // Magnitude -> meters-of-offset factor. 1e-5 keeps a typical
+    // 50,000-100,000 N*m moment (or 100,000-200,000 N axial force) to a
+    // ~0.5-2m offset, comparable to the member's own cross-section size.
+    // NOTE: a previous 1e-4 default was a real bug -- it put the diagram
+    // 5-20m off an ordinary ~6m member, entirely outside the framed view,
+    // which read as "the feature does nothing". Sanity-check any new
+    // default against real .str/ANALYSIS_RESULTS magnitudes.
+    float scale = 1e-5f;
+
+    // true = every member with force data (a whole-structure overview, the
+    // SAP2000-style default); false = only the currently selected member.
+    bool all_members = true;
+
+    bool Enabled(ForceComponent c) const {
+        switch (c) {
+            case ForceComponent::Axial: return show_axial;
+            case ForceComponent::Shear: return show_shear;
+            case ForceComponent::Moment: return show_moment;
+            case ForceComponent::Torsion: return show_torsion;
+        }
+        return false;
+    }
+
+    bool AnyEnabled() const { return show_axial || show_shear || show_moment || show_torsion; }
+};
+
 // Shared selection state: what's picked in the 3D viewport, read/written
 // by ViewportPanel (picking, gizmo drag) and read by PropertiesPanel
 // (numeric editing, delete button) -- both act on the same joint/member.
@@ -83,33 +152,9 @@ struct EditorOptions {
     bool show_deformed_shape = false;
     float deformation_scale = 50.f;
 
-    // Issue #71: 3D-viewport force diagram (N/V/M/T) ribbon overlay,
-    // additive to the existing 2D ForceDiagramPanel (#61) -- reuses the
-    // same per-member ForceDiagram data (SceneModel's MemberVisual::
-    // force_diagram, computed via gui::ComputeForceDiagram()). Only takes
-    // effect when at least one member in the scene has a non-empty
-    // force_diagram (i.e. the scene has analysis results) -- see
-    // ViewportPanel::Draw's overlay control, same disabled-toggle
-    // convention as show_deformed_shape above. `force_diagram_component`:
-    // 0=N (axial), 1=V (shear), 2=M (moment), 3=T (torsion) -- matches the
-    // order ForceDiagramPanel's own 4 stacked plots already use.
-    // `force_diagram_all_members`: true = every member with data, for a
-    // whole-structure overview (SAP2000-style "show forces for the whole
-    // model" default -- issue #71's own follow-up report: with this
-    // defaulted false, toggling "Show" with no member selected rendered
-    // nothing at all, reading as "the feature doesn't work"); false =
-    // only the currently selected member, for a focused single-member view.
-    bool show_force_diagram = false;
-    int force_diagram_component = 2; // default to Moment (M) -- typically the most informative at a glance
-    // Issue #71 follow-up: 1e-4 was a real bug -- for this project's real
-    // moment magnitudes (tens of thousands of N*m), that scale produced a
-    // multi-meter offset on an ordinary ~5-6m member, pushing the ribbon
-    // far outside the camera's framed view (effectively invisible, read as
-    // "doesn't work" rather than "too small to see"). 1e-5 keeps a typical
-    // ~50,000-100,000 N*m moment or ~100,000-200,000 N axial force to a
-    // ~0.5-2m offset, comparable to the member's own cross-section size.
-    float force_diagram_scale = 1e-5f;
-    bool force_diagram_all_members = true;
+    // Issue #71: 3D-viewport force diagram overlay -- see ForceDiagramOptions
+    // above and gui/viewport/SceneModel.h's ComputeForceDiagramPlacement().
+    ForceDiagramOptions force_diagram;
 };
 
 } // namespace orcisf::gui

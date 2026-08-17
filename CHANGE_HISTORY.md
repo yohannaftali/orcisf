@@ -5073,3 +5073,85 @@ succeeded cleanly (zero warnings).
   interactively (asked the user, who is actively at the machine, to
   re-test directly rather than risk GUI automation)
 - Files: `src/gui/editor/Selection.h`
+
+## [2026-08-17] — feat(gui): #71 rework -- 4 simultaneous force diagrams as filled 3D planes
+
+User re-tested the defaults fix above and reported the feature still
+wasn't what was asked for: *"i mean want to show 4 type force diagrams
+in 3d drawed structure of each member, we can toggle each force"*, with
+a pasted generic spec describing filled "3D diagram planes sticking out
+from line elements" plus Fill-Color / Render-Text-Values toggles.
+
+Two structural gaps, not tuning issues:
+1. The overlay had a **single-selection combo box** -- it could never
+   show more than one component at a time, by construction.
+2. It drew a **thin offset polyline**, not a filled diagram plane.
+
+**Mapping the pasted 4-mode spec onto this project** (it describes a
+generic Python/Three.js app; ORCISF is C++/OpenGL): Mode 1 (undeformed)
+and Mode 2 (deformed shape) already exist (#5/#60) -- deformed-shape
+*animation* is noted as a possible separate issue, not done here. Mode 3
+(frame forces) was the real gap and is what this change implements. Mode
+4 (shell stresses F11/F22/M11/M22) is **not applicable at all**: ORCISF
+is a space *frame*, line elements only -- there are no shell/area
+elements anywhere in the engine or the legacy file format, so nothing
+was faked for it.
+
+**Changes:**
+- `gui/editor/Selection.h`: new `ForceComponent` enum +
+  `kAllForceComponents`, and a new `ForceDiagramOptions` struct (one bool
+  per component + `filled`/`values`/`all_members`/`scale`, with
+  `Enabled()`/`AnyEnabled()`), replacing the 4 loose
+  `show_force_diagram`/`force_diagram_component`/`_scale`/`_all_members`
+  fields. Kept `Selection.h` dependency-free, as its own comment
+  requires.
+- `gui/viewport/SceneModel.{h,cpp}`: new shared placement/appearance
+  helpers -- `ComputeForceDiagramPlacement()`, `ForceComponentValue()`,
+  `ForceComponentLabel()`, `ForceComponentUnit()`,
+  `ForceComponentColor()` -- following the `ComputeGroundGridLayout()`
+  precedent so the GL geometry and the text labels can't disagree.
+  Shear/moment get the physically-correct local 1-2 plane; axial/torsion
+  get the perpendicular 1-3 plane as a documented display choice, which
+  is what keeps all four legible at once.
+- `gui/viewport/SceneRenderer.{h,cpp}`: new `DrawTriangles()` + a second
+  *dynamic* VBO, because a filled diagram is a trapezoid strip and
+  therefore **not** an affine transform of the unit cube every other
+  shape here uses (affine maps preserve parallelism). Rewrote
+  `DrawForceDiagramOverlay()` to loop over enabled components, emitting a
+  filled surface (2 triangles per station interval) plus the outline
+  curve and end stems. `Render()` now takes one
+  `const ForceDiagramOptions&` instead of four separate force params.
+- `gui/ViewportPanel.cpp`: overlay control is now 4 component checkboxes
+  (each tinted with its own render color, so the control doubles as the
+  legend) + Fill/Values/All-members + the magnitude slider; plus new
+  `DrawForceDiagramValueLabels()` for the "Render Text Values" toggle,
+  labelling each diagram's **peak** station only (labelling all 21
+  stations x 4 components x N members would be unreadable).
+
+**Bug caught while writing it** (worth remembering): the per-component
+color constants were first written as `{r, g, b}` into `float[4]`,
+leaving **alpha = 0**. The offscreen FBO is RGBA8 and `ImGui::Image()`
+blends on that alpha, so every ribbon would have rendered fully
+transparent -- i.e. a third consecutive "compiles, launches, shows
+nothing" failure. Fixed before building and documented in `AGENTS.md`.
+
+**Verification:** clean build, zero warnings. Geometry verified against
+a real `Apl1-1` run by a standalone program linking the *real*
+`SceneModel.cpp`/`ForceDiagram.cpp` + `orcisf_engine` (no ImGui/GL in
+that chain, so it needs no GUI toolchain): every member gets a populated
+diagram; all 4 placements are valid right-handed orthonormal frames;
+shear/moment share one plane and axial/torsion the perpendicular one;
+`ForceComponentValue()` maps each component to its own sample field (a
+switch typo would silently alias two); all 4 colors distinct and opaque;
+default scale yields a 2.19 m largest peak offset (vs. ~20 m at the old
+1e-4). GUI launch confirmed (no crash) with the new dynamic-VBO path.
+**On-screen appearance still not agent-confirmed** -- both previous bugs
+were found by the user driving the real GUI, so a real interactive pass
+remains outstanding.
+
+- Issue #71: reworked, built, geometry-verified; awaiting the user's
+  interactive re-test
+- Files: `src/gui/editor/Selection.h`,
+  `src/gui/viewport/SceneModel.{h,cpp}`,
+  `src/gui/viewport/SceneRenderer.{h,cpp}`, `src/gui/ViewportPanel.cpp`,
+  `AGENTS.md`
