@@ -4605,3 +4605,63 @@ verified correct.
 
 - Issues #59, #60, #61, #62 closed on GitHub (`state_reason: completed`)
 - Files: `AGENTS.md` (Tracked Issues table), `CHANGE_HISTORY.md`
+
+## [2026-08-17] — chore(investigate): #63 (RunPanel hang) -- no confirmed fix
+
+`/coder` ("fix issue #63"). Extensive investigation, no code change --
+could not reproduce a hang to fix with confidence, and shipping a blind
+"fix" for an unreproduced bug would be false confidence, not a real fix.
+
+**18 reproduction attempts, 0 hangs**: 7 `orcisf_cli optimize` runs
+(across two sessions, various seeds/thread counts) plus 11 fresh runs
+of a standalone program built specifically to mirror `RunPanel::
+StartRun()`'s *exact* threading pattern (background `std::thread`,
+mutex-guarded `ProgressInfo`, `std::atomic<bool>` cancel flag,
+`worker_threads=15` from a real `hardware_concurrency()=16` read,
+matching the original report's default) -- every run converged in
+~0.5s. Since this reproduces both the algorithm *and* the threading
+mechanism with zero GLFW/ImGui/GPU involvement and never hung, a
+deterministic bug (if one exists) isn't in `RunOptimization()`'s core
+loop or the fork-join/mutex/atomic pattern itself. Static review of
+`RunOptimization()`/`RunOnLanes`/`EvaluatePopulationParallel`/
+`CariBaruParallel` found no infinite-loop or deadlock possibility --
+every path either advances toward `j_iterasi_mak` or breaks, and
+fork-join threads are always joined before returning.
+
+**One real, separate bug found and filed (not the same defect,
+unconfirmed relevance)**: `sd.fitstr[sd.JSTD - sd.JVD - 1]` reads
+out-of-bounds (index `-1`, UB via the `size_t` cast in `LegacyArray::
+operator[]`) when `fak_plus=0` and `fak_kali=1` -- both reachable via
+the Run panel's unclamped `InputInt` fields. The original #63 report
+used `fak_plus=3` (in-bounds), so this doesn't explain what was
+actually observed that night -- filed separately as **#65** rather
+than fixed inline, since fixing it wouldn't have addressed #63's own
+report and this project's convention (see #64) is to scope
+unrelated-but-discovered findings into their own issue.
+
+**Best-effort hypothesis, explicitly not proven**: the original
+report's own evidence (`Process.Responding=True` but
+`TotalProcessorTime` climbing ~1m46s over ~90s -- real CPU-bound work,
+not an idle/blocked wait) doesn't match a classic deadlock signature.
+The most plausible explanation reasoned through: that session was
+running heavy concurrent screen-capture/window-automation
+(`GetWindowRect`/`CopyFromScreen` polling loops) against the same
+machine, which could plausibly starve the background optimization
+thread of real CPU time in a resource-constrained environment --
+consistent with every observed symptom (real CPU usage, a frozen
+"Elapsed" display matching exactly the last progress update before
+convergence, Cancel appearing unresponsive if the UI thread was also
+starved). This was **not verified** -- there's no way to confirm it
+after the fact -- and is offered as the most consistent explanation
+given the evidence, not a diagnosis to treat as settled.
+
+Posted the full writeup as a comment on issue #63 (with the user's
+explicit confirmation before posting) rather than closing it -- nothing
+here constitutes a confirmed fix, so the issue stays open pending a
+clean reproduction attempt (no concurrent heavy automation racing for
+CPU) or a recurrence with better diagnostics.
+
+- Issue #63: comment posted on GitHub, left open (no fix to close it with)
+- Issue #65 filed on GitHub (the unrelated OOB-index bug found along the way)
+- Files: `AGENTS.md` (Tracked Issues table + new #63 investigation note
+  in the `engine/` section), `CHANGE_HISTORY.md`

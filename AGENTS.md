@@ -2100,6 +2100,25 @@ things every future agent touching it must know:
   the fallback threshold temporarily forced low to actually exercise the
   parallel merge path rather than only the sequential fallback) — see
   `engine/README.md`'s Validation section for the exact commands.
+- **Issue #63 (RunPanel hang, GUI-only, unreproduced) — read before
+  assuming a threading bug exists here.** A `coder` investigation
+  (2026-08-17) ran `RunOptimization()`/`RunOnLanes`/`CariBaruParallel`/
+  `EvaluatePopulationParallel` 18 times total under two different
+  harnesses — 7x via `orcisf_cli`, 11x via a standalone program mirroring
+  `RunPanel::StartRun()`'s *exact* threading pattern (background
+  `std::thread`, mutex-guarded `ProgressInfo`, `std::atomic<bool>`
+  cancel, `worker_threads=15` matching the original report) — and never
+  reproduced a hang; every run converged in well under a second. Static
+  review of the convergence loop and fork-join path found no
+  infinite-loop/deadlock possibility. **Do not assume this area has an
+  unfixed concurrency bug without a fresh, reproducible repro** — the
+  evidence (climbing CPU, not idle-waiting) is more consistent with the
+  original session's own concurrent screenshot-automation tooling
+  competing for CPU than a code defect, though this was never proven.
+  See issue #63's own comment thread for the full writeup. A genuine,
+  separate, unrelated bug *was* found and filed as #65 along the way
+  (`sd.fitstr[sd.JSTD - sd.JVD - 1]` goes out-of-bounds when
+  `fak_plus=0`/`fak_kali=1`) — don't confuse the two.
 - **Never point the CLI/GUI's output at `Optimasi Beton/Example/` directly**
   — output filenames are case-insensitive-colliding with the checked-in
   reference files on Windows (`GEDUNG.opt` == `gedung.opt`). Always use a
@@ -2668,8 +2687,9 @@ later, different one (e.g. closing an issue or cutting a release).
 | #60 | feat(gui): deformed-shape overlay in the 3D viewport | closed (reviewer: PASS WITH NOTES -- `GetForegroundDrawList()` overlay-compositing finding tracked as a follow-up, see AGENTS.md's #60 section; live interactive spot-check still UNVERIFIED) | 2026-08-17 |
 | #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | closed (reviewer: PASS) | 2026-08-17 |
 | #62 | feat(gui): joint displacement / member force / reaction tables + global equilibrium check | closed (reviewer: PASS) | 2026-08-17 |
-| #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open (tester re-confirmed orcisf_cli unaffected 2026-08-17; still blocks live GUI verification of #60/#61/#62) | 2026-08-17 |
+| #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open, unreproduced (coder investigated 2026-08-17: 18/18 clean repros incl. the exact threading pattern, no hang; best-effort hypothesis is resource contention with concurrent automation tooling that night, not a code defect -- see AGENTS.md's #63 note and the GitHub comment) | 2026-08-17 |
 | #64 | docs(src): fix pre-existing "Nmm" mislabeling -- AM moment/torsion fields are actually N*m | open | 2026-08-17 |
+| #65 | bug(src): fak_plus=0/fak_kali=1 causes an out-of-bounds fitstr[-1] read in RunOptimization() | open (found while investigating #63, unrelated/unconfirmed to be its cause) | 2026-08-17 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
