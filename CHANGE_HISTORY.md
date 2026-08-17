@@ -4874,3 +4874,116 @@ around unattended GUI automation).
   `src/gui/viewport/SceneRenderer.{h,cpp}`, `src/app/Application.{h,cpp}`,
   `src/app/DockTabIcons.cpp`, `src/CMakeLists.txt`, `src/engine/README.md`,
   `AGENTS.md`
+
+## [2026-08-17] — chore(test): tester pass on #66 and #67 (+ sub-issues #68-#70)
+
+Fresh build via `builder` (HEAD `013371f`, `ninja: no work to do` --
+binary already matched, confirmed current). Foreground window was the
+user's own active VS Code throughout this pass, so per this project's
+established automation-safety rule, no interactive mouse/keyboard GUI
+automation was attempted. Verified everything CLI/standalone-testable
+independently (fresh programs, not reusing `coder`'s own test
+harnesses; fresh datasets/seeds/parameters).
+
+**#66 -- load analysis results from saved .str file on Open Data:**
+- AC1 (reader parses `.str` back into `AnalysisResults`): **PASS** --
+  ran `orcisf_cli optimize` against a scratch `Apl1-1` copy (seed 777,
+  fresh params), then a new standalone program (`read_str_only.exe`,
+  calling *only* `ReadAnalysisResultsFromStr()`) read the resulting
+  `.str` and printed output byte-for-byte identical to `orcisf_cli`'s
+  own `ANALYSIS_RESULTS` section from that same run.
+- AC2 (`OnOpenFolderRequested()` GUI wiring): **UNVERIFIED** -- blocked
+  by automation hazard (see above).
+- AC3 (scope: no RC-design/`MemberResult` fields touched): **PASS** --
+  confirmed structurally (`ReadAnalysisResultsFromStr()`'s return type
+  is `AnalysisResults` only; no `MemberResult` involved anywhere in the
+  call).
+- AC4 (verified against a real dataset, matches `orcisf_cli`'s
+  `ANALYSIS_RESULTS`): **PASS** -- this is exactly what AC1's test
+  demonstrated.
+
+**#67 (epic) -- manual-dimension Analyze mode:**
+- AC1 (Analyze mode reachable in the GUI, distinct from Run
+  Optimization): **UNVERIFIED** -- GUI-only, blocked by automation
+  hazard.
+- AC2 (end-to-end: pick values, run Analyze, see demand vs. capacity +
+  Safe/Unsafe, no cost search): **PASS at the engine/data-flow level**
+  -- see #68/#70 below; the GUI-driven click-through itself is
+  UNVERIFIED.
+- AC3 (all three sub-issues closed and independently verified): **not
+  yet met** -- none of #68/#69/#70 are closed, and #69/#70's
+  GUI-presentation criteria remain UNVERIFIED this pass.
+
+**#68 -- engine analyze-only entry point:** independently re-verified
+with a different dataset (fresh scratch copy), different cost/cover
+params, a different RNG seed (4242 vs. `coder`'s 42), and
+`worker_threads=2`, via a new standalone program (`verify_68.exe`):
+- AC1 (writes to slot 0, `Inersia()`+`Struktur()`, `ComputeMemberResults()`,
+  no `optimasi()`): **PASS** -- all 8 members' width/height/`harga`/
+  `Kendala()` matched a freshly self-consistent reference exactly.
+- AC2 (also returns `AnalysisResults`): **PASS** -- `member_forces`/
+  `displacements` both populated.
+- AC3 (input validation, throws instead of OOB): **PASS** -- confirmed
+  both a `var_b` size-mismatch and an out-of-range `var_k` index throw
+  `std::invalid_argument`.
+- AC4 (verified via standalone/CLI test): **PASS** -- this test *is*
+  that verification.
+
+**#69 -- GUI input panel:** every criterion describes ImGui rendering/
+interaction (dropdown table, default pre-fill, button click, dock/panel
+reachability, interactive walkthrough) -- all **UNVERIFIED**, blocked
+by the automation hazard. The one non-GUI piece (the function the "Run
+Analyze" button is supposed to call) is independently confirmed correct
+via #68 above, but the button-to-callback wiring itself was not
+exercised.
+
+**#70 -- results display:** a new standalone program (`verify_70.exe`,
+linking `orcisf_engine` + the real `gui/viewport/SceneModel.cpp` +
+`gui/diagrams/ForceDiagram.cpp` directly -- no ImGui/GL dependency in
+that chain, confirmed by checking their includes first) exercised the
+*exact* production call path `Application::OnAnalyzeRunRequested()` +
+`LoadStructure()` use (`AnalyzeFixedDesign()` -> `BuildSceneModel()`),
+deliberately with one column at the smallest discrete indices
+(undersized) and the other three at the largest (adequate), in the
+*same* `AnalyzeFixedDesign()` call -- matching AC4's own wording.
+- AC1 (demand vs. capacity + Safe/Unsafe per member): **PASS at the
+  data level** -- the undersized column (400x400mm) came back with
+  `Kendala()=0.4115` (Unsafe), the oversized one (600x600mm)
+  `Kendala()=0.0` (Safe); on-screen table/badge rendering itself
+  **UNVERIFIED**.
+- AC2 (overall Safe/Unsafe summary): **UNVERIFIED** -- rendered text,
+  GUI-only.
+- AC3 (3D viewport reflects the same result via `SceneModel`'s
+  existing `has_results`/`kendala` machinery): **PASS at the data
+  level** -- feeding the same `AnalyzeResult` into the real
+  `BuildSceneModel()` produced `MemberVisual.has_results=true` and
+  `kendala` matching each column's own verdict for both test members,
+  agreeing with `SceneRenderer.cpp`'s own `kendala <= 0.f ? Satisfied :
+  Violated` convention; the actual on-screen color pixels
+  **UNVERIFIED**.
+- AC4 (interactive verification with one undersized + one adequate
+  member in the same run): **PASS for the underlying claim** (this
+  test *is* exactly that scenario, run against the real production
+  functions) but **not interactively** -- no GUI was clicked through.
+
+**Also performed** (independent of any single criterion): a
+non-interactive GUI launch smoke test (`Start-Process` +
+`Get-Process` after 5s, no mouse/keyboard input, so no focus-stealing
+risk) -- `orcisf_gui.exe` launched and was still running, then closed
+cleanly.
+
+**Recommendation**: #66 and #68 are functionally solid --
+recommend closing once their GUI-only criteria get a manual
+confirmation pass (a genuinely quick check: open a dataset with a
+`.str`, see Force Diagrams/Results populate). #70's underlying logic is
+solid too. #69's GUI-presentation criteria and the full #67 epic-level
+"reachable from the GUI"/interactive-workflow criteria remain
+completely unverified and need either a session where the user isn't
+actively using their own machine, or the user's own manual
+confirmation -- **not** a code defect, purely an automation-safety
+constraint this pass. Epic #67 should stay open until then.
+
+- Issues #66/#68/#69/#70 status updated in `AGENTS.md`'s Tracked Issues
+  table (not closed/commented on GitHub -- awaiting explicit
+  confirmation per this project's standard `reviewer`-stage caution)
+- Files: `AGENTS.md` (Tracked Issues table), `CHANGE_HISTORY.md`
