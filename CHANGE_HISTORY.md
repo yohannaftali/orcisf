@@ -5263,3 +5263,124 @@ same as #66/#69/#70/#71 already were.
   `src/report/PdfExport.cpp`, `src/app/Application.cpp`,
   `src/app/DockTabIcons.cpp`, `src/gui/AnalyzePanel.{h,cpp}`,
   `AGENTS.md`
+
+## [2026-08-17] — tester (autonomous overnight): full interactive GUI pass on #64-#74, live #63 reproduction
+
+Continuing the same overnight authorization: with the user confirmed
+away from the machine, performed real interactive GUI automation
+(screenshot + synthesized input, DPI-aware) for the first time this
+session rather than deferring every GUI-only criterion to UNVERIFIED.
+Fresh build confirmed current (`ninja: no work to do` at HEAD
+`ff487ee`). Set up a scratch dataset (`DatasetWithStr`, a copy of
+`Apl1-1`) with a real `.str`/`.opt` sitting next to `aplikasi.inp`
+(produced via a real `orcisf_cli optimize` run) so `File > Open Data...`
+would have something real to load, and captured that run's own
+`ANALYSIS_RESULTS`/reactions as independent ground truth to diff the
+GUI against.
+
+**Native folder-picker dialog handled by typing the full path directly
+into the "Folder:" field and pressing "Select Folder"** — avoided the
+unreliable folder-tree-navigation approach earlier sessions (issue #29)
+struggled with. Worked cleanly on the first attempt.
+
+**#66 — 4/4 PASS, fully confirmed live.** `File > Open Data...` on the
+scratch dataset logged "Loaded saved analysis results from: ..." with
+no Run click; the Results panel's Support Reactions row for joint 1
+(`Fx=29350.2, Fz=16207.2, Mx=23667.5, My=179.806, Mz=-49989.6`) matched
+`orcisf_cli`'s own `ANALYSIS_RESULTS` output for the same `.str` file
+**exactly**.
+
+**#71 — visually confirmed on screen for the first time**, across 3
+implementation rounds. Enabling all 4 force-diagram checkboxes at once
+showed genuinely filled, distinctly-colored diagram planes (yellow/
+pink/green/torsion) sticking out of the real beams and columns
+simultaneously; "Values" showed correctly-labeled peak magnitudes
+matching the dataset's real force magnitudes; "Fill" toggle and
+individual component toggles all worked as expected.
+
+**#73 — visually confirmed on screen.** Switched the active tab within
+two separate tab groups (Viewport/Detailing/Force Diagrams, and
+Properties/Results/Optimization/Analyze) and zoomed into the
+now-inactive tabs' icons in both cases — all remained visible (the cube
+icon on "Viewport", the moment-diagram icon on "Force Diagrams", the
+sliders/play-triangle/checkmark icons on "Properties"/"Optimization"/
+"Analyze"). Re-opened the File menu with these panels visible and
+confirmed it still renders fully opaque over the tab row (no #51
+regression). DPI-forced-scale re-check (`ORCISF_UI_SCALE`) not
+performed this pass.
+
+**#69/#70/#67 (Analyze mode) — thoroughly confirmed live via the real
+Analyze panel.** With a real dataset loaded: the Design Input table
+showed one row per beam/column with pre-filled, valid dropdown values;
+the "Same bars at lapangan/tumpuan" checkbox (#74) was checked by
+default, showing the collapsed 8-column beam table; unchecking it
+correctly expanded to the full 12-slot/~13-column layout, and
+re-checking collapsed it again. Clicking "Run Analyze" produced a real
+Design Check Results table ("Unsafe: 8 of 8 members fail a design
+check.") and the 3D viewport members turned red, matching the table's
+verdicts exactly -- direct, live confirmation that #70's viewport
+reuse works. Increasing one column's `Sisi` from 400 to 600mm and
+re-running visibly updated that member's own capacity/demand numbers
+in the results table, confirming #69's "Run Analyze uses the panel's
+current selections" claim end-to-end. Combined with #70's own
+standalone data-flow test (undersized-vs-adequate columns in the same
+run, done earlier this session), #70's AC4 is now considered fully
+covered.
+
+**#74 — all 5 ACs confirmed live**, per the Analyze-mode testing above:
+checked by default, 8-column layout when checked, full 12-slot layout
+when unchecked, Run Analyze reflects the current checkbox state with
+no crash.
+
+**#63 — genuinely reproduced live, twice, with a major new finding.**
+Attempting to get a real completed optimization run (needed for #72's
+post-Run Loads-panel check) hung identically both times: progress
+frozen at "98% / Generation 39 of 40 / Elapsed: 0.1s" for over a
+minute, `Get-Process`'s `Responding` stayed `True`, and clicking
+**Cancel had no effect** -- matching the original report's own symptom
+description exactly. Reproduced once with `worker_threads=15`
+(matching the original report) and once with `worker_threads=1`,
+ruling out thread count as a necessary condition. **The critical new
+evidence**: both hung runs' output directories on disk contained
+*fully complete* `.opt`/`.str`/`.kdl`/`.inf`/`.his`/`.log.txt` files
+(the `.log.txt` ~690KB each) -- meaning the engine's search loop and
+all file-writing had already finished successfully. This rules out the
+optimizer/threading path as the hang's location (it demonstrably
+already completed) and narrows the search to `RunPanel.cpp`'s own
+worker-thread-to-main-thread completion handoff, or an OS-level stall
+in file-handle release *after* the bytes are already on disk. Windows
+Defender real-time protection was confirmed enabled on this machine
+(`Get-MpComputerStatus`) -- a plausible explanation for exactly this
+"file is done, but closing it stalls" pattern on a large freshly-
+written file, and consistent with every observed symptom (very slow
+CPU climb on the process overall, consistent with only the *main*
+thread's idle render loop running while the *worker* thread sits
+blocked in a zero-CPU syscall; `Responding=True` since the UI thread
+itself was never blocked; Cancel doing nothing since there's no
+cancellation point inside a blocked file-close call). **Not a
+confirmed fix** -- this is a substantially narrower hypothesis than
+existed before tonight, not a resolution. Full writeup in `AGENTS.md`'s
+#63 section. Did not attempt a fix (out of `tester`'s scope); left the
+issue open with this new evidence for `coder`'s next attempt.
+
+**#72 — partially reverified.** The pre-run half (Loads panel showing
+correct raw `.bbn` values via `ReadLoadsRaw()`, the same code path the
+fix now reuses post-run) was confirmed live. The literal "click Run,
+watch the Loads panel after" criterion could not be completed --
+both attempts to get a finished run hung on the #63 bug above. The
+fix's own logic is unaffected (already standalone-verified via a
+program that doesn't go through `RunPanel`'s threading at all), but the
+GUI-visible criterion stays open pending #63.
+
+**#68/#64/#65** unchanged from earlier verification this session
+(already PASS via CLI/standalone tests); not re-tested interactively
+since they have no GUI-rendering component to check beyond what CLI
+tests already covered.
+
+- Issues #66, #69, #70, #71, #73, #74 status upgraded to fully
+  interactively confirmed in `AGENTS.md`'s Tracked Issues table and
+  their own detailed sections; #67 (epic) still needs its "sub-issues
+  closed" criterion; #72 partially confirmed, blocked by #63; #63 left
+  open with major new evidence, not closed
+- Files: `AGENTS.md` (Tracked Issues table, #63/#71/#72 detailed
+  sections), `CHANGE_HISTORY.md`

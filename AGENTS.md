@@ -2100,25 +2100,76 @@ things every future agent touching it must know:
   the fallback threshold temporarily forced low to actually exercise the
   parallel merge path rather than only the sequential fallback) — see
   `engine/README.md`'s Validation section for the exact commands.
-- **Issue #63 (RunPanel hang, GUI-only, unreproduced) — read before
-  assuming a threading bug exists here.** A `coder` investigation
-  (2026-08-17) ran `RunOptimization()`/`RunOnLanes`/`CariBaruParallel`/
-  `EvaluatePopulationParallel` 18 times total under two different
-  harnesses — 7x via `orcisf_cli`, 11x via a standalone program mirroring
-  `RunPanel::StartRun()`'s *exact* threading pattern (background
-  `std::thread`, mutex-guarded `ProgressInfo`, `std::atomic<bool>`
-  cancel, `worker_threads=15` matching the original report) — and never
-  reproduced a hang; every run converged in well under a second. Static
-  review of the convergence loop and fork-join path found no
-  infinite-loop/deadlock possibility. **Do not assume this area has an
-  unfixed concurrency bug without a fresh, reproducible repro** — the
-  evidence (climbing CPU, not idle-waiting) is more consistent with the
-  original session's own concurrent screenshot-automation tooling
-  competing for CPU than a code defect, though this was never proven.
-  See issue #63's own comment thread for the full writeup. A genuine,
-  separate, unrelated bug *was* found and filed as #65 along the way
-  (`sd.fitstr[sd.JSTD - sd.JVD - 1]` goes out-of-bounds when
-  `fak_plus=0`/`fak_kali=1`) — don't confuse the two.
+- **Issue #63 (RunPanel hang) — READ THIS before assuming it's
+  unreproducible: a `tester` pass (2026-08-17 night) genuinely
+  reproduced it live, twice in a row, and narrowed the root-cause space
+  significantly.** An earlier `coder` investigation the same day ran the
+  engine's own threading path 18 times under two harnesses (`orcisf_cli`
+  and a standalone program mirroring `RunPanel::StartRun()`'s exact
+  pattern) with no hang, and reasoned the evidence pointed at
+  concurrent screenshot-automation tooling competing for CPU rather than
+  a code defect (see below for what's now believed wrong about that
+  theory) — that reasoning is now **superseded**, not just unconfirmed:
+  - **Both reproductions happened through the real GUI** (File > Open
+    Data, switch to the Optimization panel, click Run — no automation
+    tooling running concurrently this time), with `worker_threads=15`
+    matching the original report the first time, and again with
+    `worker_threads=1` the second time — **ruling out worker-thread
+    count as a necessary condition**. Both hangs looked identical:
+    progress frozen at "98% / Generation 39 of 40 / Elapsed: 0.1s" for
+    over a minute, `Get-Process`'s `Responding` stayed `True` the whole
+    time, and clicking **Cancel had no effect** (matching the original
+    report's own "Cancel appears unresponsive" symptom exactly).
+  - **The critical new finding: the engine had already fully finished.**
+    Both hung runs' output directories contained complete, correctly-sized
+    `.opt`/`.str`/`.kdl`/`.inf`/`.his`/`.log.txt` files (`.log.txt` ~690KB
+    each) — meaning `RunFullOptimization()` (the search loop *and*
+    `WriteFinalResults()`) had already returned. This flatly rules out
+    the optimizer/convergence loop, the fork-join threading path, and
+    file *writing* itself as the hang's location — all of that
+    demonstrably already completed. `RunPanel::StartRun()`'s worker
+    lambda (`RunPanel.cpp` ~line 92-110) has nothing between the
+    `RunFullOptimization()` call returning and `running_.store(false)`
+    that could itself hang, which makes the UI staying stuck at 98%
+    (rather than flipping to "finished" on the very next frame) hard to
+    explain from that code alone.
+  - **Leading hypothesis, not yet confirmed**: something in the OS-level
+    tail of file I/O (e.g. `std::ofstream::close()`/handle release for
+    the freshly-written, unusually large `.log.txt`) blocking the
+    worker thread *after* the bytes are already fully on disk but
+    *before* the call frame actually returns -- Windows Defender
+    real-time protection was confirmed **enabled** on this machine
+    (`Get-MpComputerStatus`), and real-time AV scanning a large
+    freshly-created file on close is a well-known source of exactly
+    this kind of "file is done, but closing/releasing it takes a long
+    time" stall. This would explain every symptom: CPU climbed only
+    very slowly on the whole process (~0.3-0.5 CPU-seconds per 8
+    wall-seconds -- consistent with the *main* thread's own idle
+    per-frame render overhead while the *worker* thread sits blocked in
+    a syscall consuming ~0% of its own CPU), the window stayed
+    `Responding` (the UI thread was never blocked, only the worker
+    was), and Cancel did nothing (there's no cancellation point inside
+    a blocked OS file-close call). **Not yet verified** -- this needs
+    either a repro with real-time AV temporarily disabled, or adding a
+    timestamp log immediately before/after the `his->close()`/
+    `log_detail->close()` calls in `Engine.cpp` to see exactly which
+    line the thread is stuck on.
+  - **Both scratch-dataset runs used a path under
+    `AppData\Local\Temp\...\scratchpad\...`** (this session's own
+    scratchpad convention) -- if AV scanning is confirmed as the cause,
+    it's worth checking whether the original report's dataset path had
+    similar properties (a location Defender scans more aggressively,
+    e.g. a Downloads/Temp-adjacent folder) vs. a location it doesn't
+    (excluded folder, or a location already scanned/trusted).
+  - A genuine, separate, unrelated bug *was* found while investigating
+    this issue earlier the same day and filed as #65
+    (`sd.fitstr[sd.JSTD - sd.JVD - 1]` out-of-bounds when
+    `fak_plus=0`/`fak_kali=1`) — already fixed as of this same night's
+    batch; don't confuse the two.
+  - **Do not close #63 or claim it's fixed** — nothing here is a fix,
+    only a much narrower root-cause hypothesis than existed before.
+    Route back to `coder` with this section as the starting point for
+    the next attempt.
 - **Never point the CLI/GUI's output at `Optimasi Beton/Example/` directly**
   — output filenames are case-insensitive-colliding with the checked-in
   reference files on Windows (`GEDUNG.opt` == `gedung.opt`). Always use a
@@ -2687,18 +2738,18 @@ later, different one (e.g. closing an issue or cutting a release).
 | #60 | feat(gui): deformed-shape overlay in the 3D viewport | closed (reviewer: PASS WITH NOTES -- `GetForegroundDrawList()` overlay-compositing finding tracked as a follow-up, see AGENTS.md's #60 section; live interactive spot-check still UNVERIFIED) | 2026-08-17 |
 | #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | closed (reviewer: PASS) | 2026-08-17 |
 | #62 | feat(gui): joint displacement / member force / reaction tables + global equilibrium check | closed (reviewer: PASS) | 2026-08-17 |
-| #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open, unreproduced (coder investigated 2026-08-17: 18/18 clean repros incl. the exact threading pattern, no hang; best-effort hypothesis is resource contention with concurrent automation tooling that night, not a code defect -- see AGENTS.md's #63 note and the GitHub comment) | 2026-08-17 |
-| #64 | docs(src): fix pre-existing "Nmm" mislabeling -- AM moment/torsion fields are actually N*m | ready-for-review (coder: implemented + verified overnight -- all label sites fixed, .opt output confirmed value-identical, zero-warning build) | 2026-08-17 |
-| #65 | bug(src): fak_plus=0/fak_kali=1 causes an out-of-bounds fitstr[-1] read in RunOptimization() | ready-for-review (coder: fixed at both GUI and engine layers overnight, verified via orcisf_cli -- bad combo now fails with a clear error, valid combos unaffected) | 2026-08-17 |
-| #66 | feat(src): load analysis results from saved .str file on Open Data | ready-for-review (tester: 3/4 PASS -- reader+scope+numeric-match ACs independently verified; GUI wiring AC UNVERIFIED, blocked by automation hazard) | 2026-08-17 |
-| #67 | epic(src): manual-dimension "Analyze" mode (design check without cost optimization) | open (tester: engine-level end-to-end data flow PASS; GUI-reachability AC UNVERIFIED; "sub-issues closed" AC not yet met) | 2026-08-17 |
+| #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open, REPRODUCED live 2026-08-17 night by `tester` (2/2 real GUI runs hung identically; engine already fully finished -- output files complete -- so the hang is NOT in the search/threading path; leading hypothesis is OS-level file-close blocking, e.g. AV scanning a large .log.txt; see AGENTS.md's #63 section for full detail) | 2026-08-17 |
+| #64 | docs(src): fix pre-existing "Nmm" mislabeling -- AM moment/torsion fields are actually N*m | ready-for-review (coder: implemented + verified -- all label sites fixed, .opt output confirmed value-identical, zero-warning build) | 2026-08-17 |
+| #65 | bug(src): fak_plus=0/fak_kali=1 causes an out-of-bounds fitstr[-1] read in RunOptimization() | ready-for-review (coder: fixed at both GUI and engine layers, verified via orcisf_cli -- bad combo now fails with a clear error, valid combos unaffected) | 2026-08-17 |
+| #66 | feat(src): load analysis results from saved .str file on Open Data | ready-for-review (tester: 4/4 PASS -- interactively confirmed live: Open Data loaded a real .str with zero Run clicks, Results panel's Support Reactions matched orcisf_cli's ANALYSIS_RESULTS exactly) | 2026-08-17 |
+| #67 | epic(src): manual-dimension "Analyze" mode (design check without cost optimization) | open (tester: AC1/AC2 both interactively confirmed PASS live; AC3 "sub-issues closed" not yet met -- #68/#69/#70 still open on GitHub pending explicit close) | 2026-08-17 |
 | #68 | feat(src): engine analyze-only entry point (fixed-design analysis, no optimization search) | ready-for-review (tester: 4/4 PASS, independently re-verified with different dataset params/seed than coder's own test) | 2026-08-17 |
-| #69 | feat(src): per-member manual dimension input panel for Analyze mode | ready-for-review (tester: GUI-rendering/interaction ACs UNVERIFIED, blocked by automation hazard -- underlying AnalyzeFixedDesign() call target independently confirmed correct via #68) | 2026-08-17 |
-| #70 | feat(src): Analyze-mode design-check results display (demand vs. capacity, safe/unsafe) | ready-for-review (tester: demand-vs-capacity + viewport-coloring data flow PASS via standalone program (undersized-vs-adequate column test); on-screen table/badge/viewport-pixel ACs UNVERIFIED, blocked by automation hazard) | 2026-08-17 |
-| #71 | feat(src): 3D-viewport force diagram overlay (N/V/M/T ribbons on the structure) | ready-for-review (coder, 2 rounds: fixed broken defaults, then reworked to 4 simultaneously-toggleable filled 3D diagram planes per the user's clarified ask; geometry verified standalone against a real run, zero-warning build; on-screen appearance still awaiting the user's interactive re-test) | 2026-08-17 |
-| #72 | fix(src): loads disappear from Loads panel after a completed optimization run | ready-for-review (coder: implemented + verified overnight via a standalone program mirroring OnRunResult()'s exact logic -- post-run loads now match a fresh re-read of the dataset's own .bbn; GUI display itself not interactively confirmed) | 2026-08-17 |
-| #73 | fix(src): dock tab icon disappears when that panel's tab is not the active one | ready-for-review (coder: root-caused and fixed overnight -- see AGENTS.md's own section; fix based on imgui_internal.h structural analysis, not yet interactively confirmed on screen) | 2026-08-17 |
-| #74 | feat(src): default checkbox for same lapangan/tumpuan bars in Analyze mode's beam input | ready-for-review (coder: implemented overnight as one table-wide toggle rather than per-beam -- see AGENTS.md's own section for why; code-reviewed, not yet interactively confirmed on screen) | 2026-08-17 |
+| #69 | feat(src): per-member manual dimension input panel for Analyze mode | ready-for-review (tester: 5/5 PASS -- interactively confirmed live: dropdown table, sensible defaults, Run Analyze button, dock-tab-icon reachability, no crash) | 2026-08-17 |
+| #70 | feat(src): Analyze-mode design-check results display (demand vs. capacity, safe/unsafe) | ready-for-review (tester: 4/4 PASS -- interactively confirmed live: results table + "Unsafe: 8 of 8" summary + viewport turning red all matched; AC4's mixed-verdict scenario combines this session's live edit-and-rerun with the standalone undersized-vs-adequate test) | 2026-08-17 |
+| #71 | feat(src): 3D-viewport force diagram overlay (N/V/M/T ribbons on the structure) | ready-for-review (tester: interactively CONFIRMED live -- filled colored diagram planes visible on real beams/columns, all 4 components simultaneously with distinct colors, Values labels showing correct magnitudes, Fill toggle working) | 2026-08-17 |
+| #72 | fix(src): loads disappear from Loads panel after a completed optimization run | ready-for-review (coder: standalone-verified; tester: pre-run Loads panel confirmed correct live via the identical ReadLoadsRaw() code path; the specific post-Run GUI check was blocked by a live #63 hang reproduction, see AGENTS.md's #72/#63 notes) | 2026-08-17 |
+| #73 | fix(src): dock tab icon disappears when that panel's tab is not the active one | ready-for-review (tester: interactively CONFIRMED live in two separate tab groups -- inactive-tab icons visible, #51 regression check passed; DPI-forced-scale re-check not done this pass) | 2026-08-17 |
+| #74 | feat(src): default checkbox for same lapangan/tumpuan bars in Analyze mode's beam input | ready-for-review (tester: interactively CONFIRMED live -- checkbox checked by default, 8-column layout when checked, reverts to full 12-slot layout when unchecked, Run Analyze works with no crash) | 2026-08-17 |
 
 Epic #67 tracks #68–#70 (manual-dimension "Analyze" mode: engine
 entry point, GUI input panel, GUI results display — reuses the
@@ -3271,12 +3322,17 @@ DrawForceDiagramOverlay()`, or `EditorOptions`' `show_force_diagram`/
   field (a switch-typo would otherwise silently alias two components);
   all four colors are distinct and opaque; and the default scale puts
   the largest peak offset at **2.19 m** (vs. ~20 m at the old buggy
-  1e-4), comfortably visible but member-sized. **The on-screen
-  appearance still has not been visually confirmed by an agent in this
-  environment** -- every round of this issue was diagnosed by code/data
-  review rather than screenshots, and both bugs so far were found by the
-  user driving the real GUI. Treat a real interactive/screenshot pass as
-  still outstanding before considering #71 done.
+  1e-4), comfortably visible but member-sized.
+- **`tester` follow-up (2026-08-17 night): visually CONFIRMED on
+  screen, live, against a real dataset.** Screenshots taken with all
+  four components enabled simultaneously show genuinely filled,
+  distinctly-colored diagram planes on the real beams/columns (yellow
+  axial, pink shear, green moment, and torsion together); toggling
+  "Values" showed correctly-labeled peak magnitudes (e.g. "N 2.191e+05
+  N", "M 5.536e+05 Nm") matching the same run's own `ANALYSIS_RESULTS`
+  order of magnitude; unchecking "Fill" and toggling individual
+  components was exercised without error. #71 is now visually confirmed
+  end to end, not just geometry-verified standalone.
 
 **`fak_kali`/`fak_plus` OOB fix (issue #65) — read before touching
 `RunOptimization()`'s convergence check or `RunPanel`'s `fak_plus_`/
@@ -3349,11 +3405,20 @@ touching `Application::OnRunResult()`'s load handling:**
   same dataset path produces `W`/`AML`/`AJ` values that exactly match a
   completely independent, freshly-loaded `StructureData`'s own
   `ReadLoadsRaw()` call -- confirming the reload is genuine raw data,
-  not a leftover self-weight-inflated value and not zeros. **The
-  GUI-level display itself (Loads panel/schedule, viewport load arrows
-  actually showing these values after a real Run click) was not
-  interactively confirmed** -- `Application.cpp` isn't practically
-  unit-testable standalone; this needs a `tester`/interactive pass.
+  not a leftover self-weight-inflated value and not zeros.
+- **`tester` follow-up (2026-08-17 night): the pre-run half was
+  confirmed live** -- opening a real dataset via File > Open Data showed
+  the Loads panel with the exact raw `.bbn` values (35000 N/m on the
+  loaded members), going through the identical `ReadLoadsRaw()` code
+  path `OnRunResult()`'s fix now also uses. **The specific
+  post-Run-click GUI state could not be confirmed** -- two attempts to
+  complete a real optimization run in the GUI both hung (issue #63,
+  reproduced live this same session -- see that issue's own section).
+  The engine-level fix itself is unaffected by #63 (they're unrelated
+  code paths, confirmed via the standalone verification above, which
+  doesn't go through the GUI's `RunPanel` threading at all) — treat
+  this fix's *logic* as solid, but the literal "watch the Loads panel
+  after clicking Run" acceptance criterion as still open pending #63.
 
 **Dock tab icon vanishing on an inactive tab (issue #73) — read before
 touching `DockTabIcons.cpp`'s draw-list choice again:**
