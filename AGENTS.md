@@ -2690,6 +2690,19 @@ later, different one (e.g. closing an issue or cutting a release).
 | #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open, unreproduced (coder investigated 2026-08-17: 18/18 clean repros incl. the exact threading pattern, no hang; best-effort hypothesis is resource contention with concurrent automation tooling that night, not a code defect -- see AGENTS.md's #63 note and the GitHub comment) | 2026-08-17 |
 | #64 | docs(src): fix pre-existing "Nmm" mislabeling -- AM moment/torsion fields are actually N*m | open | 2026-08-17 |
 | #65 | bug(src): fak_plus=0/fak_kali=1 causes an out-of-bounds fitstr[-1] read in RunOptimization() | open (found while investigating #63, unrelated/unconfirmed to be its cause) | 2026-08-17 |
+| #66 | feat(src): load analysis results from saved .str file on Open Data | open | 2026-08-17 |
+| #67 | epic(src): manual-dimension "Analyze" mode (design check without cost optimization) | open | 2026-08-17 |
+| #68 | feat(src): engine analyze-only entry point (fixed-design analysis, no optimization search) | open | 2026-08-17 |
+| #69 | feat(src): per-member manual dimension input panel for Analyze mode | open | 2026-08-17 |
+| #70 | feat(src): Analyze-mode design-check results display (demand vs. capacity, safe/unsafe) | open | 2026-08-17 |
+| #71 | feat(src): 3D-viewport force diagram overlay (N/V/M/T ribbons on the structure) | open | 2026-08-17 |
+
+Epic #67 tracks #68–#70 (manual-dimension "Analyze" mode: engine
+entry point, GUI input panel, GUI results display — reuses the
+existing discrete design-variable system and `Kendala()`/`kendala`
+demand-capacity fields, not new engineering formulas or a
+continuous-dimension input system; see #67's own body for the scope
+decision). #66 and #71 are standalone (not part of any epic).
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),

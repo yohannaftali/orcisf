@@ -4665,3 +4665,74 @@ CPU) or a recurrence with better diagnostics.
 - Issue #65 filed on GitHub (the unrelated OOB-index bug found along the way)
 - Files: `AGENTS.md` (Tracked Issues table + new #63 investigation note
   in the `engine/` section), `CHANGE_HISTORY.md`
+
+## [2026-08-17] — planner: 6 new issues from a batch feature request (results loading, Analyze mode epic, 3D force overlay)
+
+User's `/planner` request bundled several asks; most of the literal
+wording (deformed shapes, N/V/M/T plots, tabular displacement/force/
+reaction tables, global-equilibrium check) duplicates functionality
+epic #58 already shipped (issues #59-#62). Parsed out the genuinely
+new asks and confirmed two ambiguous points with the user via
+`AskUserQuestion` before drafting (both times the user picked the
+recommended option):
+
+1. **Force-diagram data source** -- "should only read the result in
+   file if not yet calculate with optimization" was ambiguous between
+   loading from the saved `.str` file on `Open Data` vs. some other
+   trigger. Confirmed: load from the saved `.str` file on Open Data.
+   Filed as standalone **#66** (`feat(src): load analysis results from
+   saved .str file on Open Data`) -- a new reader mirroring the
+   existing `WriteStrukturSection()` writer in `LegacyIO.cpp`, wired
+   into `OnOpenFolderRequested()`. Explicitly scoped to
+   `AnalysisResults` only (forces/displacements/reactions) --
+   `MemberResult`'s RC-design fields live in `.opt`/`.kdl`, not `.str`;
+   loading those too is flagged as a natural follow-up, not required
+   here.
+
+2. **Manual-dimension design check** -- "user can input manually
+   member dimension and then user can do analysis whether the
+   structure is safe or not" was ambiguous between a checkbox/toggle
+   on the existing Run panel vs. a wholly separate mode. Confirmed: a
+   new "Analyze" mode, separate from "Optimize". Filed as epic **#67**
+   with three sub-issues:
+   - **#68** -- engine: `AnalyzeFixedDesign()`-style entry point (write
+     user-chosen indices into population slot 0, run `Inersia()` +
+     `Struktur()` directly -- no `optimasi()` search -- reuse
+     `ComputeMemberResults()` for the design check). Mirrors
+     `orcisf_cli`'s existing `CmdEquilibrium()` pattern.
+   - **#69** -- GUI: per-member dropdown table (via `gui::TableView.h`,
+     #52) to pick discrete design-variable indices (12/beam, 5/column,
+     per `AGENTS.md`'s "Discrete design variables" section) -- **not**
+     a free-typed continuous-dimension input, deliberately reusing the
+     existing `.isd`/`.idl`/`.ijl`/`.ids`/`.ijs` discrete-table system.
+   - **#70** -- GUI: demand-vs-capacity table + Safe/Unsafe badges,
+     reusing existing `MemberResult`/`kendala` fields and the
+     viewport's existing green/red constraint-coloring convention --
+     no new engineering formulas.
+
+   This scope decision (reuse the existing discrete-index system and
+   `Kendala()` logic, not a new continuous-dimension checker) is
+   recorded directly in #67's issue body so `coder` doesn't have to
+   re-derive it later.
+
+3. **3D force-diagram rendering** -- "our showing force should also in
+   3D frame" was unambiguous (additive, not a replacement for the
+   existing 2D `ForceDiagramPanel`/#61). Filed as standalone **#71**
+   (`feat(src): 3D-viewport force diagram overlay`) -- reuses
+   `gui::ComputeForceDiagram()` (#61) directly, ribbon/line geometry
+   via `SceneRenderer`'s existing box-drawing primitives (matching
+   #50's grid-line precedent), overlay control pattern matching #60's
+   deformed-shape toggle. Explicitly calls out using
+   `GetWindowDrawList()` (not `GetForegroundDrawList()`) for any 2D
+   overlay chrome, per the compositing-order lesson already documented
+   for issue #51 and the known gap flagged in #60's reviewer pass.
+
+Duplicate-check performed before filing: GitHub Search API for "manual
+dimension design check" (0 results) and "3D force diagram viewport" (2
+results: #58, #61 themselves -- expected, not duplicates of these more
+specific asks).
+
+- Issues #66, #67, #68, #69, #70, #71 created on GitHub (all open, all
+  `enhancement`)
+- Files: `AGENTS.md` (Tracked Issues table, new epic-#67 tracking
+  note), `CHANGE_HISTORY.md`
