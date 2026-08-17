@@ -2666,9 +2666,10 @@ later, different one (e.g. closing an issue or cutting a release).
 | #58 | epic(src): FE analysis results visualization (deformed shape, force diagrams, tables) | open (all 4 sub-issues #59-#62 implemented overnight, pending tester/reviewer -- #61's M(x) formula and live GUI rendering of #60/#61/#62 still need verification, blocked by #63) | 2026-08-16 |
 | #59 | feat(engine): expose joint displacements, member end forces, and support reactions for GUI consumption | ready-for-review (tester: 6/6 PASS, re-verified against a fresh run 2026-08-17) | 2026-08-17 |
 | #60 | feat(gui): deformed-shape overlay in the 3D viewport | ready-for-review (tester: 6/7 source-verified PASS; live interactive spot-check UNVERIFIED -- see CHANGE_HISTORY 2026-08-17) | 2026-08-17 |
-| #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | needs-work (tester: 4/5 PASS, 1 FAIL -- M(x) interior formula confirmed wrong by ~134-1638x against real MLAP/MTUM_KI/MTUM_KA, see CHANGE_HISTORY 2026-08-17) | 2026-08-17 |
+| #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | ready-for-review (coder: fixed 2026-08-17 -- root cause was AM's moment/torsion units being N*m not Nmm, not a formula bug; re-verified against the real ComputeForceDiagram() function, see CHANGE_HISTORY) | 2026-08-17 |
 | #62 | feat(gui): joint displacement / member force / reaction tables + global equilibrium check | ready-for-review (tester: 4/5 PASS; CSV export + panel rendering UNVERIFIED -- see CHANGE_HISTORY 2026-08-17) | 2026-08-17 |
-| #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open (tester re-confirmed orcisf_cli unaffected 2026-08-17; still blocks live GUI verification of #60/#62) | 2026-08-17 |
+| #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open (tester re-confirmed orcisf_cli unaffected 2026-08-17; still blocks live GUI verification of #60/#61/#62) | 2026-08-17 |
+| #64 | docs(src): fix pre-existing "Nmm" mislabeling -- AM moment/torsion fields are actually N*m | open | 2026-08-17 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
@@ -2778,54 +2779,62 @@ or trusting the moment diagram's interior shape:**
   `DestroyContext()` in `main.cpp`, alongside ImGui's) -- it was already
   an installed `vcpkg.json` dependency (chosen in #2, never previously
   used) but nothing called `ImPlot::CreateContext()` before this issue.
-- **CONFIRMED BUG (not just "unverified" -- a `tester` pass on
-  2026-08-17 reproduced and quantified it precisely), read
-  `gui/diagrams/ForceDiagram.h`'s header comment for the fuller
-  narrative, this bullet for the hard numbers**: `M(x)`'s interior
-  shape is **wrong by orders of magnitude**, not a rounding-scale gap.
-  Built a temporary instrumented `orcisf_cli` (reverted, never
-  committed) that prints the exact formula's `M(0)`/`M(L/2)`/`M(L)`
-  alongside the real `MTUM_KI`/`MLAP`/`MTUM_KA` for every beam in a
-  fresh run of the `Apl1-1` scratch dataset. Batang 5: `M(0)` matches
-  `MTUM_KI` exactly (**-66645.8 Nmm**, trivially true by construction --
-  no `V*x`/`w*x^2` term involved at `x=0`), but `M(L/2)` computed =
-  **157,702,651 Nmm** vs. actual `MLAP` = **96,254 Nmm** (~1638x off),
-  and `M(L)` computed = **-10,328,052 Nmm** vs. actual `MTUM_KA` =
-  **-76,907 Nmm** (~134x off) -- and the same order-of-magnitude
-  failure repeats identically across all 4 beam members in the
-  dataset (5, 6, 7, 8). `V(x)` itself and both `M` endpoints (taken
-  directly from `moment_z_a`/`moment_z_b`, no formula involved) remain
-  exactly correct -- only the *integration* of the verified `V(x)` from
-  the verified `M_start` is broken. The magnitude of the error (`MLAP`
-  itself is only ~96 N·m -- far too small for a beam nominally carrying
-  `w*L^2/8 ≈ 163 kN·m` under its own stated 36200 N/m over 6m -- while
-  `shear_y_a` is ~108,000 N, an enormous shear for a barely-bending
-  member) indicates `shear_y_a`/`w_total_n_per_m` are **not actually the
-  conjugate pair driving `moment_z`'s variation** in this codebase's real
-  local-axis convention -- i.e. the AC's own prescribed formula (which
-  the code faithfully implements) does not hold for this port's actual
-  rotation-matrix/local-axis setup. Root cause still not identified;
-  candidates from the original 2026-08-16 investigation (self-weight
-  timing, a resolved/rotated load component) remain unconfirmed and
-  should be revisited by `coder`, not assumed correct. **N(x)/T(x)
-  (direct constant copies) remain solid; only M(x)'s interior shape is
-  broken** -- do not remove or soften this flag without a fresh,
-  reproducible numeric re-check (the exact repro: instrument
-  `CmdOptimize()` to print `sd.MLAP`/`MTUM_KI`/`MTUM_KA`/`EL` alongside
-  `ComputeForceDiagram()`'s own output for a real run).
-- **Verification status:** compiled cleanly (zero warnings). GUI launch
-  confirmed, "Force Diagrams" dock tab (with its own hand-drawn icon)
-  renders correctly and shows the right disabled-state placeholder text
-  with no dataset loaded and with no completed run's results loaded.
-  **The actual populated ImPlot rendering (BeginPlot/PlotShaded/PlotLine/
-  DragLineX with real diagram data) was not visually confirmed this
-  session** -- blocked by issue #63 (RunPanel hang), the same blocker
-  #60 hit. **`tester` (2026-08-17) confirmed the M(x) bug above via a
-  CLI-only repro (no GUI needed) -- this is now a known FAIL, not
-  merely unverified; do not treat it as "probably fine, just unseen."**
-  Re-verify the actual pixel rendering once #63 is fixed, but the
-  interior-shape bug must be fixed first regardless of #63 (details:
-  `CHANGE_HISTORY.md`, 2026-08-16 and 2026-08-17).
+- **FIXED 2026-08-17 -- root cause was a unit misunderstanding, not a
+  formula bug.** A `tester` pass earlier the same day had confirmed
+  `M(x)`'s interior shape was wrong by 134x-1638x against real
+  `MTUM_KI`/`MLAP`/`MTUM_KA`. Root-causing it found: **`sd.AM`'s
+  moment/torsion components -- and therefore `MemberForces::moment_*`/
+  `torsion_*` -- are in N*m, not Nmm** as a pre-existing comment on
+  `MemberResult` (issue #5) claimed and this file's own comments
+  copied without independently verifying. Confirmed two ways: (1)
+  `BeratSendiri()`'s self-weight fixed-end-moment formula
+  (`W_Balok*EL^2/12`, `W_Balok` in N/m, `EL` in m) is only
+  dimensionally consistent as N*m, no conversion factor anywhere; (2)
+  the legacy `MLAP` formula (`-AM[6] + 0.125*W*EL^2`) only reproduces
+  its own real checked-in value when `-AM[6]` is N*m -- as Nmm the two
+  terms mismatch ~1000x. **The fix was removing a spurious
+  millimeter conversion** `ComputeForceDiagram()` was applying to
+  `x`/`w` (based on the wrong Nmm assumption) -- once `x`/`length_m`
+  stay in meters and `w_total_n_per_m` is used directly with no
+  `/1000`, the *original* formula (unchanged: `V(x) = V_start - w*x`,
+  `M(x) = M_start + V_start*x - w*x^2/2`) reproduces `MTUM_KA` to
+  float32 precision at `x=length_m` across all 4 real beam members
+  tested -- confirming the formula itself was always correct, only the
+  unit bookkeeping around it was wrong. `ForceDiagramSample`'s fields
+  renamed `m_nmm`/`t_nmm` -> `m_nm`/`t_nm` (N*m) to match; the extreme-
+  fiber stress calc now explicitly converts N*m -> N*mm (`*1000`)
+  before dividing by the section modulus (mm^3). All "(Nmm)" labels in
+  `ResultsPanel.cpp`/`ForceDiagramPanel.cpp`/`ResultsCsvExport.cpp`
+  (epic #58's own new code) corrected to "(Nm)". **This same
+  mislabeling exists in pre-existing, already-shipped code this fix
+  deliberately did NOT touch** (`MemberResults.h`, `LegacyIO.cpp`'s
+  `.opt` file "Nmm" print labels, `PropertiesPanel.cpp`,
+  `PdfExport.cpp`) -- filed separately as issue #64 rather than risk
+  an unrelated-refactor sweep through already-validated files; those
+  files' actual *values* are unaffected (RC design formulas there are
+  internally self-consistent regardless of the print label's wording),
+  only their unit *labels* are wrong.
+- **Verification: the real `gui::ComputeForceDiagram()` function
+  itself was exercised (not a hand-reimplementation or reasoning about
+  the diff)** -- a standalone program was compiled linking directly
+  against `orcisf_engine.lib` + `gui/diagrams/ForceDiagram.cpp` (zero
+  ImGui/GL dependency, so this needed no GUI toolchain), ran a real
+  optimization against a scratch `Apl1-1` copy, and called
+  `ComputeForceDiagram()` on each beam's real `MemberForces`: `M(0)`
+  matched `MTUM_KI` and `M(length_m)` matched `MTUM_KA` to 5-6
+  significant figures for all 4 beams (5, 6, 7, 8) -- e.g. batang 5:
+  real `MTUM_KI=-86750.2`, computed `M(0)=-86750.2`; real
+  `MTUM_KA=-86750.2`, computed `M(L)=-86750.19` (float32 rounding
+  only). Compiled cleanly (zero warnings) via the normal
+  `build.ps1` path too. **The actual on-screen ImPlot rendering was
+  still not visually confirmed this pass** -- issue #63 (RunPanel
+  hang) still blocks a completed run through the GUI, and the
+  session's foreground window was the user's own active VS Code
+  throughout (no automation attempted, per this project's established
+  GUI-automation safety rule). Re-verify pixel rendering once #63 is
+  fixed; the formula/units bug itself is fixed and independently
+  confirmed regardless of #63 (details: `CHANGE_HISTORY.md`,
+  2026-08-16 and 2026-08-17, and issue #64).
 
 **Results tables + CSV export (issue #62, part of epic #58) — read
 before touching `ResultsPanel.{h,cpp}` or

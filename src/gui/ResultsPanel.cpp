@@ -50,8 +50,8 @@ void DrawDisplacementsTable(const engine::AnalysisResults& analysis, Selection& 
 void DrawMemberForcesTable(const engine::AnalysisResults& analysis, Selection& selection) {
     if (!BeginTableView("results_member_forces", 13)) return;
     ImGui::TableSetupColumn("Member", ImGuiTableColumnFlags_WidthFixed, 60.f);
-    for (const char* label : {"N_a (N)", "Vy_a (N)", "Vz_a (N)", "T_a (Nmm)", "My_a (Nmm)", "Mz_a (Nmm)",
-                               "N_b (N)", "Vy_b (N)", "Vz_b (N)", "T_b (Nmm)", "My_b (Nmm)", "Mz_b (Nmm)"}) {
+    for (const char* label : {"N_a (N)", "Vy_a (N)", "Vz_a (N)", "T_a (Nm)", "My_a (Nm)", "Mz_a (Nm)",
+                               "N_b (N)", "Vy_b (N)", "Vz_b (N)", "T_b (Nm)", "My_b (Nm)", "Mz_b (Nm)"}) {
         ImGui::TableSetupColumn(label);
     }
     ImGui::TableHeadersRow();
@@ -81,9 +81,9 @@ void DrawReactionsTable(const engine::AnalysisResults& analysis) {
     ImGui::TableSetupColumn("Fx (N)");
     ImGui::TableSetupColumn("Fy (N)");
     ImGui::TableSetupColumn("Fz (N)");
-    ImGui::TableSetupColumn("Mx (Nmm)");
-    ImGui::TableSetupColumn("My (Nmm)");
-    ImGui::TableSetupColumn("Mz (Nmm)");
+    ImGui::TableSetupColumn("Mx (Nm)");
+    ImGui::TableSetupColumn("My (Nm)");
+    ImGui::TableSetupColumn("Mz (Nm)");
     ImGui::TableHeadersRow();
 
     for (const engine::JointReaction& r : analysis.reactions) {

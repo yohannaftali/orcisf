@@ -27,8 +27,8 @@ std::string WriteResultsCsv(const engine::AnalysisResults& analysis, const std::
     }
 
     out << "\nMember End Forces\n";
-    out << "Member,N_a (N),Vy_a (N),Vz_a (N),T_a (Nmm),My_a (Nmm),Mz_a (Nmm),"
-           "N_b (N),Vy_b (N),Vz_b (N),T_b (Nmm),My_b (Nmm),Mz_b (Nmm)\n";
+    out << "Member,N_a (N),Vy_a (N),Vz_a (N),T_a (Nm),My_a (Nm),Mz_a (Nm),"
+           "N_b (N),Vy_b (N),Vz_b (N),T_b (Nm),My_b (Nm),Mz_b (Nm)\n";
     for (const engine::MemberForces& f : analysis.member_forces) {
         out << f.no_batang << "," << f.axial_a << "," << f.shear_y_a << "," << f.shear_z_a << "," << f.torsion_a
             << "," << f.moment_y_a << "," << f.moment_z_a << "," << f.axial_b << "," << f.shear_y_b << ","
@@ -36,7 +36,7 @@ std::string WriteResultsCsv(const engine::AnalysisResults& analysis, const std::
     }
 
     out << "\nSupport Reactions\n";
-    out << "Joint,Fx (N),Fy (N),Fz (N),Mx (Nmm),My (Nmm),Mz (Nmm)\n";
+    out << "Joint,Fx (N),Fy (N),Fz (N),Mx (Nm),My (Nm),Mz (Nm)\n";
     for (const engine::JointReaction& r : analysis.reactions) {
         out << r.no_joint << "," << r.fx << "," << r.fy << "," << r.fz << "," << r.mx << "," << r.my << "," << r.mz
             << "\n";

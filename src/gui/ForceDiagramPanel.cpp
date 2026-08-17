@@ -88,8 +88,8 @@ void ForceDiagramPanel::Draw(bool* open, const SceneModel& scene, const Selectio
         xs.push_back(s.x_m);
         n_ys.push_back(s.n_n);
         v_ys.push_back(s.v_n);
-        m_ys.push_back(s.m_nmm);
-        t_ys.push_back(s.t_nmm);
+        m_ys.push_back(s.m_nm);
+        t_ys.push_back(s.t_nm);
     }
 
     double drag_x = static_cast<double>(std::clamp(station_t_, 0.f, 1.f) * length_m);
@@ -97,8 +97,8 @@ void ForceDiagramPanel::Draw(bool* open, const SceneModel& scene, const Selectio
 
     DrawOnePlot("Axial (N)", "N (N)", xs, n_ys, plot_h, &drag_x);
     DrawOnePlot("Shear (V, local y)", "V (N)", xs, v_ys, plot_h, &drag_x);
-    DrawOnePlot("Moment (M, local z)", "M (Nmm)", xs, m_ys, plot_h, &drag_x);
-    DrawOnePlot("Torsion (T)", "T (Nmm)", xs, t_ys, plot_h, &drag_x);
+    DrawOnePlot("Moment (M, local z)", "M (Nm)", xs, m_ys, plot_h, &drag_x);
+    DrawOnePlot("Torsion (T)", "T (Nm)", xs, t_ys, plot_h, &drag_x);
 
     station_t_ = length_m > 1e-6f ? std::clamp(static_cast<float>(drag_x) / length_m, 0.f, 1.f) : 0.f;
 
@@ -116,7 +116,7 @@ void ForceDiagramPanel::Draw(bool* open, const SceneModel& scene, const Selectio
     if (!diagram.samples.empty()) {
         const ForceDiagramSample& s = diagram.samples[idx];
         ImGui::Text("x = %.3f m", s.x_m);
-        ImGui::Text("N = %.4g N   V = %.4g N   M = %.4g Nmm   T = %.4g Nmm", s.n_n, s.v_n, s.m_nmm, s.t_nmm);
+        ImGui::Text("N = %.4g N   V = %.4g N   M = %.4g Nm   T = %.4g Nm", s.n_n, s.v_n, s.m_nm, s.t_nm);
         if (diagram.has_section) {
             ImGui::Text("Extreme-fiber stress: top %.4g MPa, bottom %.4g MPa", s.sigma_top_mpa, s.sigma_bottom_mpa);
         } else {

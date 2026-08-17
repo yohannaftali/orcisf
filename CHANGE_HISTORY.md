@@ -4373,3 +4373,76 @@ throughout; VS Code stayed foreground the entire session.
 
 - Files: `AGENTS.md` (Tracked Issues table + #61's section rewritten
   with confirmed numbers, `CHANGE_HISTORY.md`)
+
+## [2026-08-17] — fix(gui): #61's M(x) formula -- root cause was units, not math
+
+`/coder` ("fix issue #61 -- the M(x) interior-shape bug confirmed by
+tester"). Root-caused and fixed the confirmed bug from today's earlier
+`tester` pass: `gui::ComputeForceDiagram()`'s `M(x)` was wrong by
+134x-1638x against real `MTUM_KI`/`MLAP`/`MTUM_KA`.
+
+**Root cause: `sd.AM`'s moment/torsion components are in N*m, not
+Nmm.** A pre-existing comment on `engine::MemberResult` (issue #5, long
+before epic #58) claimed "Nmm", and last night's `AnalysisResults.h`
+copied that claim without independently verifying it -- `#59`'s own
+"verified" checks (matching `.str` output exactly) never actually
+tested unit *scale*, only that the raw numbers round-tripped correctly
+between two computations of the same value, which is unit-agnostic.
+Confirmed the real unit two ways: (1) `BeratSendiri()`'s self-weight
+fixed-end-moment formula (`W_Balok*EL^2/12`, `W_Balok` in N/m, `EL` in
+m) is only dimensionally consistent as N*m, no conversion factor
+anywhere in the formula; (2) the legacy `MLAP` formula
+(`-AM[6] + 0.125*W*EL^2`) only reproduces its real, checked-in output
+value when `-AM[6]` is treated as N*m -- as Nmm the two terms mismatch
+by ~1000x, exactly the scale of #61's bug.
+
+**The fix**: `ComputeForceDiagram()` was converting `x`/`w` to
+millimeters before evaluating the formula (following the wrong Nmm
+assumption). Removed that conversion entirely -- `x`/`length_m` stay
+in meters, `w_total_n_per_m` is used directly. The underlying formula
+itself (`V(x) = V_start - w*x`, `M(x) = M_start + V_start*x -
+w*x^2/2`) was **never wrong** -- it needed consistent units, which it
+now has. `ForceDiagramSample::m_nmm`/`t_nmm` renamed to `m_nm`/`t_nm`;
+the extreme-fiber stress calculation now explicitly converts N*m to
+N*mm (`*1000`) before dividing by the section modulus (mm^3), where
+previously it divided a (mislabeled) Nmm value directly. All "(Nmm)"
+labels in this epic's own new code (`ResultsPanel.cpp`,
+`ForceDiagramPanel.cpp`, `ResultsCsvExport.cpp`) corrected to "(Nm)".
+`AnalysisResults.h`'s doc comments rewritten with the full
+unit-correction narrative so a future agent doesn't reintroduce the
+same mistake.
+
+**Filed issue #64** for the same mislabeling in pre-existing,
+already-shipped code (`MemberResults.h`, `LegacyIO.cpp`'s `.opt` file
+print labels, `PropertiesPanel.cpp`, `PdfExport.cpp`) -- deliberately
+NOT fixed as part of this change, since those files' actual computed
+*values* are unaffected (self-contained, already-validated RC design
+formulas don't care what a comment/print-label says) and touching
+them would be exactly the kind of unrelated-file sweep this project's
+conventions caution against doing inside a narrowly-scoped fix.
+
+**Validation**: rather than re-verify via hand arithmetic or a
+reimplemented formula (both already proven unreliable earlier today --
+a hand-calculation mistake is what caused the mm-conversion bug not to
+be caught until now), compiled and ran a **standalone program linking
+directly against the real, shipped `orcisf_engine.lib` +
+`gui/diagrams/ForceDiagram.cpp`** (zero ImGui/GL dependency, so this
+needed no GUI toolchain) against a scratch `Apl1-1` copy: for all 4
+real beam members, `ComputeForceDiagram()`'s `M(0)` matched `MTUM_KI`
+and `M(length_m)` matched `MTUM_KA` to 5-6 significant figures (float32
+precision) -- e.g. batang 5: real `MTUM_KI=-86750.2` vs. computed
+`M(0)=-86750.2`; real `MTUM_KA=-86750.2` vs. computed `M(L)=-86750.19`.
+`src/build.ps1` also confirmed a clean, zero-warning build via the
+normal path. **Pixel-level ImPlot rendering still not visually
+confirmed** -- issue #63 (RunPanel hang) still blocks a completed run
+through the GUI, and the user's own VS Code was the active foreground
+window throughout this session (checked before any automation
+attempt, none was made).
+
+- Issue #61 addressed on GitHub (not yet closed -- left for a
+  `tester`/`reviewer` re-pass); issue #64 filed as a new, separate,
+  out-of-scope documentation issue, not fixed here
+- Files: `src/engine/include/engine/AnalysisResults.h`,
+  `src/gui/diagrams/ForceDiagram.h`, `src/gui/diagrams/ForceDiagram.cpp`,
+  `src/gui/ForceDiagramPanel.cpp`, `src/gui/ResultsPanel.cpp`,
+  `src/report/ResultsCsvExport.cpp`, `AGENTS.md`

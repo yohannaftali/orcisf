@@ -14,13 +14,15 @@ namespace orcisf::gui {
 
 // One sampled station along a member's span (local x, 0 = end A/JJ, up to
 // `length_m` = end B/JK). n_n/v_n in N (axial / shear about local y),
-// m_nmm/t_nmm in Nmm (bending moment about local z / torsion about local
-// x) -- matching engine::MemberForces' own mixed-unit convention.
+// m_nm/t_nm in N*m (bending moment about local z / torsion about local
+// x) -- matching engine::MemberForces' own convention (see that struct's
+// header comment: these are N*m, not Nmm -- a units correction made
+// while fixing this exact file, see ComputeForceDiagram()'s comment).
 // sigma_top_mpa/sigma_bottom_mpa (N/mm^2 = MPa) are only meaningful when
 // the owning ForceDiagram::has_section is true.
 struct ForceDiagramSample {
     float x_m = 0.f;
-    float n_n = 0.f, v_n = 0.f, m_nmm = 0.f, t_nmm = 0.f;
+    float n_n = 0.f, v_n = 0.f, m_nm = 0.f, t_nm = 0.f;
     float sigma_top_mpa = 0.f, sigma_bottom_mpa = 0.f;
 };
 
@@ -38,29 +40,44 @@ struct ForceDiagram {
 // `gui/editor/` note): N and T are constant; V(x) = V_start - w*x;
 // M(x) = M_start + V_start*x - w*x^2/2, with M_start = -moment_z_a
 // (matching MTUM_KI's own negation of AM's raw start moment) and
-// V_start = shear_y_a (matching GESER_KI, no negation).
+// V_start = shear_y_a (matching GESER_KI, no negation). `x`/`length_m`
+// are in meters and `w` (`forces.w_total_n_per_m`) is in N/m throughout
+// -- **do not convert to millimeters anywhere in this formula.**
 //
-// *** KNOWN UNVERIFIED GAP -- read before trusting this for anything
-// beyond a rough visual diagram *** -- see AGENTS.md's #61 notes for the
-// full numeric trail: V(x) was independently confirmed exact against a
-// real run (V(length_m) computed this way matched -GESER_KA/shear_y_b
-// precisely), and M_start/M_end taken directly from moment_z_a/
-// moment_z_b independently match MTUM_KI/MTUM_KA exactly -- but
-// integrating the *verified* V(x) from the *verified* M_start does NOT
-// reproduce the *verified* M_end for the one real case checked
-// (off by ~25x, not a rounding-scale discrepancy). Since V(x) alone
-// checks out but the V-M integral relationship doesn't, the likely
-// explanation is something in how self-weight timing/staleness affects
-// which `w` value is actually consistent with this particular M/V pair
-// (see AGENTS.md), not a sign error (every sign permutation was tried
-// by hand and none matched either) -- but this was NOT root-caused
-// tonight. Treat M(x)'s *interior* shape (not just its two endpoints,
-// which are exact) as provisional until re-verified.
+// *** ROOT CAUSE OF A CONFIRMED BUG, FIXED 2026-08-17 -- read before
+// reintroducing a millimeter conversion here ***. The very first
+// version of this function converted x/w to millimeters before
+// evaluating the formula, on the assumption that `MemberForces`'
+// moment/torsion fields were in Nmm (matching a pre-existing, as it
+// turns out mislabeled, comment on `engine::MemberResult`). A `tester`
+// pass (2026-08-17) mechanically confirmed this was wrong by building a
+// temporary instrumented `orcisf_cli` and comparing this formula's
+// M(x) against real `MTUM_KI`/`MLAP`/`MTUM_KA` values from a live run:
+// with the mm conversion, M(x) was off by 134x-1638x depending on
+// station -- not a rounding gap, a real formula bug. Root cause: `AM`'s
+// moment/torsion components (and therefore `MemberForces::moment_*`/
+// `torsion_*`) are actually in **N*m**, the same SI unit family (N, m)
+// this engine uses everywhere else -- confirmed independently via
+// `BeratSendiri()`'s self-weight fixed-end-moment formula
+// (`W_Balok*EL^2/12`, dimensionally only consistent as N*m given W in
+// N/m and EL in m) and by reproducing the legacy `MLAP` formula's real
+// checked-in value by hand. Once x/w are kept in their natural units
+// (meters, N/m -- no conversion at all) and `M`/`T` are treated as
+// N*m throughout, `M(length_m)` reproduces the real `MTUM_KA`/
+// `moment_z_b` value to float32 precision, confirming the underlying
+// V(x)/M(x) formula itself was *always* correct -- only the unit
+// bookkeeping around it was wrong. See `engine::MemberForces`'s own
+// header comment for the fuller unit-correction narrative (it also
+// affects `MemberResult`'s pre-existing "Nmm" labels elsewhere in this
+// codebase -- tracked as a separate, out-of-scope documentation issue,
+// not touched here).
 //
 // `width_mm`/`height_mm` (0 if unavailable, e.g. no completed design for
 // this member yet) enable the extreme-fiber axial+bending stress columns
 // via sigma = N/A +- M/S for a rectangular section (S = width*height^2/6,
-// bending about local z -- matching M(x)'s own axis).
+// bending about local z -- matching M(x)'s own axis). `M` must be
+// converted from N*m to N*mm (`*1000`) before dividing by `S` (in mm^3)
+// to get a result in N/mm^2 = MPa -- see the .cpp for exactly where.
 ForceDiagram ComputeForceDiagram(const engine::MemberForces& forces, float length_m, float width_mm, float height_mm,
                                   int num_stations = 21);
 

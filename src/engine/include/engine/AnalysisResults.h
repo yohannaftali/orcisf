@@ -17,9 +17,37 @@ namespace orcisf::engine {
 // sd.AM[no_batang][1..12] (index 1-6 = end A/"start"/JJ, 7-12 = end
 // B/"end"/JK), the same field Hasil() already populates and
 // WriteStrukturSection() already writes to the .str file. Axial/shear in
-// N, torsion/moment in Nmm -- matching MemberResult's own already-shipped
-// "(N, Nmm)" convention for the same AM-derived quantities (see
-// MemberResults.h's axial_demand/moment_x_demand/moment_y_demand).
+// N, torsion/moment in **N*m** (not Nmm -- see the correction note
+// below; this contradicts MemberResult's own "(N, Nmm)" comment for the
+// same AM-derived quantities, which is itself mislabeled -- tracked as
+// a documentation-only issue against that pre-existing, already-shipped
+// file rather than fixed here, see the note).
+//
+// **Unit correction (issue #61's actual root cause, found 2026-08-17):**
+// every field derived from `sd.AM`/`AR`/`AJ`/`AE` that represents a
+// moment or torsion is in **N*m** (newton-meters), the same consistent
+// SI unit family (N, m) the whole analysis engine uses throughout
+// (`E`/`G` in Pa, `X`/`Y`/`Z`/`EL` in meters, forces in N) -- *not*
+// Nmm as a pre-existing comment on `MemberResult` (issue #5) claimed
+// and this file's own comments copied without independently verifying.
+// Confirmed two ways: (1) `BeratSendiri()`'s self-weight fixed-end
+// moment (`sd.AML[6][i] += W_Balok*EL^2/12`) uses `W` in N/m and `EL` in
+// m with no unit-conversion factor anywhere, giving a result that can
+// only be dimensionally consistent as N*m; (2) the legacy `MLAP`
+// formula (`Hasil()`: `MLAP = -AM[6] + 0.125*W*EL^2`, W in N/m, EL in
+// m) only reproduces its own real, checked-in output value when
+// `-AM[6]` is treated as N*m -- treating it as Nmm (as this file
+// originally assumed) makes the two terms mismatch by a factor of
+// ~1000-1600x, which is exactly the bug `gui::ComputeForceDiagram()`
+// had. The legacy `.opt` file's own "Nmm" print label
+// (`WriteFinalResults()`: `"Momen kiri : " << MTUM_KI/0.8f << " Nmm"`)
+// is therefore *also* mislabeled -- a pre-existing issue predating this
+// epic, filed separately (see AGENTS.md's #61 note) rather than touched
+// here, since the underlying *numbers* in that already-shipped,
+// already-validated code are self-consistent within their own formulas
+// regardless of the print label's wording; only a new consumer doing
+// independent dimensional analysis (this force-diagram code) was
+// actually affected.
 struct MemberForces {
     int no_batang = 0; // 1-based, matches sd.JJ[no_batang]/JK[no_batang]
 
@@ -65,8 +93,8 @@ struct JointDisplacement {
 // restrained DOF -- Hasil() only ever writes an AR entry when the
 // corresponding sd.JRL flag is 1 (see StructuralAnalysis.cpp), so an
 // unrestrained joint's reaction is not a meaningful physical quantity.
-// Force in N, moment in Nmm (same AM-derived mixed-unit convention as
-// MemberForces above).
+// Force in N, moment in N*m (same AM-derived convention as MemberForces
+// above -- see that struct's comment for the unit correction).
 struct JointReaction {
     int no_joint = 0; // 1-based
     float fx = 0.f, fy = 0.f, fz = 0.f;
