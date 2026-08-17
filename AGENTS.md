@@ -2695,7 +2695,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #68 | feat(src): engine analyze-only entry point (fixed-design analysis, no optimization search) | ready-for-review (tester: 4/4 PASS, independently re-verified with different dataset params/seed than coder's own test) | 2026-08-17 |
 | #69 | feat(src): per-member manual dimension input panel for Analyze mode | ready-for-review (tester: GUI-rendering/interaction ACs UNVERIFIED, blocked by automation hazard -- underlying AnalyzeFixedDesign() call target independently confirmed correct via #68) | 2026-08-17 |
 | #70 | feat(src): Analyze-mode design-check results display (demand vs. capacity, safe/unsafe) | ready-for-review (tester: demand-vs-capacity + viewport-coloring data flow PASS via standalone program (undersized-vs-adequate column test); on-screen table/badge/viewport-pixel ACs UNVERIFIED, blocked by automation hazard) | 2026-08-17 |
-| #71 | feat(src): 3D-viewport force diagram overlay (N/V/M/T ribbons on the structure) | ready-for-review (coder: implemented + compiled overnight, see AGENTS.md's own section; GUI not interactively exercised yet -- not tested this pass, user asked for #66/#67 only) | 2026-08-17 |
+| #71 | feat(src): 3D-viewport force diagram overlay (N/V/M/T ribbons on the structure) | ready-for-review (coder: user re-tested and found it non-functional; root-caused to two broken default values (scale, all_members), fixed and rebuilt clean; awaiting user's own re-confirmation) | 2026-08-17 |
 | #72 | fix(src): loads disappear from Loads panel after a completed optimization run | open | 2026-08-17 |
 | #73 | fix(src): dock tab icon disappears when that panel's tab is not the active one | open | 2026-08-17 |
 | #74 | feat(src): default checkbox for same lapangan/tumpuan bars in Analyze mode's beam input | open | 2026-08-17 |
@@ -3162,14 +3162,44 @@ DrawForceDiagramOverlay()`, or `EditorOptions`' `show_force_diagram`/
   own background rect, which used the correct pattern from the start --
   copying the known-bad pattern a third time was judged worse than a
   same-day, one-line, low-risk fix to the two pre-existing instances.
-- **Verification status:** compiled cleanly (zero warnings); `orcisf_gui`
-  launch confirmed (no crash). The overlay's actual on-screen appearance
-  (ribbon shape/position, component switching, All-members mode, and a
-  side-by-side comparison against the 2D `ForceDiagramPanel` for the
-  same member) was **not** visually confirmed this pass -- implemented
-  overnight per explicit user request to proceed autonomously without
-  interactive GUI automation; next `tester`/`reviewer` pass should
-  confirm this end-to-end.
+- **Real bug found on first re-test, fixed same day**: the overlay
+  compiled and ran but was, in practice, invisible/non-functional --
+  the user's own report was "I still found only 2D". Root cause was two
+  broken *default values* in `EditorOptions`, not the rendering logic
+  itself (`DrawForceDiagramOverlay()`/`BuildSceneModel()`/
+  `ComputeForceDiagram()` were all re-checked and are correct):
+  1. `force_diagram_scale` defaulted to `1e-4f` -- for this project's
+     real moment magnitudes (tens of thousands of N*m) and axial forces
+     (hundreds of thousands of N), that produces a multi-meter offset on
+     an ordinary ~5-6m member, pushing the ribbon far outside the
+     camera's framed view. **Fixed to `1e-5f`** (keeps a typical value
+     to a ~0.5-2m offset, comparable to the member's own cross-section).
+  2. `force_diagram_all_members` defaulted to `false` -- with no member
+     selected in the viewport, toggling "Show" rendered nothing at all.
+     **Fixed to default `true`**, matching the user's own explicit ask
+     ("show force in 3D view with current structure like in SAP 2000" --
+     SAP2000 shows the whole model's diagrams by default) and making the
+     feature visibly do something the instant "Show" is checked, no
+     other setup required.
+  If you ever add a new scaled/magnitude-based overlay control to this
+  file, sanity-check its default against this project's *real* data
+  magnitudes (grep a real `.str`/`ANALYSIS_RESULTS` output for actual
+  N/Nm ranges) before picking a round number -- this is exactly how the
+  original `1e-4f` went unnoticed through compilation and a non-crash
+  launch check.
+- **Verification status:** compiled cleanly (zero warnings) both before
+  and after the defaults fix; `orcisf_gui` launch confirmed (no crash)
+  each time. The overlay's actual on-screen appearance (ribbon shape/
+  position, component switching, All-members mode, a side-by-side
+  comparison against the 2D `ForceDiagramPanel` for the same member)
+  still has **not** been visually confirmed by an agent in this
+  environment -- the original implementation was overnight autonomous
+  work (per explicit user request, no interactive GUI automation used),
+  and the defaults fix was diagnosed and applied the same way (careful
+  code/data review, not a screenshot). The user found the original bug
+  by testing the real GUI themselves and is expected to re-test the fix
+  the same way; treat this as still needing that confirmation (or a
+  `tester` pass) before considering #71 fully verified.
 
 ---
 

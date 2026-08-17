@@ -93,13 +93,23 @@ struct EditorOptions {
     // convention as show_deformed_shape above. `force_diagram_component`:
     // 0=N (axial), 1=V (shear), 2=M (moment), 3=T (torsion) -- matches the
     // order ForceDiagramPanel's own 4 stacked plots already use.
-    // `force_diagram_all_members`: false = only the currently selected
-    // member (the common case -- "inspect this member"); true = every
-    // member with data, for a whole-structure overview.
+    // `force_diagram_all_members`: true = every member with data, for a
+    // whole-structure overview (SAP2000-style "show forces for the whole
+    // model" default -- issue #71's own follow-up report: with this
+    // defaulted false, toggling "Show" with no member selected rendered
+    // nothing at all, reading as "the feature doesn't work"); false =
+    // only the currently selected member, for a focused single-member view.
     bool show_force_diagram = false;
     int force_diagram_component = 2; // default to Moment (M) -- typically the most informative at a glance
-    float force_diagram_scale = 1e-4f;
-    bool force_diagram_all_members = false;
+    // Issue #71 follow-up: 1e-4 was a real bug -- for this project's real
+    // moment magnitudes (tens of thousands of N*m), that scale produced a
+    // multi-meter offset on an ordinary ~5-6m member, pushing the ribbon
+    // far outside the camera's framed view (effectively invisible, read as
+    // "doesn't work" rather than "too small to see"). 1e-5 keeps a typical
+    // ~50,000-100,000 N*m moment or ~100,000-200,000 N axial force to a
+    // ~0.5-2m offset, comparable to the member's own cross-section size.
+    float force_diagram_scale = 1e-5f;
+    bool force_diagram_all_members = true;
 };
 
 } // namespace orcisf::gui

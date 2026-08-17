@@ -5034,3 +5034,42 @@ first (0 results each), then filed:
 
 - Issues #72, #73, #74 created on GitHub (all open)
 - Files: `AGENTS.md` (Tracked Issues table), `CHANGE_HISTORY.md`
+
+## [2026-08-17] — fix(gui): #71's 3D force-diagram overlay had two broken defaults
+
+User re-tested last night's #71 implementation and reported "I still
+found only 2D" -- the 3D-viewport overlay wasn't visibly doing
+anything. Root-caused to two real bugs in `gui/editor/Selection.h`'s
+default values, not a rendering-logic bug (`DrawForceDiagramOverlay()`
+itself, `BuildSceneModel()`'s `force_diagram` population, and
+`ComputeForceDiagram()` were all re-checked and are correct):
+
+1. **`force_diagram_scale` defaulted to `1e-4f`.** For this project's
+   real moment magnitudes (tens of thousands of N*m) and axial forces
+   (hundreds of thousands of N), that scale produces a multi-meter
+   (often 5-20m) offset on an ordinary ~5-6m member -- the ribbon
+   renders far outside the camera's framed view, effectively invisible.
+   Lowered to `1e-5f` (keeps a typical value to a ~0.5-2m offset,
+   comparable to the member's own cross-section).
+2. **`force_diagram_all_members` defaulted to `false`.** With no member
+   selected in the viewport, toggling "Show" rendered nothing at all
+   (the overlay only draws the *selected* member's diagram when this is
+   false). Defaulted to `true` instead -- matches the user's own
+   explicit ask ("show force in 3D view with current structure like in
+   SAP 2000", which shows the whole model's diagrams by default, not
+   one member at a time) and means the feature visibly does something
+   the moment "Show" is checked, with no other setup required.
+
+Also found and closed a real process-management issue along the way:
+an `orcisf_gui.exe` from the user's own review session was still
+running (772 CPU-seconds, clearly in active use, not idle) and held
+the just-built `.exe` open, causing `LNK1104` on the first rebuild
+attempt -- asked the user to confirm before touching it (a live GUI
+session, not routine build-lock cleanup) rather than force-killing it
+unilaterally; user closed it themselves and confirmed, rebuild then
+succeeded cleanly (zero warnings).
+
+- Issue #71: fix implemented and built; not yet re-confirmed
+  interactively (asked the user, who is actively at the machine, to
+  re-test directly rather than risk GUI automation)
+- Files: `src/gui/editor/Selection.h`
