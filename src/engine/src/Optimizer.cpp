@@ -848,6 +848,19 @@ void RunOptimization(StructureData& sd, const OptimizationOptions& options, cons
                                      "JVD (" + std::to_string(sd.JVD) +
                                      ") -- increase fak_kali and/or fak_plus (JSTD = JVD*fak_kali + fak_plus).");
     }
+    // Issue #75 (found instrumenting #63): the opposite failure mode from
+    // #65 above -- var_b/var_k/fitstr/kendalastr/hargastr are fixed
+    // kMak(825)-sized LegacyArray(2D)s (see StructureData.h), never resized
+    // by JSTD, so a JSTD that's too *large* (a big fak_kali on a dataset
+    // with enough beams/columns -- e.g. fak_kali=20 on an 8-member dataset
+    // already exceeds it) writes past the end of every one of those arrays.
+    // Confirmed as a real, deterministic segfault via orcisf_cli before this
+    // guard was added. Same fail-loudly-and-early treatment as #65.
+    if (sd.JSTD > kMak) {
+        throw std::invalid_argument("RunOptimization: JSTD (" + std::to_string(sd.JSTD) +
+                                     ") exceeds the maximum population size (" + std::to_string(kMak) +
+                                     ") -- reduce fak_kali and/or fak_plus (JSTD = JVD*fak_kali + fak_plus).");
+    }
 
     Rng rng(options.rng_seed != 0 ? options.rng_seed : std::random_device{}());
     AcakVariabel(sd, rng, options);

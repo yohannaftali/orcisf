@@ -9,6 +9,7 @@ add_library(orcisf_engine STATIC
     src/Engine.cpp
     src/MemberResults.cpp
     src/AnalysisResults.cpp
+    src/DebugLog.cpp
 )
 
 target_include_directories(orcisf_engine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

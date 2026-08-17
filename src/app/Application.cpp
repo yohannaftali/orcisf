@@ -12,6 +12,7 @@
 #include <optional>
 #include <utility>
 
+#include "engine/DebugLog.h" // issue #63 investigation, see DebugLog.h
 #include "engine/Engine.h"
 #include "engine/LegacyIO.h"
 #include "engine/MemberResults.h"
@@ -178,10 +179,14 @@ void Application::LoadStructure(engine::StructureData sd, const std::vector<engi
     current_analysis_ = analysis ? *analysis : engine::AnalysisResults{};
     has_analysis_results_ = (analysis != nullptr); // issue #66: broader than has_run_results_, see its own comment
 
+    engine::DebugLog("Application::LoadStructure", "about to call BuildSceneModel()");
     scene_ = gui::BuildSceneModel(loaded_sd_, results, loaded_dataset_path_, &editable_->MemberTypeOverrides(),
                                    analysis);
+    engine::DebugLog("Application::LoadStructure", "BuildSceneModel() returned, about to call Validate()");
     validation_issues_ = editable_->Validate();
+    engine::DebugLog("Application::LoadStructure", "Validate() returned, about to call FrameScene()");
     viewport_panel_.FrameScene(scene_);
+    engine::DebugLog("Application::LoadStructure", "FrameScene() returned, LoadStructure done");
 }
 
 void Application::RebuildSceneAfterEdit() {
@@ -241,13 +246,16 @@ void Application::OnOpenFolderRequested() {
 }
 
 void Application::OnRunResult(engine::StructureData sd, std::string dataset_path, std::string output_path) {
+    engine::DebugLog("Application::OnRunResult", "entered, dataset=" + dataset_path);
     std::vector<engine::MemberResult> results = engine::ComputeMemberResults(sd);
+    engine::DebugLog("Application::OnRunResult", "ComputeMemberResults() returned");
     // Issue #60: captured here (before the load-zeroing loop below,
     // though that loop only touches W/AML/AJ, not AM/DJ/AR) so the
     // deformed-shape overlay's data comes from the exact same sd state
     // ComputeMemberResults() just read -- see AnalysisResults.h's header
     // comment on why this deliberately does not re-run Struktur().
     engine::AnalysisResults analysis = engine::ComputeAnalysisResults(sd);
+    engine::DebugLog("Application::OnRunResult", "ComputeAnalysisResults() returned");
 
     // RunFullOptimization's sd came through engine::ReadLoads(), which
     // bakes self-weight into W/AJ (see engine::ReadLoadsRaw()'s comment on
@@ -266,9 +274,12 @@ void Application::OnRunResult(engine::StructureData sd, std::string dataset_path
     // loads the user last saved, unaffected by anything RunFullOptimization
     // did to this in-memory copy.
     engine::DatasetPaths input_paths = engine::MakeDatasetPaths(dataset_path);
+    engine::DebugLog("Application::OnRunResult", "about to call ReadLoadsRaw() on " + input_paths.bbn);
     engine::ReadLoadsRaw(sd, input_paths.bbn);
+    engine::DebugLog("Application::OnRunResult", "ReadLoadsRaw() returned");
 
     LoadStructure(std::move(sd), &results, dataset_path, &analysis);
+    engine::DebugLog("Application::OnRunResult", "LoadStructure() returned, OnRunResult about to return");
     last_run_output_path_ = output_path; // issue #25: LoadStructure() doesn't touch this, set it after
     log_panel_.AddLine("Viewport updated with results from: " + dataset_path + " (output: " + output_path + ")");
 }

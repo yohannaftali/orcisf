@@ -6,6 +6,8 @@
 #include <fstream>
 #include <memory>
 
+#include "engine/DebugLog.h" // issue #63 investigation, see DebugLog.h
+
 namespace orcisf::engine {
 
 namespace {
@@ -99,12 +101,17 @@ std::string RunFullOptimization(StructureData& sd, const std::string& generic_da
         }
     };
 
+    DebugLog("Engine", "about to call RunOptimization()");
     RunOptimization(sd, options, progress_wrapper, detail_writer, cancel);
+    DebugLog("Engine", "RunOptimization() returned, closing his");
 
     his->close();
+    DebugLog("Engine", "his closed, closing log_detail (" + paths.log_detail + ")");
     log_detail->close();
+    DebugLog("Engine", "log_detail closed, calling WriteFinalResults");
 
     WriteFinalResults(sd, paths);
+    DebugLog("Engine", "WriteFinalResults returned, RunFullOptimization about to return");
 
     return output_generic;
 }

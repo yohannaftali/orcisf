@@ -7,6 +7,7 @@
 
 #include <imgui.h>
 
+#include "engine/DebugLog.h" // issue #63 investigation, see DebugLog.h
 #include "engine/Engine.h"
 #include "gui/PanelTitles.h"
 
@@ -99,15 +100,21 @@ void RunPanel::StartRun() {
             return !cancel_.load();
         };
 
+        engine::DebugLog("RunPanel::worker", "entering RunFullOptimization(), dataset=" + dataset_path);
         try {
             result_output_path_ = engine::RunFullOptimization(result_sd_, dataset_path, options, on_progress, &cancel_);
+            engine::DebugLog("RunPanel::worker", "RunFullOptimization() returned normally, output=" + result_output_path_);
         } catch (const std::exception& e) {
             last_error_ = e.what();
             has_error_ = true;
+            engine::DebugLog("RunPanel::worker", std::string("RunFullOptimization() threw: ") + e.what());
         }
 
+        engine::DebugLog("RunPanel::worker", "about to call running_.store(false)");
         running_.store(false);
+        engine::DebugLog("RunPanel::worker", "running_.store(false) done, worker lambda returning");
     });
+    engine::DebugLog("RunPanel::StartRun", "worker thread spawned");
 }
 
 void RunPanel::RequestCancel() { cancel_.store(true); }
@@ -128,6 +135,7 @@ void RunPanel::Draw(bool* open) {
     }
     bool running = IsRunning();
     if (was_running_ && !running) {
+        engine::DebugLog("RunPanel::Draw", "UI thread observed running_==false edge");
         if (has_error_) {
             if (log_sink_) log_sink_("Optimization run stopped with an error: " + last_error_);
         } else if (cancel_.load()) {
@@ -136,7 +144,9 @@ void RunPanel::Draw(bool* open) {
             if (log_sink_) log_sink_("Optimization run finished. Output: " + result_output_path_);
             has_result_ = true;
             result_dataset_path_ = dataset_path_;
+            engine::DebugLog("RunPanel::Draw", "about to call on_result_ (Application::OnRunResult)");
             if (on_result_) on_result_(result_sd_, dataset_path_, result_output_path_);
+            engine::DebugLog("RunPanel::Draw", "on_result_ returned");
         }
     }
     was_running_ = running;
@@ -171,6 +181,17 @@ void RunPanel::Draw(bool* open) {
     fak_kali_ = std::max(1, fak_kali_);
     fak_plus_ = std::max(0, fak_plus_);
     if (fak_kali_ == 1 && fak_plus_ == 0) fak_plus_ = 1;
+    // Issue #75 (found instrumenting #63): JSTD = JVD*fak_kali + fak_plus
+    // must not exceed kMak (825) -- the fixed size of var_b/var_k/fitstr/
+    // kendalastr/hargastr (see Optimizer.cpp's RunOptimization() guard,
+    // the authoritative check since this field doesn't know the loaded
+    // dataset's JVD). This panel has no dataset loaded here to compute the
+    // real JVD from, so it clamps to a generous-but-bounded ceiling instead
+    // -- keeps an accidental huge value (e.g. a mistyped extra digit) from
+    // reaching the engine at all for any realistic dataset size, while the
+    // engine's own guard remains the one that's always correct.
+    fak_kali_ = std::min(fak_kali_, 100);
+    fak_plus_ = std::min(fak_plus_, engine::kMak);
 
     ImGui::SeparatorText("Performance");
     int max_threads = static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));

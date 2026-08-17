@@ -2166,10 +2166,67 @@ things every future agent touching it must know:
     (`sd.fitstr[sd.JSTD - sd.JVD - 1]` out-of-bounds when
     `fak_plus=0`/`fak_kali=1`) — already fixed as of this same night's
     batch; don't confuse the two.
-  - **Do not close #63 or claim it's fixed** — nothing here is a fix,
-    only a much narrower root-cause hypothesis than existed before.
-    Route back to `coder` with this section as the starting point for
-    the next attempt.
+  - **Diagnostic instrumentation added (`engine::DebugLog()`,
+    `src/engine/include/engine/DebugLog.h` + `src/engine/src/DebugLog.cpp`)
+    — a millisecond-timestamped append-only logger writing to
+    `<temp dir>/orcisf_run_debug.log`** (the GUI build has no console,
+    issue #12, so `std::cerr` goes nowhere). Calls are placed at every
+    candidate stall point along the completion path: `Engine.cpp`'s
+    `RunFullOptimization()` (around `RunOptimization()`,
+    `his->close()`, `log_detail->close()`, `WriteFinalResults()`),
+    `RunPanel.cpp`'s worker lambda (entering/leaving
+    `RunFullOptimization()`, around `running_.store(false)`) and
+    `Draw()`'s `was_running_`-edge detection, and
+    `Application::OnRunResult()`/`LoadStructure()` (around
+    `ComputeMemberResults()`, `ComputeAnalysisResults()`,
+    `ReadLoadsRaw()`, `BuildSceneModel()`, `Validate()`,
+    `FrameScene()`). **Left in place, not removed** — cheap
+    (a handful of mutex-guarded file appends, only on the run-completion
+    path, never per-generation) and exactly what the next live-GUI
+    repro attempt needs to pinpoint the stuck line; remove the call
+    sites once #63 is confirmed fixed and no longer needs live
+    diagnosis, not before.
+  - **A second, genuinely distinct, more serious bug was found and
+    fixed while adding this instrumentation — filed and closed as
+    #75.** `JSTD = JVD*fak_kali + fak_plus` (`Optimizer.cpp`'s
+    `PrepareOptimization()`) had no upper-bound check against `kMak`
+    (825), the fixed size of `var_b`/`var_k`/`fitstr`/`kendalastr`/
+    `hargastr`. This is the *opposite* failure mode from #65's guard
+    (population too *large*, not too small): the very first CLI repro
+    attempt with this instrumentation (`fak_kali=20` on Apl1-1's
+    8-member dataset, `JVD=68` → `JSTD=1365 > 825`) **segfaulted
+    deterministically**, confirmed via `DebugLog`'s own trail --
+    the log showed entry into `RunOptimization()` and nothing after,
+    i.e. the crash happened *inside* the search loop from an
+    out-of-bounds heap write, not in any completion-path code. Fixed
+    with a matching guard (`if (sd.JSTD > kMak) throw
+    std::invalid_argument(...)`, right next to #65's existing
+    `JSTD <= JVD` check in `RunOptimization()`) plus a best-effort
+    `RunPanel.cpp` clamp (`fak_kali_` capped at 100, `fak_plus_` at
+    `kMak`) -- the panel has no loaded dataset to compute the real
+    `JVD` from, so the engine-level throw is the authoritative guard;
+    the GUI clamp is only a courtesy against an obviously-mistyped
+    value. Re-ran the identical repro parameters after the fix: clean
+    `std::invalid_argument` message instead of a crash. **Confirmed
+    unrelated to #63's actual hang** — RunPanel's own defaults
+    (`fak_kali=1`, `fak_plus=3`) keep `JSTD` far under 825 for any
+    realistic dataset, and a follow-up CLI run with those exact
+    defaults plus `worker_threads=15` (matching the original #63
+    report) completed cleanly in 0.4s with no hang and a fully
+    populated `DebugLog` trail — but it was a real, easily
+    user-triggerable crash in its own right (any GUI user raising
+    `fak_kali` past a few dozen on a modestly-sized dataset), well
+    worth finding regardless of #63.
+  - **Do not close #63 or claim it's fixed** — the #75 crash is fixed,
+    but #63's own hang has still not been reproduced with the new
+    instrumentation in place (the CLI can't reproduce the GUI-specific
+    "window stays Responding but frozen" symptom at all -- it has no
+    message pump to freeze -- so a real repro still needs the live GUI,
+    ideally with a run long/slow enough to produce a `.log.txt` in the
+    same size range as the two hung runs, ~690KB, to meaningfully test
+    the AV-file-close hypothesis). Route back to `coder`/`tester` with
+    this section (now including the instrumentation and the ruled-out
+    #75 lead) as the starting point for the next attempt.
 - **Never point the CLI/GUI's output at `Optimasi Beton/Example/` directly**
   — output filenames are case-insensitive-colliding with the checked-in
   reference files on Windows (`GEDUNG.opt` == `gedung.opt`). Always use a
@@ -2738,7 +2795,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #60 | feat(gui): deformed-shape overlay in the 3D viewport | closed (reviewer: PASS WITH NOTES -- `GetForegroundDrawList()` overlay-compositing finding tracked as a follow-up, see AGENTS.md's #60 section; live interactive spot-check still UNVERIFIED) | 2026-08-17 |
 | #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | closed (reviewer: PASS) | 2026-08-17 |
 | #62 | feat(gui): joint displacement / member force / reaction tables + global equilibrium check | closed (reviewer: PASS) | 2026-08-17 |
-| #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open, REPRODUCED live 2026-08-17 night by `tester` (2/2 real GUI runs hung identically; engine already fully finished -- output files complete -- so the hang is NOT in the search/threading path; leading hypothesis is OS-level file-close blocking, e.g. AV scanning a large .log.txt; see AGENTS.md's #63 section for full detail) | 2026-08-17 |
+| #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open, `coder` added `DebugLog()` timestamp instrumentation across the full completion path (Engine.cpp/RunPanel.cpp/Application.cpp) but has not yet reproduced the hang with it in place -- CLI can't reproduce the GUI-freeze symptom at all, so a live GUI repro is still needed; found+fixed an unrelated crash bug along the way (#75), ruled out as #63's cause; see AGENTS.md's #63 section for full detail | 2026-08-17 |
 | #64 | docs(src): fix pre-existing "Nmm" mislabeling -- AM moment/torsion fields are actually N*m | ready-for-review (coder: implemented + verified -- all label sites fixed, .opt output confirmed value-identical, zero-warning build) | 2026-08-17 |
 | #65 | bug(src): fak_plus=0/fak_kali=1 causes an out-of-bounds fitstr[-1] read in RunOptimization() | ready-for-review (coder: fixed at both GUI and engine layers, verified via orcisf_cli -- bad combo now fails with a clear error, valid combos unaffected) | 2026-08-17 |
 | #66 | feat(src): load analysis results from saved .str file on Open Data | ready-for-review (tester: 4/4 PASS -- interactively confirmed live: Open Data loaded a real .str with zero Run clicks, Results panel's Support Reactions matched orcisf_cli's ANALYSIS_RESULTS exactly) | 2026-08-17 |
@@ -2750,6 +2807,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #72 | fix(src): loads disappear from Loads panel after a completed optimization run | ready-for-review (coder: standalone-verified; tester: pre-run Loads panel confirmed correct live via the identical ReadLoadsRaw() code path; the specific post-Run GUI check was blocked by a live #63 hang reproduction, see AGENTS.md's #72/#63 notes) | 2026-08-17 |
 | #73 | fix(src): dock tab icon disappears when that panel's tab is not the active one | ready-for-review (tester: interactively CONFIRMED live in two separate tab groups -- inactive-tab icons visible, #51 regression check passed; DPI-forced-scale re-check not done this pass) | 2026-08-17 |
 | #74 | feat(src): default checkbox for same lapangan/tumpuan bars in Analyze mode's beam input | ready-for-review (tester: interactively CONFIRMED live -- checkbox checked by default, 8-column layout when checked, reverts to full 12-slot layout when unchecked, Run Analyze works with no crash) | 2026-08-17 |
+| #75 | bug(src): JSTD can exceed kMak (825), causing OOB heap write / segfault for large fak_kali | ready-for-review (coder: fixed at both engine (RunOptimization() throws instead of OOB write) and GUI (RunPanel clamp) layers; verified via orcisf_cli -- the exact repro that segfaulted before the fix now fails with a clear error message, and a regression run with RunPanel's own defaults + worker_threads=15 still completes correctly) | 2026-08-17 |
 
 Epic #67 tracks #68–#70 (manual-dimension "Analyze" mode: engine
 entry point, GUI input panel, GUI results display — reuses the

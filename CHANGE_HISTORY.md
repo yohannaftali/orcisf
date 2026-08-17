@@ -5384,3 +5384,54 @@ tests already covered.
   open with major new evidence, not closed
 - Files: `AGENTS.md` (Tracked Issues table, #63/#71/#72 detailed
   sections), `CHANGE_HISTORY.md`
+
+## [2026-08-17] — chore(src): #63 file-close-hang investigation, found+fixed #75 (JSTD/kMak overflow segfault)
+- Per explicit user instruction ("have coder investigate the #63
+  file-close hang"), added `engine::DebugLog()` (new
+  `src/engine/include/engine/DebugLog.h` + `src/engine/src/DebugLog.cpp`,
+  a millisecond-timestamped append-only file logger to `<temp
+  dir>/orcisf_run_debug.log`, since the GUI build has no console for
+  `std::cerr` to reach) and instrumented every candidate stall point
+  along the run-completion path: `Engine.cpp`'s `RunFullOptimization()`
+  (around `RunOptimization()`/`his->close()`/`log_detail->close()`/
+  `WriteFinalResults()`), `RunPanel.cpp`'s worker thread lambda and
+  `Draw()`'s completion-edge detection, and `Application::OnRunResult()`/
+  `LoadStructure()` (`ComputeMemberResults`/`ComputeAnalysisResults`/
+  `ReadLoadsRaw`/`BuildSceneModel`/`Validate`/`FrameScene`).
+- While exercising this instrumentation via `orcisf_cli` against a
+  scratch copy of `Example/Apl1-1`, the very first test (a large
+  `fak_kali=20`) **segfaulted deterministically**. Root cause: `JSTD =
+  JVD*fak_kali + fak_plus` (`Optimizer.cpp`'s `PrepareOptimization()`)
+  had no upper-bound check against `kMak` (825), the fixed size of
+  `var_b`/`var_k`/`fitstr`/`kendalastr`/`hargastr` — `JVD=68` (Apl1-1's
+  4 beams + 4 columns) times `fak_kali=20` gives `JSTD=1365 > 825`, an
+  out-of-bounds heap write on every population-indexed array. This is
+  the mirror-image failure mode of issue #65's guard (population too
+  *small*, not too large). Filed as issue #75 and fixed immediately in
+  the same session: a matching `if (sd.JSTD > kMak) throw
+  std::invalid_argument(...)` guard next to #65's existing check in
+  `RunOptimization()`, plus a best-effort `RunPanel.cpp` clamp
+  (`fak_kali_` capped at 100, `fak_plus_` at `kMak`) since the panel has
+  no loaded dataset to compute the real `JVD` from at edit time.
+  Re-ran the exact repro parameters after the fix: clean error message,
+  no crash. A follow-up run with `RunPanel`'s own real defaults
+  (`fak_kali=1`, `fak_plus=3`) plus `worker_threads=15` (matching the
+  original #63 report) completed correctly in 0.4s with a full
+  `DebugLog` trail and no hang — confirming #75 is a real, separate,
+  easily user-triggerable bug, but not the cause of #63.
+- **Issue #63 itself remains open and unreproduced this pass** — the
+  CLI has no message pump to freeze, so it cannot reproduce the
+  GUI-specific "window stays Responding but frozen at 98%" symptom at
+  all; a real repro attempt still needs the live GUI, ideally with a
+  long/slow-enough run to produce a `.log.txt` in the same size range
+  as the two hung runs from the prior tester pass (~690KB), to
+  meaningfully test the AV-file-close-stall hypothesis. The
+  instrumentation is left in place (not removed) specifically so the
+  next live-GUI attempt can pinpoint the exact stuck line.
+- Files: `src/engine/include/engine/DebugLog.h` (new),
+  `src/engine/src/DebugLog.cpp` (new), `src/engine/CMakeLists.txt`,
+  `src/engine/src/Engine.cpp`, `src/engine/src/Optimizer.cpp` (#75
+  fix), `src/gui/RunPanel.cpp` (#75 GUI clamp + instrumentation),
+  `src/app/Application.cpp` (instrumentation), `AGENTS.md` (#63 section
+  rewritten with the #75 finding + instrumentation notes, Tracked
+  Issues table updated for #63 and new row for #75)
