@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <random>
+#include <stdexcept>
 #include <thread>
 #include <utility>
 
@@ -771,6 +772,61 @@ void PrepareOptimization(StructureData& sd, const OptimizationOptions& options) 
 
     sd.JVD = 12 * sd.jum_balok + 5 * sd.jum_kolom;
     sd.JSTD = sd.JVD * sd.fak_kali + sd.fak_plus;
+}
+
+AnalyzeResult AnalyzeFixedDesign(StructureData& sd, const OptimizationOptions& options, const std::vector<int>& var_b,
+                                  const std::vector<int>& var_k) {
+    PrepareOptimization(sd, options);
+
+    if (static_cast<int>(var_b.size()) != 12 * sd.jum_balok) {
+        throw std::invalid_argument("AnalyzeFixedDesign: var_b size " + std::to_string(var_b.size()) +
+                                     " does not match 12*jum_balok=" + std::to_string(12 * sd.jum_balok));
+    }
+    if (static_cast<int>(var_k.size()) != 5 * sd.jum_kolom) {
+        throw std::invalid_argument("AnalyzeFixedDesign: var_k size " + std::to_string(var_k.size()) +
+                                     " does not match 5*jum_kolom=" + std::to_string(5 * sd.jum_kolom));
+    }
+
+    LoadBatasAtas(sd);
+    for (size_t i = 0; i < var_b.size(); ++i) {
+        int upper = sd.nvb[static_cast<int>(i)];
+        if (var_b[i] < 0 || var_b[i] >= upper) {
+            throw std::invalid_argument("AnalyzeFixedDesign: var_b[" + std::to_string(i) +
+                                         "]=" + std::to_string(var_b[i]) + " out of range [0," +
+                                         std::to_string(upper) + ")");
+        }
+    }
+    for (size_t i = 0; i < var_k.size(); ++i) {
+        int upper = sd.nvk[static_cast<int>(i)];
+        if (var_k[i] < 0 || var_k[i] >= upper) {
+            throw std::invalid_argument("AnalyzeFixedDesign: var_k[" + std::to_string(i) +
+                                         "]=" + std::to_string(var_k[i]) + " out of range [0," +
+                                         std::to_string(upper) + ")");
+        }
+    }
+
+    sd.no_struktur = 0;
+    for (size_t i = 0; i < var_b.size(); ++i) sd.var_b[0][static_cast<int>(i)] = var_b[i];
+    for (size_t i = 0; i < var_k.size(); ++i) sd.var_k[0][static_cast<int>(i)] = var_k[i];
+
+    Inersia(sd);
+    Struktur(sd);
+
+    // ComputeMemberResults() (like WriteFinalResults()) always reads
+    // whichever slot sd.JSTD-1 points at ("the best structure" convention).
+    // This function only ever populates slot 0, so force JSTD=1 to make
+    // that convention land on the fixed design just written, regardless of
+    // whatever JSTD PrepareOptimization()'s fak_kali/fak_plus computed --
+    // safe because fitstr/hargastr/kendalastr/var_b/var_k are all
+    // fixed-kMak-sized LegacyArray(2D)s, never resized by JSTD (see
+    // StructureData.h's LegacyArray comment), so this touches no array
+    // bounds, just which slot downstream readers select.
+    sd.JSTD = 1;
+
+    AnalyzeResult result;
+    result.member_results = ComputeMemberResults(sd);
+    result.analysis = ComputeAnalysisResults(sd);
+    return result;
 }
 
 void RunOptimization(StructureData& sd, const OptimizationOptions& options, const ProgressCallback& on_progress,

@@ -7,6 +7,7 @@
 #include "engine/AnalysisResults.h"
 #include "engine/MemberResults.h"
 #include "engine/StructureData.h"
+#include "gui/diagrams/ForceDiagram.h"
 #include "gui/viewport/Math3D.h"
 
 // Render-ready snapshot of a loaded dataset, built once when a folder is
@@ -30,6 +31,19 @@ struct MemberVisual {
     // factor at draw time, not here), from engine::AnalysisResults.
     // {0,0,0} when no analysis result was supplied to BuildSceneModel().
     math3d::Vec3 disp_a{0.f, 0.f, 0.f}, disp_b{0.f, 0.f, 0.f};
+
+    // Issue #71: this member's N/V/M/T force diagram (gui::ComputeForceDiagram(),
+    // #61 -- no new math here), precomputed once per BuildSceneModel() call
+    // (not per frame) the same way disp_a/disp_b already are. Empty
+    // (samples.empty()) when no AnalysisResults was supplied, or when this
+    // particular member has no matching entry in it (e.g. a .str-loaded
+    // AnalysisResults, #66, whose member_forces list may not cover a
+    // member added by an edit since). Drives the new 3D viewport ribbon
+    // overlay (#71) -- ForceDiagramPanel (#61) keeps its own separate
+    // on-demand computation for just the selected member, unchanged; both
+    // call the same ComputeForceDiagram() so they always agree on
+    // shape/magnitude for any member both happen to show.
+    ForceDiagram force_diagram;
 };
 
 struct JointVisual {

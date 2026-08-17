@@ -26,8 +26,8 @@ engine/
 | `BeamDesign.{h,cpp}` | `Balok.hpp` | `class balok`'s constructor → `DesignBeam()`; `lendutan()` → `Lendutan()`. |
 | `ColumnDesign.{h,cpp}` | `Kolom.hpp` | `class kolom`'s constructor → `DesignColumn()`, including the false-position biaxial-capacity search. |
 | `CostConstraint.{h,cpp}` | `Kendala.hpp` | `Kendala_Harga()` → `KendalaHarga()`. **Deliberately** does not re-run the analysis on every call (see the header comment) — a documented, justified deviation, not a fidelity gap. |
-| `Optimizer.{h,cpp}` | `Polyhedron.hpp`, `Pengacakan.hpp`, `Penormalan.hpp`, `Telusur.hpp`, `Baru.hpp`, `Pengurutan.hpp`, `Diskritisasi.hpp` | `RunOptimization()` is the `optimasi()` driver; every other legacy file in this list has a matching internal (anonymous-namespace) function in `Optimizer.cpp`. |
-| `LegacyIO.{h,cpp}` | `InOut.hpp` (read half), `Pembebanan.hpp` (read half), `CETAK.HPP` | Reads the legacy `.inp/.isd/.idl/.ijl/.ids/.ijs/.bbn` format exactly (plain whitespace-token ASCII); writes `.opt/.str/.kdl/.inf` reproducing `cetak_akhir()`, including its specific choice of which population slot's geometry the `.str` section reflects (see the function's header comment). |
+| `Optimizer.{h,cpp}` | `Polyhedron.hpp`, `Pengacakan.hpp`, `Penormalan.hpp`, `Telusur.hpp`, `Baru.hpp`, `Pengurutan.hpp`, `Diskritisasi.hpp` | `RunOptimization()` is the `optimasi()` driver; every other legacy file in this list has a matching internal (anonymous-namespace) function in `Optimizer.cpp`. `AnalyzeFixedDesign()` (issue #68, new) reuses the same anonymous-namespace `LoadBatasAtas()` for bounds-checking a caller-supplied design against no search/population involved -- see "Analyze mode" below. |
+| `LegacyIO.{h,cpp}` | `InOut.hpp` (read half), `Pembebanan.hpp` (read half), `CETAK.HPP` | Reads the legacy `.inp/.isd/.idl/.ijl/.ids/.ijs/.bbn` format exactly (plain whitespace-token ASCII); writes `.opt/.str/.kdl/.inf` reproducing `cetak_akhir()`, including its specific choice of which population slot's geometry the `.str` section reflects (see the function's header comment). `ReadAnalysisResultsFromStr()` (issue #66, new) reads a `.str` written by `WriteStrukturSection()` back into an `AnalysisResults` -- see its own header comment for exactly what it can and can't reconstruct. |
 | `Engine.{h,cpp}` | -- (new) | Facade: `RunFullOptimization()` / `LoadDatasetForViewing()`. Also writes the new detailed per-generation log (`<generic>.log.txt`, superset of `.his`). |
 | `Discretization.h` | `Diskritisasi.hpp` | `konversi()` → `Konversi()` — see the file's comment for why this isn't just `std::round`. |
 | `AnalysisResults.{h,cpp}` | -- (new, issue #59) | `ComputeAnalysisResults()`: captures `sd.AM`/`DJ`/`AR` (member end forces, joint displacements, support reactions) into GUI-friendly structs, for epic #58's results-visualization work. Reads the same "frozen slot" state `WriteFinalResults()`'s `.str` section already does -- see this file's own header comment and the "Deliberate deviations" section below before assuming it reflects the best (JSTD-1) structure. |
@@ -116,6 +116,78 @@ had no such option).
   result's cost is never worse than the seed's, given equal constraint
   satisfaction (`kendala`) -- this was reasoned through analytically (see
   Validation below for why it wasn't exercised with a real run).
+
+## Analyze mode (issue #68, epic #67)
+
+`AnalyzeFixedDesign()` runs analysis + the existing RC design-check logic
+against a single, caller-supplied design-variable set -- no `optimasi()`
+search, no population, no cost minimization. It's the engine half of the
+GUI's new "Analyze" mode (#69/#70): the user picks discrete design-variable
+indices by hand instead of letting the Flexible Polyhedron search choose
+them, and gets back the same `MemberResult`/`AnalysisResults` a completed
+optimization run produces, so every existing results display (Force
+Diagrams, Results tables, viewport constraint coloring) works unmodified.
+
+- **Formalizes an already-proven pattern**: `orcisf_cli`'s `equilibrium`
+  command (`CmdEquilibrium()`) has done exactly this ad hoc since issue #3
+  -- write to population slot 0, call `Inersia()`+`Struktur()` directly,
+  skip `RunOptimization()`'s search loop entirely. `AnalyzeFixedDesign()`
+  is that same pattern, generalized to accept the caller's own indices
+  (not always mid-range) and to also run `ComputeMemberResults()`/
+  `ComputeAnalysisResults()` for a full design-check result, not just an
+  equilibrium residual.
+- **Why `sd.JSTD` gets forced to 1**: `ComputeMemberResults()` (like
+  `WriteFinalResults()`) always reads whichever slot `sd.JSTD-1` points at
+  ("the best structure" convention -- see this file's "Deliberate
+  deviations" #6 below). This function only ever writes population slot
+  0, so it sets `sd.JSTD = 1` right before calling `ComputeMemberResults()`
+  so that convention lands on the fixed design just written. Safe because
+  `fitstr`/`hargastr`/`kendalastr`/`var_b`/`var_k` are all fixed-`kMak`-
+  sized `LegacyArray`/`LegacyArray2D`s (see `StructureData.h`), never
+  resized by `JSTD` -- this touches no array bounds, only which slot
+  downstream readers select. `PrepareOptimization()`'s own `JSTD` (from
+  `fak_kali`/`fak_plus`) is only used to size the discrete-table bounds
+  check (`LoadBatasAtas()`/`nvb`/`nvk`) before being overwritten.
+- **Validation is the caller's responsibility, strictly**: index sizes
+  must exactly match `12*jum_balok`/`5*jum_kolom`, and each index must be
+  `< nvb[i]`/`nvk[i]` (the discrete table's own row count) -- both throw
+  `std::invalid_argument` rather than clamping or silently ignoring an
+  out-of-range value, since an Analyze-mode design is something the user
+  explicitly chose and should never have the engine quietly alter.
+- **Deliberately does NOT run `EvaluateCandidateFull()`'s adaptive
+  stirrup-tightening** (the per-generation population-evaluation loop's
+  behavior, see `CostConstraint.h`'s note on why `KendalaHarga()` also
+  differs from it) -- `ComputeMemberResults()` uses the fixed
+  `var_b`/`var_k` exactly as given, so an Analyze-mode "Unsafe" verdict
+  reflects the user's actual chosen stirrup spacing, not a design the
+  engine silently tightened to pass.
+- **Verified, with a real methodology pitfall caught along the way**: a
+  standalone program linked directly against `orcisf_engine` fed a real
+  dataset's own optimized `var_b`/`var_k` (captured from a completed
+  `RunFullOptimization()` call against a scratch `Apl1-1` copy) into
+  `AnalyzeFixedDesign()`. The first comparison (against
+  `ComputeMemberResults(sd_run)` called directly on the just-finished
+  run's own `StructureData`) showed every beam's/column's `Kendala()`
+  mismatching by a small but real amount -- **not a bug in
+  `AnalyzeFixedDesign()`**, but this file's own documented "frozen slot"
+  quirk (`AnalysisResults.h`'s header comment, "Deliberate deviations"
+  below): `ComputeMemberResults()` reads `MLAP`/`MTUM_KI`/etc arrays
+  populated by whichever `Struktur()` call happened *last* (the search's
+  own frozen slot), not necessarily a fresh analysis of the JSTD-1 design
+  its dimensions/reinforcement actually came from -- so it isn't a valid
+  "ground truth" for a *freshly, self-consistently analyzed* design the
+  way `AnalyzeFixedDesign()` always produces. Confirmed by re-running
+  `Inersia()`+`Struktur()` explicitly for slot JSTD-1 (self-consistent,
+  the same thing `AnalyzeFixedDesign()` already does for its own slot 0)
+  before calling `ComputeMemberResults()` again: every field (width,
+  height, `harga`, `Kendala()`) then matched `AnalyzeFixedDesign()`'s
+  output exactly, including several `Kendala()` values shared bit-for-bit
+  across all four beams/columns (Apl1-1's tested configuration is
+  symmetric enough that this is a real property of the dataset, not a
+  test artifact). This is worth remembering for any *future* comparison
+  against a completed run's `ComputeMemberResults()` output too, not just
+  this one -- see `CHANGE_HISTORY.md`'s 2026-08-17 entry for the exact
+  numbers from both passes.
 
 ## Validation
 

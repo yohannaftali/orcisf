@@ -82,6 +82,24 @@ struct EditorOptions {
     // structural displacements so they're visible at building scale.
     bool show_deformed_shape = false;
     float deformation_scale = 50.f;
+
+    // Issue #71: 3D-viewport force diagram (N/V/M/T) ribbon overlay,
+    // additive to the existing 2D ForceDiagramPanel (#61) -- reuses the
+    // same per-member ForceDiagram data (SceneModel's MemberVisual::
+    // force_diagram, computed via gui::ComputeForceDiagram()). Only takes
+    // effect when at least one member in the scene has a non-empty
+    // force_diagram (i.e. the scene has analysis results) -- see
+    // ViewportPanel::Draw's overlay control, same disabled-toggle
+    // convention as show_deformed_shape above. `force_diagram_component`:
+    // 0=N (axial), 1=V (shear), 2=M (moment), 3=T (torsion) -- matches the
+    // order ForceDiagramPanel's own 4 stacked plots already use.
+    // `force_diagram_all_members`: false = only the currently selected
+    // member (the common case -- "inspect this member"); true = every
+    // member with data, for a whole-structure overview.
+    bool show_force_diagram = false;
+    int force_diagram_component = 2; // default to Moment (M) -- typically the most informative at a glance
+    float force_diagram_scale = 1e-4f;
+    bool force_diagram_all_members = false;
 };
 
 } // namespace orcisf::gui

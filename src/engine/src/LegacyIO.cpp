@@ -639,4 +639,112 @@ void WriteFinalResults(StructureData& sd, const DatasetPaths& paths) {
     hopt << "JSTD = (JVD*" << sd.fak_kali << ")+" << sd.fak_plus << "\n";
 }
 
+namespace {
+
+// Reads one "Jumlah <label> : <n>" header line's integer value, or returns
+// -1 if `line` isn't that header at all (caller keeps scanning).
+int ParseCountLine(const std::string& line, const char* label) {
+    if (line.rfind(label, 0) != 0) return -1;
+    size_t colon = line.find(':');
+    if (colon == std::string::npos) return -1;
+    try {
+        return std::stoi(line.substr(colon + 1));
+    } catch (const std::exception&) {
+        return -1;
+    }
+}
+
+} // namespace
+
+std::optional<AnalysisResults> ReadAnalysisResultsFromStr(const std::string& str_path) {
+    std::ifstream in(str_path);
+    if (!in.is_open()) return std::nullopt;
+
+    int m = 0, nj = 0;
+    std::string line;
+    bool found_displacements_header = false;
+    while (std::getline(in, line)) {
+        int mv = ParseCountLine(line, "Jumlah batang");
+        if (mv >= 0) m = mv;
+        int njv = ParseCountLine(line, "Jumlah titik kumpul");
+        if (njv >= 0) nj = njv;
+        if (line.find("Perpindahan Titik Kumpul") != std::string::npos) {
+            found_displacements_header = true;
+            break;
+        }
+    }
+    if (!found_displacements_header || m <= 0 || nj <= 0) return std::nullopt;
+
+    AnalysisResults result;
+    result.has_applied_load = false; // .str has no applied-load section -- see LegacyIO.h's comment
+
+    if (!std::getline(in, line)) return std::nullopt; // "Titik  DJ1  DJ2 ..." column header
+
+    result.displacements.reserve(static_cast<size_t>(nj));
+    for (int i = 0; i < nj; ++i) {
+        if (!std::getline(in, line)) return std::nullopt;
+        std::istringstream iss(line);
+        JointDisplacement d;
+        iss >> d.no_joint >> d.ux >> d.uy >> d.uz >> d.rx >> d.ry >> d.rz;
+        if (iss.fail()) return std::nullopt;
+        result.displacements.push_back(d);
+    }
+
+    bool found_forces_header = false;
+    while (std::getline(in, line)) {
+        if (line.find("Gaya Ujung Batang") != std::string::npos) {
+            found_forces_header = true;
+            break;
+        }
+    }
+    if (!found_forces_header) return std::nullopt;
+    if (!std::getline(in, line)) return std::nullopt; // "Batang  AM1..AM12" column header
+
+    result.member_forces.reserve(static_cast<size_t>(m));
+    for (int i = 0; i < m; ++i) {
+        if (!std::getline(in, line)) return std::nullopt;
+        std::istringstream iss(line);
+        MemberForces f;
+        float am[12];
+        iss >> f.no_batang;
+        for (float& v : am) iss >> v;
+        if (iss.fail()) return std::nullopt;
+        f.axial_a = am[0];
+        f.shear_y_a = am[1];
+        f.shear_z_a = am[2];
+        f.torsion_a = am[3];
+        f.moment_y_a = am[4];
+        f.moment_z_a = am[5];
+        f.axial_b = am[6];
+        f.shear_y_b = am[7];
+        f.shear_z_b = am[8];
+        f.torsion_b = am[9];
+        f.moment_y_b = am[10];
+        f.moment_z_b = am[11];
+        // w_total_n_per_m: not present in .str -- see LegacyIO.h's comment.
+        result.member_forces.push_back(f);
+    }
+
+    bool found_reactions_header = false;
+    while (std::getline(in, line)) {
+        if (line.find("Reaksi Tumpuan") != std::string::npos) {
+            found_reactions_header = true;
+            break;
+        }
+    }
+    if (!found_reactions_header) return std::nullopt;
+    if (!std::getline(in, line)) return std::nullopt; // "Titik   AR1..AR6" column header
+
+    while (std::getline(in, line)) {
+        if (line.empty()) break;
+        std::istringstream iss(line);
+        JointReaction r;
+        iss >> r.no_joint >> r.fx >> r.fy >> r.fz >> r.mx >> r.my >> r.mz;
+        if (iss.fail()) break; // trailing blank/EOF line, not a real row
+        result.reactions.push_back(r);
+    }
+
+    return result;
+}
+
 } // namespace orcisf::engine

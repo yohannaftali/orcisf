@@ -25,9 +25,14 @@ public:
     // `show_deformed_shape` (only meaningful when `scene.has_deformation`
     // -- caller gates this, see ViewportPanel::Draw) overlays a
     // `deformation_scale`-exaggerated deformed shape alongside the
-    // (always-drawn) undeformed structure.
+    // (always-drawn) undeformed structure. Issue #71: `show_force_diagram`
+    // overlays a `force_diagram_scale`-exaggerated N/V/M/T ribbon
+    // (`force_diagram_component`: 0=N,1=V,2=M,3=T) for `selected_member`
+    // alone, or every member with force_diagram data when
+    // `force_diagram_all_members` is true.
     unsigned int Render(const SceneModel& scene, const Camera& camera, int width, int height, int selected_member,
-                         bool show_deformed_shape, float deformation_scale);
+                         bool show_deformed_shape, float deformation_scale, bool show_force_diagram,
+                         int force_diagram_component, float force_diagram_scale, bool force_diagram_all_members);
 
 private:
     void EnsureGLObjects();
@@ -53,6 +58,16 @@ private:
     // undeformed structure already drawn in Render(), in a color used
     // nowhere else in this renderer so it always reads as overlay data.
     void DrawDeformedShape(const SceneModel& scene, float scale, const float* view_proj);
+    // Issue #71: N/V/M/T ribbon overlay -- an offset polyline (DrawBox
+    // segments, same idiom) tracing `component`'s value along each
+    // qualifying member's span, offset perpendicular to the member's own
+    // local axis (the same axis_y DrawBox() derives internally) by
+    // `value * scale`, plus a short stem at each end connecting the
+    // ribbon back to the member's baseline so it reads as a diagram
+    // anchored to the structure rather than a floating line. `component`:
+    // 0=N,1=V,2=M,3=T, matching ForceDiagramSample's field order.
+    void DrawForceDiagramOverlay(const SceneModel& scene, int selected_member, bool all_members, int component,
+                                  float scale, const float* view_proj);
 
     bool gl_objects_ready_ = false;
     unsigned int shader_program_ = 0;

@@ -15,6 +15,7 @@
 #include "engine/Engine.h"
 #include "engine/LegacyIO.h"
 #include "engine/MemberResults.h"
+#include "engine/Optimizer.h"
 #include "report/PdfExport.h"
 #include "report/ResultsCsvExport.h"
 #include "report/TextExport.h"
@@ -76,6 +77,10 @@ Application::Application() {
     run_panel_.SetLogSink([this](std::string line) { log_panel_.AddLine(std::move(line)); });
     run_panel_.SetOnResult([this](engine::StructureData sd, std::string dataset_path, std::string output_path) {
         OnRunResult(std::move(sd), std::move(dataset_path), std::move(output_path));
+    });
+    analyze_panel_.SetOnRunRequested([this](const engine::OptimizationOptions& options, const std::vector<int>& var_b,
+                                             const std::vector<int>& var_k) {
+        OnAnalyzeRunRequested(options, var_b, var_k);
     });
     toolbar_.SetOnNewData([this]() { OnNewDataRequested(); });
     toolbar_.SetOnSave([this]() { OnSaveRequested(); });
@@ -158,7 +163,8 @@ void Application::OnSaveAsRequested() {
 }
 
 void Application::LoadStructure(engine::StructureData sd, const std::vector<engine::MemberResult>* results,
-                                 std::string dataset_path, const engine::AnalysisResults* analysis) {
+                                 std::string dataset_path, const engine::AnalysisResults* analysis,
+                                 bool is_from_optimize) {
     loaded_sd_ = std::move(sd);
     loaded_dataset_path_ = std::move(dataset_path);
     editable_.emplace(loaded_sd_);
@@ -167,9 +173,10 @@ void Application::LoadStructure(engine::StructureData sd, const std::vector<engi
     editor_options_.connect_mode = false;
     editor_options_.connect_first_joint = -1;
 
-    has_run_results_ = (results != nullptr);
+    has_run_results_ = (results != nullptr) && is_from_optimize; // issue #69: see LoadStructure()'s header comment
     current_results_ = results ? *results : std::vector<engine::MemberResult>{};
     current_analysis_ = analysis ? *analysis : engine::AnalysisResults{};
+    has_analysis_results_ = (analysis != nullptr); // issue #66: broader than has_run_results_, see its own comment
 
     scene_ = gui::BuildSceneModel(loaded_sd_, results, loaded_dataset_path_, &editable_->MemberTypeOverrides(),
                                    analysis);
@@ -182,6 +189,7 @@ void Application::RebuildSceneAfterEdit() {
     has_run_results_ = false;
     current_results_.clear();
     current_analysis_ = engine::AnalysisResults{};
+    has_analysis_results_ = false;
     scene_ = gui::BuildSceneModel(loaded_sd_, nullptr, loaded_dataset_path_, &editable_->MemberTypeOverrides());
     validation_issues_ = editable_->Validate();
 }
@@ -208,8 +216,22 @@ void Application::OnOpenFolderRequested() {
             // set, not ReadLoads()'s self-weight-inflated in-memory state
             // (see engine::ReadLoadsRaw()'s comment).
             engine::ReadLoadsRaw(sd, paths.bbn);
-            LoadStructure(std::move(sd), nullptr, *generic);
+
+            // Issue #66: if a completed run already left a .str next to
+            // this dataset, load its analysis results too, so Force
+            // Diagrams/Results show real data immediately instead of their
+            // "run first" placeholder. Scoped to AnalysisResults only --
+            // .str has no reinforcement/RC-design data (that's .opt/.kdl,
+            // out of scope here), so has_run_results_ deliberately stays
+            // false (LoadStructure's `results` stays nullptr) -- PDF/CSV
+            // export and .opt/.str/.kdl/.inf text export still correctly
+            // require a real completed run, not a reopened one.
+            std::optional<engine::AnalysisResults> str_analysis = engine::ReadAnalysisResultsFromStr(paths.str);
+            LoadStructure(std::move(sd), nullptr, *generic, str_analysis ? &*str_analysis : nullptr);
             log_panel_.AddLine("Loaded dataset: " + *generic);
+            if (str_analysis) {
+                log_panel_.AddLine("Loaded saved analysis results from: " + paths.str);
+            }
         } catch (const std::exception& e) {
             log_panel_.AddLine(std::string("Failed to load dataset: ") + e.what());
         }
@@ -396,6 +418,29 @@ void Application::OnExportResultsCsvRequested() {
     }
 }
 
+void Application::OnAnalyzeRunRequested(const engine::OptimizationOptions& options, const std::vector<int>& var_b,
+                                         const std::vector<int>& var_k) {
+    if (!editable_) return;
+
+    // Run against a *copy* of loaded_sd_, not loaded_sd_ itself -- if
+    // AnalyzeFixedDesign() throws (a size/range mismatch, see its own
+    // header comment) or the caller cancels mid-edit, the live editor
+    // state must stay untouched. Only commit the mutated copy back via
+    // LoadStructure() on success, matching how OnRunResult() already
+    // treats a freshly-run StructureData as a new "loaded" one.
+    engine::StructureData sd_copy = loaded_sd_;
+    try {
+        engine::AnalyzeResult result = engine::AnalyzeFixedDesign(sd_copy, options, var_b, var_k);
+        analyze_panel_.SetError("");
+        LoadStructure(std::move(sd_copy), &result.member_results, loaded_dataset_path_, &result.analysis,
+                      /*is_from_optimize=*/false);
+        log_panel_.AddLine("Analyze: design check complete.");
+    } catch (const std::exception& e) {
+        analyze_panel_.SetError(std::string("Analyze failed: ") + e.what());
+        log_panel_.AddLine(std::string("Analyze failed: ") + e.what());
+    }
+}
+
 namespace {
 
 // Issue #15's "Default" preset -- exactly the single fixed layout this app
@@ -418,6 +463,7 @@ void BuildDefaultLayout(ImGuiID dock_main) {
     // comment there, established by issue #36).
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kPropertiesId).c_str(), dock_right);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kRunOptimizationId).c_str(), dock_right);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kAnalyzeId).c_str(), dock_right); // issue #69, epic #67
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLogId).c_str(), dock_right);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kResultsId).c_str(), dock_right); // issue #62
     // Issue #36: tab order (Joints, Members, Loads) comes from OnFrame().
@@ -444,6 +490,7 @@ void BuildDesignLayout(ImGuiID dock_main) {
     // OnFrame()'s Draw() call order, same convention as #36 below.
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kPropertiesId).c_str(), dock_right);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kRunOptimizationId).c_str(), dock_right);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kAnalyzeId).c_str(), dock_right); // issue #69, epic #67
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLogId).c_str(), dock_right);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kResultsId).c_str(), dock_right); // issue #62
     // Issue #36: tab order (Joints, Members, Loads) comes from OnFrame().
@@ -465,6 +512,7 @@ void BuildOptimizationLayout(ImGuiID dock_main) {
         ImGui::DockBuilderSplitNode(dock_right, ImGuiDir_Down, 0.5f, nullptr, &dock_right);
 
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kRunOptimizationId).c_str(), dock_main);
+    ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kAnalyzeId).c_str(), dock_main); // issue #69, epic #67
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kLogId).c_str(), dock_main);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kViewportId).c_str(), dock_right);
     ImGui::DockBuilderDockWindow(gui::PanelWindowId(gui::kDetailingId).c_str(), dock_right);
@@ -546,6 +594,7 @@ void Application::OnFrame() {
     panel_visibility.log = &log_open_;
     panel_visibility.force_diagram = &force_diagram_open_; // issue #61
     panel_visibility.results = &results_open_;              // issue #62
+    panel_visibility.analyze = &analyze_open_;              // issue #69, epic #67
 
     toolbar_.Draw(undo_stack_.CanUndo(), undo_stack_.CanRedo(), can_save, can_export_text, can_export_pdf,
                   can_export_inf, current_layout_, editor_options_, icon_visibility_, panel_visibility);
@@ -620,18 +669,26 @@ void Application::OnFrame() {
         detailing_panel_.Draw(&detailing_open_, scene_, selection_);
     }
     if (force_diagram_open_) {
-        // issue #61: nullptr when the loaded scene has no completed
-        // run's results (current_analysis_ is default-constructed/empty
-        // in that state, same has_run_results_-gated lifetime as
-        // current_results_ -- see LoadStructure()/RebuildSceneAfterEdit()).
+        // issue #61/#66: nullptr when the loaded scene has no analysis
+        // results at all -- either a completed run (has_run_results_) or a
+        // saved .str reloaded via Open Data (has_analysis_results_ alone,
+        // see Application.h's comment) both count.
         force_diagram_panel_.Draw(&force_diagram_open_, scene_, selection_,
-                                   has_run_results_ ? &current_analysis_ : nullptr);
+                                   has_analysis_results_ ? &current_analysis_ : nullptr);
     }
     if (results_open_) {
-        results_panel_.Draw(&results_open_, scene_, selection_, has_run_results_ ? &current_analysis_ : nullptr);
+        results_panel_.Draw(&results_open_, scene_, selection_,
+                             has_analysis_results_ ? &current_analysis_ : nullptr);
     }
     if (run_open_) {
         run_panel_.Draw(&run_open_);
+    }
+    if (analyze_open_) {
+        // issue #69: sd is nullptr (not just editable_ptr's own presence)
+        // guards the panel showing an empty/meaningless discrete-table
+        // dropdown set before anything is loaded, same convention as
+        // force_diagram_open_/results_open_ above.
+        analyze_panel_.Draw(&analyze_open_, editable_ ? &editable_->SdForUndo() : nullptr, scene_, selection_);
     }
     if (log_open_) {
         log_panel_.Draw(&log_open_);

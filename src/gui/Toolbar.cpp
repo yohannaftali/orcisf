@@ -222,6 +222,7 @@ void Toolbar::Draw(bool can_undo, bool can_redo, bool can_save, bool can_export_
                 if (panel_visibility.properties) ImGui::MenuItem("Properties", nullptr, panel_visibility.properties);
                 if (panel_visibility.optimization)
                     ImGui::MenuItem("Optimization", nullptr, panel_visibility.optimization);
+                if (panel_visibility.analyze) ImGui::MenuItem("Analyze", nullptr, panel_visibility.analyze);
                 if (panel_visibility.joints) ImGui::MenuItem("Joints", nullptr, panel_visibility.joints);
                 if (panel_visibility.members) ImGui::MenuItem("Members", nullptr, panel_visibility.members);
                 if (panel_visibility.loads) ImGui::MenuItem("Loads", nullptr, panel_visibility.loads);

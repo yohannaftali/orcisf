@@ -41,6 +41,16 @@ SceneModel BuildSceneModel(const StructureData& sd, const std::vector<MemberResu
         return it != disp_by_joint.end() ? it->second : Vec3{0.f, 0.f, 0.f};
     };
 
+    // Issue #71: no_batang -> MemberForces, for the viewport force-diagram
+    // ribbon overlay -- same lookup-by-id convention as disp_by_joint above
+    // (a .str-loaded AnalysisResults, #66, may not cover every member).
+    std::unordered_map<int, const engine::MemberForces*> forces_by_batang;
+    if (analysis) {
+        for (const engine::MemberForces& f : analysis->member_forces) {
+            forces_by_batang[f.no_batang] = &f;
+        }
+    }
+
     Vec3 min_pt{std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
                 std::numeric_limits<float>::max()};
     Vec3 max_pt{-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max(),
@@ -97,6 +107,20 @@ SceneModel BuildSceneModel(const StructureData& sd, const std::vector<MemberResu
             mv.height_m = std::max(0.05f, it->second->height / 1000.f);
             mv.kendala = it->second->Kendala();
         }
+
+        // Issue #71: width_mm/height_mm must be 0 (not mv.width_m/height_m's
+        // 0.3m *placeholder* default) when this member has no real
+        // MemberResult yet -- passing the placeholder would fabricate a
+        // has_section=true stress reading for a section that was never
+        // actually designed. N/V/M/T themselves don't need a section at
+        // all (has_section only gates the stress columns).
+        auto force_it = forces_by_batang.find(i);
+        if (force_it != forces_by_batang.end()) {
+            float width_mm = mv.has_results ? mv.width_m * 1000.f : 0.f;
+            float height_mm = mv.has_results ? mv.height_m * 1000.f : 0.f;
+            mv.force_diagram = ComputeForceDiagram(*force_it->second, len, width_mm, height_mm);
+        }
+
         scene.members.push_back(mv);
 
         if (sd.W[i] != 0.f) {

@@ -125,6 +125,16 @@ struct AnalysisResults {
     // for the same dof for a global-equilibrium check -- the two should
     // be equal and opposite (sum to ~0).
     float total_applied_load[6] = {0.f, 0.f, 0.f, 0.f, 0.f, 0.f};
+
+    // Issue #66: false when this AnalysisResults was reconstructed from a
+    // saved .str file rather than freshly computed from a live sd (the
+    // .str format -- WriteStrukturSection() -- has no applied-load
+    // section at all, only displacements/member-forces/reactions, so
+    // total_applied_load can't be derived from it). GUI consumers (see
+    // ResultsPanel.cpp's DrawEquilibriumTable()) must check this before
+    // showing the Global Equilibrium Check table, rather than displaying
+    // a misleading all-zero "applied load" column.
+    bool has_applied_load = true;
 };
 
 // Captures sd.AM/DJ/AR into GUI-friendly structs.

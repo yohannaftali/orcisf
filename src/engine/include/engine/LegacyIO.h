@@ -1,8 +1,10 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
+#include "engine/AnalysisResults.h"
 #include "engine/StructureData.h"
 
 // Port of the file I/O in Optimasi Beton/Source/InOut.hpp (baca_data),
@@ -107,5 +109,26 @@ void ReadDataset(StructureData& sd, const DatasetPaths& paths);
 // be called after an optimization run has populated sd.var_b/var_k and
 // sorted sd.fitstr/kendalastr/hargastr (best at index JSTD-1).
 void WriteFinalResults(StructureData& sd, const DatasetPaths& paths);
+
+// Issue #66: reads a previously-written .str file (WriteStrukturSection()'s
+// "Perpindahan Titik Kumpul"/"Gaya Ujung Batang"/"Reaksi Tumpuan" sections)
+// back into an AnalysisResults, so reopening a dataset that already has a
+// completed run's .str sitting on disk can show its real forces/
+// displacements/reactions without requiring a fresh Run. Returns
+// std::nullopt if `str_path` doesn't exist or doesn't parse as this
+// format -- both are ordinary, expected outcomes (a never-run or since-
+// edited dataset has no .str, or has a stale one from before a geometry
+// edit changed M/NJ), not an error the caller needs to report loudly.
+//
+// Scope note: the .str format has no applied-load section at all (see
+// WriteStrukturSection() -- only displacements/member-forces/reactions
+// are written), so the returned AnalysisResults::total_applied_load stays
+// zeroed and has_applied_load is set false; member_forces' w_total_n_per_m
+// (needed by gui::ComputeForceDiagram(), issue #61) is also unavailable
+// from .str alone and stays zeroed -- both are documented gaps, not bugs.
+// RC-design fields (MemberResult's reinforcement/capacity) live in
+// .opt/.kdl, not .str, and are out of scope for this reader entirely (see
+// issue #66's own acceptance criteria).
+std::optional<AnalysisResults> ReadAnalysisResultsFromStr(const std::string& str_path);
 
 } // namespace orcisf::engine

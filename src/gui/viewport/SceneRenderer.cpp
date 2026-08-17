@@ -307,8 +307,59 @@ void SceneRenderer::DrawDeformedShape(const SceneModel& scene, float scale, cons
     }
 }
 
+// Issue #71: bright amber/gold-orange, used nowhere else in this renderer's
+// palette (grid = dark cobalt, deformed shape = cyan, restrained joints =
+// orange -- close but not identical; kRestraintColor is a warmer, more
+// saturated orange, see the values below) so a force-diagram ribbon always
+// reads as overlay data distinct from every other viewport element. See
+// AGENTS.md's viewport-color cross-check note before picking another one.
+void SceneRenderer::DrawForceDiagramOverlay(const SceneModel& scene, int selected_member, bool all_members,
+                                             int component, float scale, const float* view_proj) {
+    static constexpr float kDiagramColor[4] = {0.95f, 0.70f, 0.15f, 1.f};
+    constexpr float kLineThickness = 0.02f;
+    constexpr float kStemThickness = 0.015f;
+
+    for (const MemberVisual& mv : scene.members) {
+        if (mv.force_diagram.samples.empty()) continue;
+        if (!all_members && mv.no_batang != selected_member) continue;
+
+        Vec3 delta = mv.b - mv.a;
+        float length = delta.Length();
+        if (length < 1e-5f) continue;
+        Vec3 axis_x = delta * (1.f / length);
+        Vec3 reference = (std::fabs(Dot(axis_x, Vec3{0, 1, 0})) > 0.99f) ? Vec3{0, 0, 1} : Vec3{0, 1, 0};
+        Vec3 axis_z = Cross(axis_x, reference).Normalized();
+        Vec3 axis_y = Cross(axis_z, axis_x).Normalized();
+
+        auto value_at = [component](const ForceDiagramSample& s) -> float {
+            switch (component) {
+                case 0: return s.n_n;
+                case 1: return s.v_n;
+                case 2: return s.m_nm;
+                default: return s.t_nm;
+            }
+        };
+        auto point_at = [&](const ForceDiagramSample& s) -> Vec3 {
+            return mv.a + axis_x * s.x_m + axis_y * (value_at(s) * scale);
+        };
+
+        const std::vector<ForceDiagramSample>& samples = mv.force_diagram.samples;
+        for (size_t i = 0; i + 1 < samples.size(); ++i) {
+            DrawBox(point_at(samples[i]), point_at(samples[i + 1]), kLineThickness, kLineThickness, kDiagramColor,
+                    view_proj);
+        }
+        // Stems anchoring the ribbon's two ends back to the member's own
+        // baseline, so it reads as a diagram attached to the structure
+        // rather than a disconnected floating line.
+        DrawBox(mv.a, point_at(samples.front()), kStemThickness, kStemThickness, kDiagramColor, view_proj);
+        DrawBox(mv.b, point_at(samples.back()), kStemThickness, kStemThickness, kDiagramColor, view_proj);
+    }
+}
+
 unsigned int SceneRenderer::Render(const SceneModel& scene, const Camera& camera, int width, int height,
-                                    int selected_member, bool show_deformed_shape, float deformation_scale) {
+                                    int selected_member, bool show_deformed_shape, float deformation_scale,
+                                    bool show_force_diagram, int force_diagram_component, float force_diagram_scale,
+                                    bool force_diagram_all_members) {
     EnsureGLObjects();
     EnsureFramebuffer(width, height);
 
@@ -365,6 +416,11 @@ unsigned int SceneRenderer::Render(const SceneModel& scene, const Camera& camera
 
     if (show_deformed_shape && scene.has_deformation) {
         DrawDeformedShape(scene, deformation_scale, view_proj.m);
+    }
+
+    if (show_force_diagram) {
+        DrawForceDiagramOverlay(scene, selected_member, force_diagram_all_members, force_diagram_component,
+                                 force_diagram_scale, view_proj.m);
     }
 
     glBindVertexArray(0);

@@ -16,7 +16,7 @@
 // IconToolbar.cpp / ViewportPanel.cpp's UCS icon).
 namespace orcisf::gui {
 
-enum class PanelIcon { Viewport, Detailing, Properties, Joints, Members, Loads, Run, Log, ForceDiagram, Results };
+enum class PanelIcon { Viewport, Detailing, Properties, Joints, Members, Loads, Run, Log, ForceDiagram, Results, Analyze };
 
 // Draws `icon` into `dl`, `size`x`size` pixels, top-left corner at `origin`.
 // `size` is the caller's responsibility to DPI-scale (via gui::Scaled()) --

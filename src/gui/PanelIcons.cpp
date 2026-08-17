@@ -98,6 +98,15 @@ void DrawForceDiagramIcon(ImDrawList* dl, ImVec2 o, ImU32 c, float size) {
     dl->AddPolyline(pts, 4, c, 0, 1.5f);
 }
 
+void DrawAnalyzeIcon(ImDrawList* dl, ImVec2 o, ImU32 c, float size) {
+    // Issue #69: a checkmark inside a box -- "check this design", distinct
+    // from DrawResultsIcon's grid (no dividers here) and DrawRunIcon's play
+    // triangle (a search/optimize action, not a pass/fail check).
+    dl->AddRect(P(o, 0.15f, 0.15f, size), P(o, 0.85f, 0.85f, size), c, 0.f, 0, 1.1f);
+    ImVec2 pts[3] = {P(o, 0.28f, 0.5f, size), P(o, 0.45f, 0.68f, size), P(o, 0.75f, 0.32f, size)};
+    dl->AddPolyline(pts, 3, c, 0, 1.4f);
+}
+
 } // namespace
 
 // Issue #54: lid + handle + can body with two rib lines -- a standard
@@ -126,6 +135,7 @@ void DrawPanelIcon(PanelIcon icon, ImDrawList* dl, ImVec2 origin, ImU32 color, f
         case PanelIcon::Log: DrawLogIcon(dl, origin, color, size); break;
         case PanelIcon::ForceDiagram: DrawForceDiagramIcon(dl, origin, color, size); break;
         case PanelIcon::Results: DrawResultsIcon(dl, origin, color, size); break;
+        case PanelIcon::Analyze: DrawAnalyzeIcon(dl, origin, color, size); break;
     }
 }
 

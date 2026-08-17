@@ -31,13 +31,14 @@ struct Entry {
 // rename needed no change on this side. Keep this table in sync with
 // whichever gui::kXxxId constants Application.cpp's panels currently
 // pass to PanelWindowTitle().
-constexpr std::array<Entry, 10> kPanels = {{
+constexpr std::array<Entry, 11> kPanels = {{
     {gui::kViewportId, gui::PanelIcon::Viewport},
     {gui::kDetailingId, gui::PanelIcon::Detailing},
     {gui::kForceDiagramId, gui::PanelIcon::ForceDiagram}, // issue #61
     {gui::kResultsId, gui::PanelIcon::Results},           // issue #62
     {gui::kPropertiesId, gui::PanelIcon::Properties},
     {gui::kRunOptimizationId, gui::PanelIcon::Run},
+    {gui::kAnalyzeId, gui::PanelIcon::Analyze}, // issue #69, epic #67
     {gui::kJointsId, gui::PanelIcon::Joints},
     {gui::kMembersId, gui::PanelIcon::Members},
     {gui::kLoadsId, gui::PanelIcon::Loads},

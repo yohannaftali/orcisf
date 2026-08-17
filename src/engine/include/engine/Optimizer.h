@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "engine/AnalysisResults.h"
+#include "engine/MemberResults.h"
 #include "engine/StructureData.h"
 
 // Port of the "Flexible Polyhedron" direct-search optimizer: Polyhedron.hpp
@@ -117,5 +119,38 @@ void RunOptimization(StructureData& sd, const OptimizationOptions& options, cons
 // (periksa_batang-based beam/column split, JVD, JSTD). Call once after
 // loading the dataset and before RunOptimization().
 void PrepareOptimization(StructureData& sd, const OptimizationOptions& options);
+
+// Issue #68 (epic #67 -- manual-dimension "Analyze" mode): runs analysis +
+// the existing RC design-check logic against a single, caller-supplied
+// design-variable set -- no Flexible Polyhedron search, no population, no
+// cost minimization. Formalizes the ad hoc pattern orcisf_cli's
+// CmdEquilibrium() already used (write to population slot 0, call
+// Inersia()+Struktur() directly) into a real, documented, reusable engine
+// entry point.
+struct AnalyzeResult {
+    std::vector<MemberResult> member_results; // one per beam/column, via ComputeMemberResults()
+    AnalysisResults analysis;                 // via ComputeAnalysisResults()
+};
+
+// `sd` must already have a dataset loaded (LegacyIO::ReadDataset +
+// ReadLoads/ReadLoadsRaw), the same precondition RunOptimization() has.
+// Calls PrepareOptimization(sd, options) itself -- the caller must NOT
+// call it first (harmless if already called, since PrepareOptimization
+// only re-derives sd.jum_balok/jum_kolom/JVD/JSTD from sd.M's live
+// PeriksaBatang() classification, but redundant).
+//
+// var_b/var_k: flat, 0-based design-variable index arrays, the exact
+// [jsum + 12*isum] / [jsum + 5*isum] layout OptimizationOptions::
+// seed_var_b/seed_var_k already use (12 slots per beam, 5 per column, in
+// sd.no_balok/no_kolom order -- see AGENTS.md's "Discrete design
+// variables" section). Sizes must be exactly 12*jum_balok / 5*jum_kolom
+// (only known once this function's own PrepareOptimization() call has
+// run) and every index must be within its discrete table's own upper
+// bound -- both throw std::invalid_argument rather than silently
+// clamping or writing out of bounds, since a manually-chosen Analyze-mode
+// design should never be altered by the engine without the caller
+// knowing.
+AnalyzeResult AnalyzeFixedDesign(StructureData& sd, const OptimizationOptions& options, const std::vector<int>& var_b,
+                                  const std::vector<int>& var_k);
 
 } // namespace orcisf::engine

@@ -2690,12 +2690,12 @@ later, different one (e.g. closing an issue or cutting a release).
 | #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open, unreproduced (coder investigated 2026-08-17: 18/18 clean repros incl. the exact threading pattern, no hang; best-effort hypothesis is resource contention with concurrent automation tooling that night, not a code defect -- see AGENTS.md's #63 note and the GitHub comment) | 2026-08-17 |
 | #64 | docs(src): fix pre-existing "Nmm" mislabeling -- AM moment/torsion fields are actually N*m | open | 2026-08-17 |
 | #65 | bug(src): fak_plus=0/fak_kali=1 causes an out-of-bounds fitstr[-1] read in RunOptimization() | open (found while investigating #63, unrelated/unconfirmed to be its cause) | 2026-08-17 |
-| #66 | feat(src): load analysis results from saved .str file on Open Data | open | 2026-08-17 |
-| #67 | epic(src): manual-dimension "Analyze" mode (design check without cost optimization) | open | 2026-08-17 |
-| #68 | feat(src): engine analyze-only entry point (fixed-design analysis, no optimization search) | open | 2026-08-17 |
-| #69 | feat(src): per-member manual dimension input panel for Analyze mode | open | 2026-08-17 |
-| #70 | feat(src): Analyze-mode design-check results display (demand vs. capacity, safe/unsafe) | open | 2026-08-17 |
-| #71 | feat(src): 3D-viewport force diagram overlay (N/V/M/T ribbons on the structure) | open | 2026-08-17 |
+| #66 | feat(src): load analysis results from saved .str file on Open Data | ready-for-review (coder: implemented + engine-level verified overnight, see AGENTS.md's own section; not yet tester/reviewer-passed) | 2026-08-17 |
+| #67 | epic(src): manual-dimension "Analyze" mode (design check without cost optimization) | ready-for-review (all 3 sub-issues #68-#70 implemented overnight; epic stays open until tester/reviewer pass) | 2026-08-17 |
+| #68 | feat(src): engine analyze-only entry point (fixed-design analysis, no optimization search) | ready-for-review (coder: implemented + engine-level verified overnight, see AGENTS.md's own section; not yet tester/reviewer-passed) | 2026-08-17 |
+| #69 | feat(src): per-member manual dimension input panel for Analyze mode | ready-for-review (coder: implemented + compiled overnight, combined into one AnalyzePanel with #70, see AGENTS.md's own section; GUI not interactively exercised yet) | 2026-08-17 |
+| #70 | feat(src): Analyze-mode design-check results display (demand vs. capacity, safe/unsafe) | ready-for-review (coder: implemented + compiled overnight, combined into one AnalyzePanel with #69, see AGENTS.md's own section; GUI not interactively exercised yet) | 2026-08-17 |
+| #71 | feat(src): 3D-viewport force diagram overlay (N/V/M/T ribbons on the structure) | ready-for-review (coder: implemented + compiled overnight, see AGENTS.md's own section; GUI not interactively exercised yet) | 2026-08-17 |
 
 Epic #67 tracks #68–#70 (manual-dimension "Analyze" mode: engine
 entry point, GUI input panel, GUI results display — reuses the
@@ -2934,6 +2934,239 @@ before touching `ResultsPanel.{h,cpp}` or
 list panel (editable, cascade-delete-with-warning), 2D plane-locked
 orthographic drawing (X-Y/X-Z/Y-Z with adjustable offset), and the UCS
 icon overlay — see each issue's own "read before touching" section above.
+
+**`.str` result loading on Open Data (issue #66) — read before touching
+`engine::ReadAnalysisResultsFromStr()`/`Application`'s `has_analysis_results_`
+flag:**
+- **`engine::ReadAnalysisResultsFromStr()`** (`LegacyIO.{h,cpp}`) parses
+  `WriteStrukturSection()`'s exact output format back into an
+  `AnalysisResults` -- scans for the "Jumlah batang"/"Jumlah titik
+  kumpul" header lines for `M`/`NJ`, then reads exactly that many rows
+  from "Perpindahan Titik Kumpul"/"Gaya Ujung Batang", and however many
+  rows precede the next blank line from "Reaksi Tumpuan" (only restrained
+  joints are written there, a variable count). Returns `std::nullopt` --
+  never throws -- for a missing file or unparseable content, since a
+  never-run or since-edited dataset having no usable `.str` is the
+  ordinary case, not an error.
+- **Deliberately does NOT populate `total_applied_load`/
+  `w_total_n_per_m`.** The `.str` format has no applied-load section at
+  all (only displacements/member-forces/reactions), so
+  `AnalysisResults::has_applied_load` (new field) is set `false` for a
+  `.str`-sourced result -- `ResultsPanel`'s `DrawEquilibriumTable()`
+  checks this and shows an explanatory disabled message instead of a
+  misleading all-zero "applied load" column. `MemberForces::
+  w_total_n_per_m` similarly stays zero, which `gui::ComputeForceDiagram()`
+  already handles (a diagram with no distributed load term -- V(x)
+  constant, M(x) linear -- rather than a wrong one from guessing at a raw
+  `sd.W` value that wouldn't match what actually produced the `.str`
+  reactions, since raw loads and self-weight-inclusive loads differ, see
+  `ReadLoadsRaw()`'s own comment).
+- **`Application::has_analysis_results_`** (new, separate from
+  `has_run_results_`) is the real design decision here: `.str` loading
+  must make Force Diagrams (#61)/Results (#62) show real data, but must
+  *not* make PDF/CSV export or the `.opt/.str/.kdl/.inf` portion of text
+  export think a real optimization run exists (those files' own headers
+  print "Hasil Optimasi Beton..."/"Metoda Optimasi: Flexible Polyhedron",
+  which would be a false claim for data that was only ever *reloaded*,
+  never *computed by this session*). `LoadStructure()`'s
+  `has_run_results_ = (results != nullptr) && is_from_optimize` (see
+  issue #69's note below -- the same `is_from_optimize` parameter serves
+  both issues) keeps these two flags independently correct.
+  `force_diagram_open_`/`results_open_`'s `Draw()` calls in
+  `Application::OnFrame()` now gate on `has_analysis_results_`, not
+  `has_run_results_`.
+- **RC-design fields (reinforcement, capacity, `kendala`) are explicitly
+  out of scope** -- they live in `.opt`/`.kdl`, not `.str`. Loading those
+  back into a `MemberResult` too (so Properties/Detailing/viewport
+  coloring also work on a reopened dataset) is flagged in the issue body
+  as a natural follow-up, not done here.
+- **Verification status:** engine-level round-trip verified with a
+  standalone program linked directly against `orcisf_engine` (not the
+  GUI): ran a real optimization against a scratch `Apl1-1` copy, then fed
+  its own freshly-written `.str` back through `ReadAnalysisResultsFromStr()`
+  and confirmed every displacement/member-force/reaction value matched
+  `ComputeAnalysisResults()` on the same post-run `StructureData` exactly
+  (float32 precision), `has_applied_load` was `false`, and a missing-file
+  path correctly returned `std::nullopt`. Compiled cleanly (zero
+  warnings); GUI launch confirmed (no crash). The actual File > Open
+  Data... flow loading a real `.str` and Force Diagrams/Results showing
+  it was **not** interactively exercised this pass (implemented
+  overnight per explicit user request to proceed autonomously without
+  interactive GUI automation) -- next `tester`/`reviewer` pass should
+  confirm this end-to-end.
+
+**Manual-dimension "Analyze" mode -- engine entry point (issue #68, epic
+#67) — read before touching `engine::AnalyzeFixedDesign()`:**
+- **Formalizes `orcisf_cli`'s existing `CmdEquilibrium()` pattern**
+  (write to population slot 0, call `Inersia()`+`Struktur()` directly,
+  skip `optimasi()`'s search loop entirely) into a real, documented,
+  reusable engine function -- see `engine/README.md`'s "Analyze mode"
+  section for the full writeup (why `sd.JSTD` is forced to `1`, the
+  validation contract, why it deliberately skips
+  `EvaluateCandidateFull()`'s adaptive stirrup-tightening).
+- **A real, non-obvious test-methodology trap, worth remembering for any
+  future comparison against a completed run's own `ComputeMemberResults()`
+  output**: the first verification attempt compared
+  `AnalyzeFixedDesign()`'s output against `ComputeMemberResults(sd_run)`
+  called directly on a just-finished `RunFullOptimization()`'s
+  `StructureData` -- every member's `Kendala()` mismatched. This was
+  **not** a bug in `AnalyzeFixedDesign()`; it was the already-documented
+  "frozen slot" quirk (`AnalysisResults.h`'s header comment): `sd_run`'s
+  `MLAP`/`MTUM_KI`/etc arrays reflect whichever `Struktur()` call ran
+  *last* (the search's own frozen slot), not necessarily a fresh
+  self-consistent analysis of the `JSTD-1` design its dimensions came
+  from. Re-running `Inersia()`+`Struktur()` explicitly for slot `JSTD-1`
+  before calling `ComputeMemberResults()` again (self-consistent, the
+  same thing `AnalyzeFixedDesign()` already does for its own slot)
+  produced an exact match instead. **A completed run's own
+  `ComputeMemberResults()` output is not a valid "ground truth" for a
+  freshly, self-consistently analyzed design** -- don't reach for it as
+  a reference again without this caveat.
+- **Verification status:** a standalone program linked directly against
+  `orcisf_engine` fed a real dataset's (`Apl1-1`) own optimized
+  `var_b`/`var_k` into `AnalyzeFixedDesign()` and confirmed every
+  `MemberResult` field (width, height, `harga`, `Kendala()`) matched the
+  self-consistent reference above exactly, including several `Kendala()`
+  values shared bit-for-bit across all four beams and all four columns
+  (`Apl1-1` is a simple symmetric 1-story square portal frame -- 4
+  corner columns, 4 top beams, confirmed via `orcisf_cli info`'s
+  coordinates -- so identical `Kendala()` per symmetric member group is a
+  real property of this dataset, not a test artifact). Also confirmed:
+  `std::invalid_argument` on a `var_b` size mismatch and on an
+  out-of-range index. Compiled cleanly (zero warnings); GUI launch
+  confirmed. See `CHANGE_HISTORY.md`'s 2026-08-17 entry and
+  `engine/README.md`'s own "Analyze mode" section for the exact numbers.
+
+**Manual-dimension "Analyze" mode -- GUI panel (issues #69/#70, epic #67)
+— read before touching `gui/AnalyzePanel.{h,cpp}` or
+`Application::OnAnalyzeRunRequested()`:**
+- **One panel, not two** -- `AnalyzePanel` covers both #69's input table
+  and #70's results table in a single dockable window (`SeparatorText()`
+  sections: Design Parameters, Design Input, Design Check Results),
+  matching this project's existing "one panel, multiple stacked
+  sections" precedent (`ResultsPanel`, issue #62) rather than splitting
+  one workflow across two separately-dockable windows. New dock/panel
+  identity: `gui::kAnalyzeId` (`PanelTitles.h`), `PanelIcon::Analyze` (a
+  checkmark-in-a-box, `PanelIcons.cpp`), `PanelVisibility::analyze`
+  (`Toolbar`'s View > Subwindows), docked tabbed alongside the
+  Optimization (RunPanel) panel in all three view-layout presets.
+- **No engine changes needed to classify beams/columns or build dropdown
+  option lists** -- `AnalyzePanel` reads `scene.members[i].is_beam`
+  (already computed by `BuildSceneModel()`'s geometry-only CXZ check,
+  same classification `PrepareOptimization()`'s own `PeriksaBatang()`
+  loop uses) for member type, and `sd.sisi_d_B`/`sd.DIA_d`/`sd.NL_d`/
+  `sd.DIAS_d`/`sd.JS_d`/`sd.sisi_d_K` + their `nsisi_B`/`nDIA`/`nNL`/
+  `nDIAS`/`nJS`/`nsisi_K` counts (already loaded on `StructureData` by
+  `ReadDiscreteTables()`) for each of the 12 beam / 5 column dropdown
+  slots -- reproducing `Optimizer.cpp`'s anonymous-namespace
+  `LoadBatasAtas()`'s exact slot-to-table mapping without needing that
+  function exposed. **Member order for `var_b`/`var_k` flattening
+  matters**: `scene.members` is built in ascending `no_batang` order
+  (`SceneModel.cpp`), so filtering it by `is_beam` while preserving
+  order reproduces `PrepareOptimization()`'s own `no_balok`/`no_kolom`
+  construction (a single ascending pass splitting on the same check)
+  exactly -- if `BuildSceneModel()`'s member-loop order ever changes,
+  this reasoning needs re-checking.
+- **Per-member chosen indices are keyed by `no_batang` in an
+  `unordered_map`, not a plain array rebuilt on dataset change** -- so
+  a geometry edit/undo naturally preserves existing choices for
+  unchanged members and inserts a zeroed default for a new one, with no
+  explicit staleness tracking needed at all.
+- **`Application::OnAnalyzeRunRequested()` runs against a *copy* of
+  `loaded_sd_`, not `loaded_sd_` itself** -- if `AnalyzeFixedDesign()`
+  throws (a size/range mismatch), the live editor state must stay
+  untouched; only a successful result is committed back via
+  `LoadStructure()`, mirroring how `OnRunResult()` already treats a
+  freshly-run `StructureData` as a new "loaded" one.
+- **`LoadStructure()` gained an `is_from_optimize` parameter (default
+  `true`, every pre-existing call site unaffected)** -- an Analyze
+  result sets `has_run_results_ = false` even though `current_results_`/
+  `current_analysis_`/`has_analysis_results_` are all populated exactly
+  like a real run's, specifically so PDF/`.opt`-labeled text export/CSV
+  export (which would print "Hasil Optimasi..."/"Metoda Optimasi:
+  Flexible Polyhedron" -- false for a user-chosen design) stay gated to
+  real `RunFullOptimization()` results only. Viewport coloring/
+  Properties/Detailing/Force Diagrams/Results panels are all
+  unaffected -- they only ever checked `current_results_`/
+  `current_analysis_`/`has_analysis_results_`, not `has_run_results_`,
+  so an Analyze result displays everywhere a real run's would.
+- **Deliberately does NOT reuse `RunPanel`'s background-thread
+  machinery** -- `AnalyzeFixedDesign()` is a single direct analysis pass
+  (no search loop), so it runs synchronously on the UI thread inside the
+  "Run Analyze" button's own click handler, same cost class as
+  `orcisf_cli equilibrium`.
+- **Verification status:** compiled cleanly (zero warnings); `orcisf_gui`
+  launch confirmed (no crash). The actual interactive workflow (picking
+  dropdown values, clicking Run Analyze, reading the results
+  table/Safe-Unsafe badges, confirming viewport coloring updates) was
+  **not** exercised this pass -- implemented overnight per explicit user
+  request to proceed autonomously; next `tester`/`reviewer` pass should
+  confirm this end-to-end.
+
+**3D-viewport force diagram overlay (issue #71) — read before touching
+`SceneModel::MemberVisual::force_diagram`, `SceneRenderer::
+DrawForceDiagramOverlay()`, or `EditorOptions`' `show_force_diagram`/
+`force_diagram_*` fields:**
+- **`gui::ComputeForceDiagram()` (#61) is reused directly, no new force
+  math** -- `BuildSceneModel()` now also looks up each member's
+  `engine::MemberForces` (by `no_batang`, same lookup-by-id convention
+  `disp_by_joint` already uses for #60) and precomputes
+  `MemberVisual::force_diagram` once per scene build, not per frame.
+  `width_mm`/`height_mm` passed to it are `0` (not `MemberVisual`'s own
+  0.3m *placeholder* default) whenever `!mv.has_results` -- reusing the
+  placeholder would fabricate a `has_section=true` stress reading for a
+  section that was never actually designed; `ForceDiagramPanel.cpp`
+  already had this exact guard (`mv_it->has_results ? ... : 0.f`),
+  copied here for consistency, not independently re-derived.
+- **Rendered as an offset polyline (`DrawBox` segments, the same "a line
+  is a thin box" idiom `DrawGrid`/`DrawDeformedShape` already use), not a
+  filled ribbon mesh** -- each sampled station's point is
+  `member_a + axis_x*x_m + axis_y*(value*scale)`, using the *same*
+  `axis_x`/`axis_y` basis `DrawBox()` derives internally for that
+  member, plus two short "stem" boxes connecting the diagram's two ends
+  back to the member's own baseline so it reads as attached to the
+  structure rather than a floating disconnected line. Color `{0.95,
+  0.70, 0.15, 1}` (amber/gold) -- cross-checked against every other
+  documented viewport color (grid = dark cobalt, deformed shape = cyan,
+  restrained joints = a more saturated orange) before picking it; add
+  any future overlay color to this same cross-check list.
+  `force_diagram_component` (0=N,1=V,2=M,3=T) selects which
+  `ForceDiagramSample` field drives the offset.
+- **Additive, not a replacement** -- the existing 2D `ForceDiagramPanel`
+  (#61) keeps its own separate on-demand `ComputeForceDiagram()` call
+  for just the selected member; both call the identical function so they
+  always agree on shape/magnitude for any member both happen to show,
+  but neither was changed to depend on the other.
+- **Overlay control (toggle + N/V/M/T combo + "All members" checkbox +
+  log-scale magnitude slider)** is a real ImGui widget block
+  (`SetCursorScreenPos` within the "Viewport" window), stacked directly
+  below the existing deformed-shape overlay (#60) in the same top-left
+  corner -- same `..._overlay_capturing` bool pattern already
+  established for the plane-offset (#24) and deformed-shape (#60)
+  overlays, OR'd into all three orbit/pan/zoom input gates so
+  interacting with any of the three overlays never also starts a
+  camera drag underneath it.
+- **Bonus fix, not part of this issue's own scope but caught while
+  copying the deformed-shape overlay's pattern for a third time**: both
+  the plane-offset overlay's (#24) and the deformed-shape overlay's
+  (#60) background rects were still using `ImGui::GetForegroundDrawList()`
+  for their `AddRectFilled()` call -- the exact compositing-order
+  antipattern issue #51 already fixed for other elements in this same
+  file, flagged as a known-but-unfixed gap by the #60 reviewer pass
+  (2026-08-17) and never addressed until now. Both switched to
+  `ImGui::GetWindowDrawList()` (the correct pattern every other overlay
+  in this file already uses) alongside the new force-diagram overlay's
+  own background rect, which used the correct pattern from the start --
+  copying the known-bad pattern a third time was judged worse than a
+  same-day, one-line, low-risk fix to the two pre-existing instances.
+- **Verification status:** compiled cleanly (zero warnings); `orcisf_gui`
+  launch confirmed (no crash). The overlay's actual on-screen appearance
+  (ribbon shape/position, component switching, All-members mode, and a
+  side-by-side comparison against the 2D `ForceDiagramPanel` for the
+  same member) was **not** visually confirmed this pass -- implemented
+  overnight per explicit user request to proceed autonomously without
+  interactive GUI automation; next `tester`/`reviewer` pass should
+  confirm this end-to-end.
 
 ---
 

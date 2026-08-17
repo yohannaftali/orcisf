@@ -413,7 +413,9 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
 
     unsigned int texture =
         renderer_.Render(scene, camera_, width, height, selection.kind == SelectionKind::Member ? selection.id : -1,
-                          options.show_deformed_shape, options.deformation_scale);
+                          options.show_deformed_shape, options.deformation_scale, options.show_force_diagram,
+                          options.force_diagram_component, options.force_diagram_scale,
+                          options.force_diagram_all_members);
     ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(texture)), avail, ImVec2(0, 1), ImVec2(1, 0));
 
     ImVec2 image_min = ImGui::GetItemRectMin();
@@ -516,10 +518,14 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
             const float input_y = pos.y + text_h + gap;
             const float slider_y = input_y + frame_h + gap;
 
-            ImDrawList* fg = ImGui::GetForegroundDrawList();
+            // Issue #51's compositing-layer lesson (fixed elsewhere in this
+            // file, missed here originally, see #71's follow-up): a window's
+            // own draw list, not GetForegroundDrawList(), so an open menu
+            // correctly draws over this background rect instead of under it.
+            ImDrawList* wdl = ImGui::GetWindowDrawList();
             ImVec2 bg_min(pos.x - Scaled(6.f), pos.y - gap);
             ImVec2 bg_max(pos.x + control_width + Scaled(6.f), slider_y + frame_h + gap);
-            fg->AddRectFilled(bg_min, bg_max, IM_COL32(20, 20, 24, 200), Scaled(4.f));
+            wdl->AddRectFilled(bg_min, bg_max, IM_COL32(20, 20, 24, 200), Scaled(4.f));
 
             ImGui::SetCursorScreenPos(pos);
             ImGui::PushID("plane_offset_overlay");
@@ -554,10 +560,13 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
         const float checkbox_y = pos.y + text_h + gap;
         const float slider_y = checkbox_y + frame_h + gap;
 
-        ImDrawList* fg = ImGui::GetForegroundDrawList();
+        // Issue #51's compositing-layer lesson, see the plane-offset
+        // overlay's identical fix above -- GetWindowDrawList(), not
+        // GetForegroundDrawList().
+        ImDrawList* wdl = ImGui::GetWindowDrawList();
         ImVec2 bg_min(pos.x - Scaled(6.f), pos.y - gap);
         ImVec2 bg_max(pos.x + control_width + Scaled(6.f), slider_y + frame_h + gap);
-        fg->AddRectFilled(bg_min, bg_max, IM_COL32(20, 20, 24, 200), Scaled(4.f));
+        wdl->AddRectFilled(bg_min, bg_max, IM_COL32(20, 20, 24, 200), Scaled(4.f));
 
         ImGui::SetCursorScreenPos(pos);
         ImGui::PushID("deformed_shape_overlay");
@@ -582,21 +591,83 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
         ImGui::PopID();
     }
 
+    // Issue #71: force-diagram (N/V/M/T) ribbon overlay toggle + component
+    // selector + scale slider, stacked directly below the deformed-shape
+    // overlay in the same top-left corner (same technique/reasoning as
+    // that block above -- real ImGui widgets on this window's own draw
+    // list, not GetForegroundDrawList()).
+    bool force_diagram_overlay_capturing = false;
+    {
+        bool scene_has_force_diagram = false;
+        for (const MemberVisual& mv : scene.members) {
+            if (!mv.force_diagram.samples.empty()) {
+                scene_has_force_diagram = true;
+                break;
+            }
+        }
+
+        const float control_width = Scaled(168.f);
+        const float gap = Scaled(4.f);
+        const float text_h = ImGui::GetTextLineHeight();
+        const float frame_h = ImGui::GetFrameHeight();
+        ImVec2 pos(image_min.x + Scaled(8.f), image_min.y + Scaled(8.f) + text_h + gap + frame_h + gap +
+                                                   frame_h + gap + Scaled(10.f));
+        const float combo_y = pos.y + text_h + gap;
+        const float checkbox_y = combo_y + frame_h + gap;
+        const float slider_y = checkbox_y + frame_h + gap;
+
+        ImDrawList* wdl = ImGui::GetWindowDrawList();
+        ImVec2 bg_min(pos.x - Scaled(6.f), pos.y - gap);
+        ImVec2 bg_max(pos.x + control_width + Scaled(6.f), slider_y + frame_h + gap);
+        wdl->AddRectFilled(bg_min, bg_max, IM_COL32(20, 20, 24, 200), Scaled(4.f));
+
+        ImGui::SetCursorScreenPos(pos);
+        ImGui::PushID("force_diagram_overlay");
+        ImGui::TextColored(ImVec4(0.95f, 0.70f, 0.15f, 1.f), "Force Diagram");
+
+        // Same "disabled with a tooltip, not silently ignored" convention
+        // as the deformed-shape overlay above -- no analysis results means
+        // nothing here would render anyway.
+        ImGui::BeginDisabled(!scene_has_force_diagram);
+        static const char* kComponents[4] = {"N (axial)", "V (shear)", "M (moment)", "T (torsion)"};
+        ImGui::SetCursorScreenPos(ImVec2(pos.x, combo_y));
+        ImGui::SetNextItemWidth(control_width);
+        ImGui::Combo("##force_diagram_component", &options.force_diagram_component, kComponents, 4);
+        force_diagram_overlay_capturing |= ImGui::IsItemHovered() || ImGui::IsItemActive();
+        ImGui::SetCursorScreenPos(ImVec2(pos.x, checkbox_y));
+        ImGui::Checkbox("Show##force_diagram_toggle", &options.show_force_diagram);
+        if (!scene_has_force_diagram && ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Run an optimization first to compute member forces.");
+        }
+        force_diagram_overlay_capturing |= ImGui::IsItemHovered() || ImGui::IsItemActive();
+        ImGui::SameLine();
+        ImGui::Checkbox("All##force_diagram_all", &options.force_diagram_all_members);
+        force_diagram_overlay_capturing |= ImGui::IsItemHovered() || ImGui::IsItemActive();
+        ImGui::SetCursorScreenPos(ImVec2(pos.x, slider_y));
+        ImGui::SetNextItemWidth(control_width);
+        ImGui::SliderFloat("##force_diagram_scale", &options.force_diagram_scale, 1e-6f, 1e-2f, "x%.6f",
+                            ImGuiSliderFlags_Logarithmic);
+        force_diagram_overlay_capturing |= ImGui::IsItemHovered() || ImGui::IsItemActive();
+        ImGui::EndDisabled();
+        ImGui::PopID();
+    }
+
     DrawGizmo(scene, selection, editable, undo, options, on_geometry_changed, image_min.x, image_min.y,
               image_size.x, image_size.y);
     bool gizmo_capturing = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
 
-    // Issue #24/#60: also gate on !offset_overlay_capturing /
-    // !deform_overlay_capturing so a click/drag that starts on either
-    // top-of-image overlay never starts an orbit/pan -- see those
-    // overlays' own comments above for why `hovered` alone can't tell.
+    // Issue #24/#60/#71: also gate on !offset_overlay_capturing /
+    // !deform_overlay_capturing / !force_diagram_overlay_capturing so a
+    // click/drag that starts on any top-of-image overlay never starts an
+    // orbit/pan -- see those overlays' own comments above for why
+    // `hovered` alone can't tell.
     if (hovered && !gizmo_capturing && !offset_overlay_capturing && !deform_overlay_capturing &&
-        ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        !force_diagram_overlay_capturing && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         orbiting_ = true;
         drag_pixels_ = 0.f;
     }
     if (hovered && !gizmo_capturing && !offset_overlay_capturing && !deform_overlay_capturing &&
-        ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+        !force_diagram_overlay_capturing && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
         panning_ = true;
     }
 
@@ -628,7 +699,7 @@ void ViewportPanel::Draw(bool* open, const SceneModel& scene, Selection& selecti
         }
     }
     if (hovered && !gizmo_capturing && !offset_overlay_capturing && !deform_overlay_capturing &&
-        io.MouseWheel != 0.f) {
+        !force_diagram_overlay_capturing && io.MouseWheel != 0.f) {
         camera_.Zoom(io.MouseWheel);
     }
 

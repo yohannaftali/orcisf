@@ -6,6 +6,7 @@
 #include "app/CustomTitleBar.h"
 #include "engine/AnalysisResults.h"
 #include "engine/MemberResults.h"
+#include "gui/AnalyzePanel.h"
 #include "gui/DetailingPanel.h"
 #include "gui/ForceDiagramPanel.h"
 #include "gui/IconToolbar.h"
@@ -63,6 +64,8 @@ private:
     void OnExportPdfRequested();
     void OnExportInfRequested();
     void OnExportResultsCsvRequested(); // issue #62
+    void OnAnalyzeRunRequested(const engine::OptimizationOptions& options, const std::vector<int>& var_b,
+                                const std::vector<int>& var_k); // issue #69, epic #67
 
     // Common load path for both OnOpenFolderRequested (view-only, no
     // results yet) and OnRunResult (results available): replaces
@@ -70,8 +73,17 @@ private:
     // scene_/validation_issues_. `analysis` (issue #60), if non-null,
     // must be the AnalysisResults computed from the *same* sd `results`
     // came from -- feeds SceneModel's deformed-shape data.
+    // `is_from_optimize` (issue #69) gates has_run_results_ (which in turn
+    // gates PDF/CSV export and the .opt/.str/.kdl/.inf portion of text
+    // export -- all of which print "Hasil Optimasi Beton..."/"Metoda
+    // Optimasi: Flexible Polyhedron"): true for a real completed
+    // RunFullOptimization() run (every existing call site), false for an
+    // Analyze-mode result (a user-chosen design has no "optimization
+    // method" to claim). has_analysis_results_ is unaffected either way --
+    // see its own comment.
     void LoadStructure(engine::StructureData sd, const std::vector<engine::MemberResult>* results,
-                        std::string dataset_path, const engine::AnalysisResults* analysis = nullptr);
+                        std::string dataset_path, const engine::AnalysisResults* analysis = nullptr,
+                        bool is_from_optimize = true);
 
     // Rebuilds scene_ + validation_issues_ from the current loaded_sd_ --
     // called after every edit. Any edit invalidates previously-computed
@@ -93,6 +105,7 @@ private:
     gui::ResultsPanel results_panel_;            // issue #62
     gui::LogPanel log_panel_;
     gui::RunPanel run_panel_;
+    gui::AnalyzePanel analyze_panel_; // issue #69, epic #67
 
     engine::StructureData loaded_sd_;
     std::optional<gui::EditableStructure> editable_; // wraps loaded_sd_ once something is loaded
@@ -126,6 +139,16 @@ private:
     // same lifetime as current_results_.
     engine::AnalysisResults current_analysis_;
 
+    // Issue #66: true whenever current_analysis_ holds real data, whether
+    // from a completed run (has_run_results_ true too) or from reading a
+    // saved .str file back in on Open Data (has_run_results_ stays false
+    // in that case -- .str has no reinforcement/RC-design data, so
+    // current_results_/PDF export/.opt-.str-.kdl-.inf text export must
+    // stay gated on has_run_results_ specifically, not this). Force
+    // Diagrams (#61) and Results (#62) only need current_analysis_, so
+    // they gate on this broader flag instead.
+    bool has_analysis_results_ = false;
+
     // Issue #25: the generic path the *most recent completed run* actually
     // wrote its .opt/.str/.kdl/.inf/.his/.log.txt to (a fresh timestamped
     // subfolder per run, see engine::RunFullOptimization) -- no longer the
@@ -149,6 +172,7 @@ private:
     bool results_open_ = true;       // issue #62
     bool log_open_ = true;
     bool run_open_ = true;
+    bool analyze_open_ = true; // issue #69, epic #67
     bool dockspace_initialized_ = false;
 
     // Issue #15: which View menu preset is active. BuildDockspace() rebuilds

@@ -107,6 +107,12 @@ void DrawReactionsTable(const engine::AnalysisResults& analysis) {
 }
 
 void DrawEquilibriumTable(const engine::AnalysisResults& analysis) {
+    if (!analysis.has_applied_load) {
+        ImGui::TextDisabled(
+            "Not available -- these results were loaded from a saved .str file, which does not "
+            "record applied loads. Run the optimizer to see the equilibrium check.");
+        return;
+    }
     static const char* kLabels[6] = {"Fx", "Fy", "Fz", "Mx", "My", "Mz"};
     if (!BeginTableView("results_equilibrium", 4)) return;
     ImGui::TableSetupColumn("DOF", ImGuiTableColumnFlags_WidthFixed, 50.f);

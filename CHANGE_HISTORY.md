@@ -4736,3 +4736,141 @@ specific asks).
   `enhancement`)
 - Files: `AGENTS.md` (Tracked Issues table, new epic-#67 tracking
   note), `CHANGE_HISTORY.md`
+
+## [2026-08-17] — coder (autonomous overnight): implement #66, #68, #69, #70, #71
+
+User asked to autonomously resolve #66 and #71 (standalone) and epic
+#67's sub-issues #68-#70, then commit and push overnight without
+further confirmation -- the same explicit standing authorization
+already given for the earlier epic #58 overnight session. Implemented
+all five, built cleanly (zero warnings) after each phase, and verified
+what could be verified via CLI/standalone programs without interactive
+GUI automation (consistent with this project's established caution
+around unattended GUI automation).
+
+**#66 -- `.str` result loading on Open Data:**
+- `engine::ReadAnalysisResultsFromStr()` (new, `LegacyIO.{h,cpp}`)
+  parses `WriteStrukturSection()`'s exact format back into an
+  `AnalysisResults`; returns `std::nullopt` (never throws) for a
+  missing/unparseable file.
+- `AnalysisResults::has_applied_load` (new field) -- false for a
+  `.str`-sourced result, since `.str` has no applied-load section;
+  `ResultsPanel::DrawEquilibriumTable()` now shows an explanatory
+  disabled message instead of misleading all-zero numbers.
+- `Application::has_analysis_results_` (new, separate from
+  `has_run_results_`) -- broader flag gating Force Diagrams/Results
+  panels; `has_run_results_` stays narrowly scoped to "a real completed
+  optimization run", still gating PDF/CSV/`.opt`-labeled text export.
+- `OnOpenFolderRequested()` now attempts `ReadAnalysisResultsFromStr()`
+  on the opened dataset's `.str` path and threads it through
+  `LoadStructure()`.
+
+**#68 -- engine analyze-only entry point:**
+- `engine::AnalyzeFixedDesign()` (new, `Optimizer.{h,cpp}`) -- writes a
+  caller-supplied `var_b`/`var_k` into population slot 0, runs
+  `Inersia()`+`Struktur()` directly (no `optimasi()` search), forces
+  `sd.JSTD = 1` so `ComputeMemberResults()`'s "best slot" convention
+  reads that same slot back, and returns both a `MemberResult` list and
+  an `AnalysisResults`. Validates array sizes and per-index bounds,
+  throwing `std::invalid_argument` rather than clamping or writing out
+  of bounds.
+
+**#69/#70 -- Analyze mode GUI (combined into one `gui::AnalyzePanel`):**
+- New dockable panel: per-member discrete-design-variable dropdowns
+  (12/beam, 5/column, reproducing `LoadBatasAtas()`'s slot-to-table
+  mapping without needing that function exported), a "Run Analyze"
+  button (synchronous -- no background thread needed, unlike RunPanel),
+  and a demand-vs-capacity results table with Safe/Unsafe badges
+  matching the viewport's existing green/red convention.
+- `Application::OnAnalyzeRunRequested()` runs against a *copy* of
+  `loaded_sd_` (never mutates the live editor state on failure) and
+  commits a successful result via `LoadStructure(..., is_from_optimize=
+  false)` -- a new `LoadStructure()` parameter that keeps
+  `has_run_results_` false for an Analyze result (so PDF/`.opt`-labeled
+  export, which would falsely claim "Metoda Optimasi: Flexible
+  Polyhedron", stays gated to real optimization runs) while still
+  populating `current_results_`/`current_analysis_`/`has_analysis_results_`
+  so every other display (viewport coloring, Properties, Detailing,
+  Force Diagrams, Results) shows an Analyze result exactly like a real
+  run's.
+- New panel identity/icon/visibility wiring: `gui::kAnalyzeId`,
+  `PanelIcon::Analyze`, `PanelVisibility::analyze`, docked tabbed
+  alongside the Optimization panel in all three view-layout presets.
+
+**#71 -- 3D-viewport force diagram overlay:**
+- `SceneModel::MemberVisual::force_diagram` (new field) -- precomputed
+  once per `BuildSceneModel()` call via the existing
+  `gui::ComputeForceDiagram()` (#61, no new math), guarding
+  `width_mm`/`height_mm` to 0 when `!has_results` (same guard
+  `ForceDiagramPanel.cpp` already had, copied for consistency).
+- `SceneRenderer::DrawForceDiagramOverlay()` (new) -- an offset
+  polyline (`DrawBox` segments, matching `DrawGrid`/`DrawDeformedShape`'s
+  existing "line = thin box" idiom) with two stem boxes anchoring it to
+  the member's baseline; amber/gold color, cross-checked against every
+  other documented viewport color.
+- New `EditorOptions` fields (`show_force_diagram`,
+  `force_diagram_component`, `force_diagram_scale`,
+  `force_diagram_all_members`) + a new top-left viewport overlay
+  control (toggle, N/V/M/T combo, "All members" checkbox, log-scale
+  slider), stacked below the existing deformed-shape overlay, same
+  `..._capturing` input-gating pattern already established for the
+  other two viewport overlays.
+- **Bonus fix while here**: the plane-offset (#24) and deformed-shape
+  (#60) overlays' background rects were still using
+  `GetForegroundDrawList()` -- the exact compositing-order bug issue
+  #51 already fixed elsewhere in this file, flagged as a known gap by
+  #60's reviewer pass and never addressed. Both switched to
+  `GetWindowDrawList()` rather than copying the same known-bad pattern
+  into a third overlay.
+
+**Verification performed:**
+- A standalone program linked directly against `orcisf_engine` (no GUI
+  toolchain needed) ran a real optimization against a scratch `Apl1-1`
+  copy, then: (a) fed the run's own `.str` back through
+  `ReadAnalysisResultsFromStr()` and confirmed every
+  displacement/member-force/reaction value matched
+  `ComputeAnalysisResults()` on the same `StructureData` exactly,
+  `has_applied_load` was false, and a missing file correctly returned
+  `nullopt`; (b) fed the run's own optimized `var_b`/`var_k` into
+  `AnalyzeFixedDesign()` and confirmed every `MemberResult` field
+  matched a self-consistent reference exactly (see the methodology note
+  below), plus confirmed both `std::invalid_argument` cases.
+- **Methodology note worth remembering**: the first `AnalyzeFixedDesign()`
+  comparison (against `ComputeMemberResults()` called directly on the
+  just-finished run's own `StructureData`) showed every member's
+  `Kendala()` mismatching -- not a bug, but the already-documented
+  "frozen slot" quirk (`AnalysisResults.h`): that `StructureData`'s
+  force arrays reflect whichever `Struktur()` call ran *last* during
+  the search, not necessarily a fresh analysis of the `JSTD-1` design
+  its dimensions came from. Re-running `Inersia()`+`Struktur()`
+  explicitly for `JSTD-1` before calling `ComputeMemberResults()` again
+  (self-consistent, matching what `AnalyzeFixedDesign()` already does)
+  produced an exact match instead. A completed run's own
+  `ComputeMemberResults()` output is not valid "ground truth" for a
+  freshly self-consistent analysis -- documented in `engine/README.md`
+  and `AGENTS.md` for the next agent.
+- `src/build.ps1` run after each implementation phase: all four builds
+  (engine-only change, +GUI/#66 wiring, +AnalyzePanel, +#71 overlay)
+  compiled cleanly with **zero warnings**. `orcisf_cli info` against a
+  real `Apl1-1` dataset confirmed no regression. `orcisf_gui.exe`
+  launched and stayed running (no immediate crash) after each phase.
+- **Not done this pass**: interactive GUI exercise of any of the three
+  new/changed panels (Analyze mode's dropdowns/Run button/results
+  table, Force Diagrams/Results panels showing a `.str`-loaded result,
+  the 3D force-diagram overlay's on-screen appearance) -- consistent
+  with this project's established caution around unattended interactive
+  GUI automation; left for the next `tester`/`reviewer` pass.
+
+- Issues #66, #68, #69, #70, #71 implemented (not yet closed -- awaiting
+  tester/reviewer per this project's standard workflow); epic #67 stays
+  open until then too.
+- Files: `src/engine/include/engine/{AnalysisResults,LegacyIO,Optimizer}.h`,
+  `src/engine/src/{LegacyIO,Optimizer}.cpp`,
+  `src/gui/AnalyzePanel.{h,cpp}` (new), `src/gui/ResultsPanel.cpp`,
+  `src/gui/ViewportPanel.cpp`, `src/gui/Toolbar.cpp`,
+  `src/gui/PanelTitles.h`, `src/gui/PanelIcons.{h,cpp}`,
+  `src/gui/PanelVisibility.h`, `src/gui/TableView.h` (unchanged, reused),
+  `src/gui/editor/Selection.h`, `src/gui/viewport/SceneModel.{h,cpp}`,
+  `src/gui/viewport/SceneRenderer.{h,cpp}`, `src/app/Application.{h,cpp}`,
+  `src/app/DockTabIcons.cpp`, `src/CMakeLists.txt`, `src/engine/README.md`,
+  `AGENTS.md`

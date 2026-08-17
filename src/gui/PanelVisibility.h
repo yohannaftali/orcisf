@@ -20,6 +20,7 @@ struct PanelVisibility {
     bool* log = nullptr;
     bool* force_diagram = nullptr; // issue #61
     bool* results = nullptr;       // issue #62
+    bool* analyze = nullptr;       // issue #69, epic #67
 };
 
 } // namespace orcisf::gui
