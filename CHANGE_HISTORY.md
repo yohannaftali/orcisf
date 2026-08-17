@@ -4591,3 +4591,17 @@ overlay finding and the still-open #63 hang as a known issue, with
 - Issues #59/#60/#61/#62: reviewer verdict recorded, closing proposed
   but not actioned (remote write requires separate confirmation)
 - Files: `AGENTS.md` (Tracked Issues table + #60's section), `CHANGE_HISTORY.md`
+
+## [2026-08-17] — chore: close #59-#62 per user confirmation
+
+User confirmed the reviewer's proposed close action. Posted a summary
+comment on each issue (verdict + key evidence + the v0.0.8-alpha link)
+and closed all 4 as completed. Epic #58 itself stays open -- #60's
+comment explicitly notes the overlay-compositing finding is tracked as
+a follow-up rather than reopened, and the epic-level blocker (#63,
+still open) means live GUI pixel-rendering of #60/#61/#62 remains
+unconfirmed even though the underlying computations are independently
+verified correct.
+
+- Issues #59, #60, #61, #62 closed on GitHub (`state_reason: completed`)
+- Files: `AGENTS.md` (Tracked Issues table), `CHANGE_HISTORY.md`

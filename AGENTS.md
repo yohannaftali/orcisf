@@ -2663,11 +2663,11 @@ later, different one (e.g. closing an issue or cutting a release).
 | #55 | feat(src): show all 6 per-DOF restraint checkboxes in the Joints table, not one summary checkbox | closed (tester: source-verified, no FAILs; live sync UNVERIFIED this pass -- see AGENTS.md #55 note) | 2026-08-13 |
 | #56 | chore(ci): Linux build-src job fails intermittently on flaky ninja download (ECONNRESET) | closed | 2026-08-13 |
 | #57 | chore(ci): rewrite build-src.yml -- Node 24 actions, apt ninja on Linux, warning detection, artifact upload | closed | 2026-08-16 |
-| #58 | epic(src): FE analysis results visualization (deformed shape, force diagrams, tables) | open (all 4 sub-issues #59-#62 reviewer-PASS 2026-08-17, v0.0.8-alpha cut -- live GUI pixel rendering of #60/#61/#62 still unconfirmed, blocked by #63; epic stays open until that's closed out) | 2026-08-17 |
-| #59 | feat(engine): expose joint displacements, member end forces, and support reactions for GUI consumption | reviewer: PASS, no findings, propose closing (awaiting user confirmation) | 2026-08-17 |
-| #60 | feat(gui): deformed-shape overlay in the 3D viewport | reviewer: PASS WITH NOTES -- new overlay reuses #24's `GetForegroundDrawList()` pattern, same compositing-order class of bug #51 already fixed elsewhere in this file (not blocking, follow-up recommended); live interactive spot-check still UNVERIFIED; propose closing (awaiting user confirmation) | 2026-08-17 |
-| #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | reviewer: PASS, no findings beyond the already-accepted AC5 revision; propose closing (awaiting user confirmation) | 2026-08-17 |
-| #62 | feat(gui): joint displacement / member force / reaction tables + global equilibrium check | reviewer: PASS, no findings (CSV export has no injection surface, numeric-only output); propose closing (awaiting user confirmation) | 2026-08-17 |
+| #58 | epic(src): FE analysis results visualization (deformed shape, force diagrams, tables) | open (all 4 sub-issues #59-#62 closed 2026-08-17, v0.0.8-alpha cut -- live GUI pixel rendering of #60/#61/#62 still unconfirmed, blocked by #63; epic stays open until that's closed out) | 2026-08-17 |
+| #59 | feat(engine): expose joint displacements, member end forces, and support reactions for GUI consumption | closed (reviewer: PASS, no findings) | 2026-08-17 |
+| #60 | feat(gui): deformed-shape overlay in the 3D viewport | closed (reviewer: PASS WITH NOTES -- `GetForegroundDrawList()` overlay-compositing finding tracked as a follow-up, see AGENTS.md's #60 section; live interactive spot-check still UNVERIFIED) | 2026-08-17 |
+| #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | closed (reviewer: PASS) | 2026-08-17 |
+| #62 | feat(gui): joint displacement / member force / reaction tables + global equilibrium check | closed (reviewer: PASS) | 2026-08-17 |
 | #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open (tester re-confirmed orcisf_cli unaffected 2026-08-17; still blocks live GUI verification of #60/#61/#62) | 2026-08-17 |
 | #64 | docs(src): fix pre-existing "Nmm" mislabeling -- AM moment/torsion fields are actually N*m | open | 2026-08-17 |
 
