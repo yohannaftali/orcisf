@@ -2663,11 +2663,11 @@ later, different one (e.g. closing an issue or cutting a release).
 | #55 | feat(src): show all 6 per-DOF restraint checkboxes in the Joints table, not one summary checkbox | closed (tester: source-verified, no FAILs; live sync UNVERIFIED this pass -- see AGENTS.md #55 note) | 2026-08-13 |
 | #56 | chore(ci): Linux build-src job fails intermittently on flaky ninja download (ECONNRESET) | closed | 2026-08-13 |
 | #57 | chore(ci): rewrite build-src.yml -- Node 24 actions, apt ninja on Linux, warning detection, artifact upload | closed | 2026-08-16 |
-| #58 | epic(src): FE analysis results visualization (deformed shape, force diagrams, tables) | open (all 4 sub-issues #59-#62 implemented overnight, pending tester/reviewer -- #61's M(x) formula and live GUI rendering of #60/#61/#62 still need verification, blocked by #63) | 2026-08-16 |
-| #59 | feat(engine): expose joint displacements, member end forces, and support reactions for GUI consumption | ready-for-review (tester: 6/6 PASS, re-verified against a fresh run 2026-08-17) | 2026-08-17 |
-| #60 | feat(gui): deformed-shape overlay in the 3D viewport | ready-for-review (tester: 6/7 source-verified PASS; live interactive spot-check UNVERIFIED -- see CHANGE_HISTORY 2026-08-17) | 2026-08-17 |
-| #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | ready-to-close (all 5 AC now checked -- AC5's wording revised 2026-08-17 by user request to reflect that MLAP is a simplified design shortcut, not required to match the rigorous midspan value exactly; GUI pixel rendering still UNVERIFIED, blocked by #63 -- reviewer should weigh that before actually closing) | 2026-08-17 |
-| #62 | feat(gui): joint displacement / member force / reaction tables + global equilibrium check | ready-for-review (tester: 4/5 PASS; CSV export + panel rendering UNVERIFIED -- see CHANGE_HISTORY 2026-08-17) | 2026-08-17 |
+| #58 | epic(src): FE analysis results visualization (deformed shape, force diagrams, tables) | open (all 4 sub-issues #59-#62 reviewer-PASS 2026-08-17, v0.0.8-alpha cut -- live GUI pixel rendering of #60/#61/#62 still unconfirmed, blocked by #63; epic stays open until that's closed out) | 2026-08-17 |
+| #59 | feat(engine): expose joint displacements, member end forces, and support reactions for GUI consumption | reviewer: PASS, no findings, propose closing (awaiting user confirmation) | 2026-08-17 |
+| #60 | feat(gui): deformed-shape overlay in the 3D viewport | reviewer: PASS WITH NOTES -- new overlay reuses #24's `GetForegroundDrawList()` pattern, same compositing-order class of bug #51 already fixed elsewhere in this file (not blocking, follow-up recommended); live interactive spot-check still UNVERIFIED; propose closing (awaiting user confirmation) | 2026-08-17 |
+| #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | reviewer: PASS, no findings beyond the already-accepted AC5 revision; propose closing (awaiting user confirmation) | 2026-08-17 |
+| #62 | feat(gui): joint displacement / member force / reaction tables + global equilibrium check | reviewer: PASS, no findings (CSV export has no injection surface, numeric-only output); propose closing (awaiting user confirmation) | 2026-08-17 |
 | #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open (tester re-confirmed orcisf_cli unaffected 2026-08-17; still blocks live GUI verification of #60/#61/#62) | 2026-08-17 |
 | #64 | docs(src): fix pre-existing "Nmm" mislabeling -- AM moment/torsion fields are actually N*m | open | 2026-08-17 |
 
@@ -2750,6 +2750,25 @@ DrawDeformedShape()`, or `EditorOptions::show_deformed_shape`/
   input gates the plane-offset overlay's `offset_overlay_capturing`
   already uses, so interacting with either overlay never also starts an
   orbit-drag underneath it.
+- **`reviewer` finding (2026-08-17, PASS WITH NOTES, not blocking):**
+  the bullet above is only true of the *interactive widgets*
+  (checkbox/slider) -- the overlay's *background panel*
+  (`fg->AddRectFilled(...)` in `ViewportPanel.cpp`) still calls
+  `ImGui::GetForegroundDrawList()`, the exact same compositing-order
+  antipattern issue #51 already proved buggy for other elements in this
+  file (a foreground-draw-list element always composites after every
+  window, so it can render on top of an open menu at that screen
+  position). **This isn't new to #60** -- it copies the pre-existing
+  plane-offset overlay's (#24) own background-rect code, which has the
+  identical issue and was never caught by #51's fix (scoped only to the
+  UCS icon/entity labels/grid labels at the time). Low practical impact
+  (a colored rectangle briefly overlapping a dropdown at the viewport's
+  top-left/bottom-left corner, not a crash or data issue) but a real,
+  reproducible-by-reasoning bug -- fix by switching both overlays'
+  background-rect draw call from `GetForegroundDrawList()` to
+  `GetWindowDrawList()`, same as every other overlay element in this
+  file already does. Good candidate for a small, self-contained
+  follow-up issue.
 - **Verification status: compiled cleanly (zero warnings); engine-level
   data path (issue #59's `ComputeAnalysisResults`) independently verified
   correct and fast via `orcisf_cli`; GUI launch confirmed (no crash, the

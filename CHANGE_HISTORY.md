@@ -4527,3 +4527,67 @@ before actually closing this issue.
 
 - Issue #61 updated on GitHub (body edited, not closed)
 - Files: `AGENTS.md` (Tracked Issues table), `CHANGE_HISTORY.md`
+
+## [2026-08-17] — chore(review): reviewer pass on epic #58 (#59-#62), cut v0.0.8-alpha
+
+`/reviewer` ("check unreview issue"). Independently audited all 4 of
+epic #58's sub-issues (#59, #60, #61, #62) -- none had been through a
+`reviewer` pass before, only `tester`'s per-criterion checks.
+
+**Architecture/design audit**: one finding. `ViewportPanel.cpp`'s new
+#60 deformed-shape overlay draws its background panel via
+`ImGui::GetForegroundDrawList()` -- the exact compositing-order
+antipattern issue #51 already proved buggy for other elements in this
+file (a foreground-draw-list element always composites after every
+window, so it can render on top of an open menu). Traced this to the
+pre-existing plane-offset overlay (#24), which #60 copied verbatim --
+#24's own background rect has the identical issue, never caught by
+#51's fix since that fix was scoped only to the UCS icon/entity/grid
+labels at the time. Low practical impact (cosmetic, not a crash/data
+bug), not blocking; documented in AGENTS.md's #60 section as a
+follow-up candidate (fix: switch both overlays to
+`GetWindowDrawList()`, matching everything else in that file).
+
+**Bug/security audit**: no correctness bugs. No security issues --
+`report::WriteResultsCsv()` (#62) writes only numeric engine output,
+no untrusted-string interpolation, no CSV-injection surface; the NFD
+save-dialog path is user-chosen, not attacker-controlled. Re-derived
+array-index/DOF-math correctness across `AnalysisResults.cpp`/
+`SceneModel.cpp`/`ForceDiagramPanel.cpp` -- all correct. Investigated
+a CI failure on #59's own commit (`c59ada7`, Linux leg only, `Configure`
+step) -- confirmed a transient `vcpkg`-fetch network flake (the very
+next commit passed with zero code changes), not a #59 regression.
+
+**End-to-end confirmation**: all dock/panel wiring (icons, visibility
+toggles, layout-preset placement across all 3 presets) verified
+consistent. `ImPlot::CreateContext()`/`DestroyContext()` correctly
+ordered relative to ImGui's own (create-after, destroy-before). Current
+HEAD's CI run (`afc61bf`) confirmed green on all 3 platforms.
+
+**Verdict**: PASS WITH NOTES for #60 (the overlay finding above);
+PASS (no findings) for #59, #61, #62. Proposed closing all 4 -- not
+yet actioned, awaiting the user's explicit confirmation per this
+project's standing rule on remote issue-state writes.
+
+**Release**: warranted per policy (real `src/` changes since
+v0.0.7-alpha, PASS/PASS WITH NOTES verdicts) -- cut **v0.0.8-alpha**
+(https://github.com/yohannaftali/orcisf/releases/tag/v0.0.8-alpha).
+The initial `POST /releases` call was blocked by this session's own
+auto-mode classifier (a public, hard-to-fully-reverse action); stopped
+and asked the user rather than routing around it, per that tool's own
+instructions -- user explicitly confirmed, then the release proceeded.
+Packaged from the current HEAD's own CI artifacts (commit `afc61bf`,
+run 31991756269, all 3 platforms green) rather than a local rebuild,
+matching v0.0.7-alpha's precedent: `orcisf_gui-v0.0.8-alpha-windows-
+x64.zip` (exe + 6 DLLs + icons), `-macos-arm64.tar.gz` and
+`-linux-x64.tar.gz` (both packaged with `tar --mode=755` to restore
+the exec bit `upload-artifact`'s zip round-trip strips -- verified via
+`tar -tvzf` showing `-rwxr-xr-x` on both binaries before upload).
+Release notes follow v0.0.7-alpha's style (a bullet per issue,
+since-last-release framing) and explicitly disclose both the #60/#24
+overlay finding and the still-open #63 hang as a known issue, with
+`orcisf_cli optimize` noted as a reliable fallback.
+
+- Issues #59/#60/#61/#62: reviewer verdict recorded, closing proposed
+  but not actioned (remote write requires separate confirmation)
+- Files: `AGENTS.md` (Tracked Issues table + #60's section), `CHANGE_HISTORY.md`
