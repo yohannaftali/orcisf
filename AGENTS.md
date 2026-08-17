@@ -2664,11 +2664,11 @@ later, different one (e.g. closing an issue or cutting a release).
 | #56 | chore(ci): Linux build-src job fails intermittently on flaky ninja download (ECONNRESET) | closed | 2026-08-13 |
 | #57 | chore(ci): rewrite build-src.yml -- Node 24 actions, apt ninja on Linux, warning detection, artifact upload | closed | 2026-08-16 |
 | #58 | epic(src): FE analysis results visualization (deformed shape, force diagrams, tables) | open (all 4 sub-issues #59-#62 implemented overnight, pending tester/reviewer -- #61's M(x) formula and live GUI rendering of #60/#61/#62 still need verification, blocked by #63) | 2026-08-16 |
-| #59 | feat(engine): expose joint displacements, member end forces, and support reactions for GUI consumption | ready-for-review (implemented + verified against a real run overnight, see CHANGE_HISTORY 2026-08-16) | 2026-08-16 |
-| #60 | feat(gui): deformed-shape overlay in the 3D viewport | ready-for-review (implemented overnight; live rendering during a run blocked by #63, see CHANGE_HISTORY 2026-08-16) | 2026-08-16 |
-| #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | ready-for-review (implemented overnight; V(x)/endpoints verified, M(x) interior shape UNVERIFIED -- see AGENTS.md #61 note; rendering blocked by #63) | 2026-08-16 |
-| #62 | feat(gui): joint displacement / member force / reaction tables + global equilibrium check | ready-for-review (implemented overnight; rendering/CSV export UNVERIFIED, blocked by #63 -- see AGENTS.md #62 note) | 2026-08-16 |
-| #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open | 2026-08-16 |
+| #59 | feat(engine): expose joint displacements, member end forces, and support reactions for GUI consumption | ready-for-review (tester: 6/6 PASS, re-verified against a fresh run 2026-08-17) | 2026-08-17 |
+| #60 | feat(gui): deformed-shape overlay in the 3D viewport | ready-for-review (tester: 6/7 source-verified PASS; live interactive spot-check UNVERIFIED -- see CHANGE_HISTORY 2026-08-17) | 2026-08-17 |
+| #61 | feat(gui): internal force diagrams (N/V/M/T) per member, with click-to-inspect station values | needs-work (tester: 4/5 PASS, 1 FAIL -- M(x) interior formula confirmed wrong by ~134-1638x against real MLAP/MTUM_KI/MTUM_KA, see CHANGE_HISTORY 2026-08-17) | 2026-08-17 |
+| #62 | feat(gui): joint displacement / member force / reaction tables + global equilibrium check | ready-for-review (tester: 4/5 PASS; CSV export + panel rendering UNVERIFIED -- see CHANGE_HISTORY 2026-08-17) | 2026-08-17 |
+| #63 | bug(src): RunPanel hangs after reporting Converged, never completes (small dataset, worker_threads=15) | open (tester re-confirmed orcisf_cli unaffected 2026-08-17; still blocks live GUI verification of #60/#62) | 2026-08-17 |
 
 Epic #1 tracks #2–#9. Chosen stack (see #1 for rationale): Dear ImGui
 (docking) + GLFW + OpenGL3, ImGuizmo (3D manipulation), ImPlot (charts),
@@ -2778,27 +2778,41 @@ or trusting the moment diagram's interior shape:**
   `DestroyContext()` in `main.cpp`, alongside ImGui's) -- it was already
   an installed `vcpkg.json` dependency (chosen in #2, never previously
   used) but nothing called `ImPlot::CreateContext()` before this issue.
-- **KNOWN UNVERIFIED GAP, found during this session's own verification,
-  not resolved -- read `gui/diagrams/ForceDiagram.h`'s header comment for
-  the full numeric trail before trusting the moment diagram's *interior*
-  shape.** Against one real run (`Apl1-1` scratch copy, batang 5): `V(x)`
-  is exactly verified (`V(length_m)` computed via the formula above
-  matched `-shear_y_b`/`GESER_KA` precisely), and the two moment
-  endpoints taken directly from `moment_z_a`/`moment_z_b` independently
-  match `MTUM_KI`/`MTUM_KA` exactly (both confirmed via a real `.opt`
-  file) -- but integrating the *verified* `V(x)` from the *verified*
-  `M_start` does **not** reproduce the *verified* `M_end` (off by roughly
-  25x, not a rounding-scale gap). Every sign-convention permutation
-  (`+V`/`-V`, `+w`/`-w`) was tried by hand against the same real numbers;
-  none matched, ruling out a simple sign flip as the explanation. Not
-  root-caused tonight -- candidates worth checking first: whether `sd.W`
-  at the moment `WriteFinalResults()`'s frozen-slot `Struktur()` call
-  captures it is genuinely the same `w` the *local* Vy/Mz pair's bending
-  plane sees (vs. some resolved/rotated component), or a subtlety in how
-  `BeratSendiri()`'s self-weight timing interacts with a re-analyzed
-  frozen slot. **N(x)/T(x) (direct constant copies) and V(x) are solid;
-  only M(x)'s point-to-point interior shape is in question** -- do not
-  remove this flag without a fresh numeric re-check against a real run.
+- **CONFIRMED BUG (not just "unverified" -- a `tester` pass on
+  2026-08-17 reproduced and quantified it precisely), read
+  `gui/diagrams/ForceDiagram.h`'s header comment for the fuller
+  narrative, this bullet for the hard numbers**: `M(x)`'s interior
+  shape is **wrong by orders of magnitude**, not a rounding-scale gap.
+  Built a temporary instrumented `orcisf_cli` (reverted, never
+  committed) that prints the exact formula's `M(0)`/`M(L/2)`/`M(L)`
+  alongside the real `MTUM_KI`/`MLAP`/`MTUM_KA` for every beam in a
+  fresh run of the `Apl1-1` scratch dataset. Batang 5: `M(0)` matches
+  `MTUM_KI` exactly (**-66645.8 Nmm**, trivially true by construction --
+  no `V*x`/`w*x^2` term involved at `x=0`), but `M(L/2)` computed =
+  **157,702,651 Nmm** vs. actual `MLAP` = **96,254 Nmm** (~1638x off),
+  and `M(L)` computed = **-10,328,052 Nmm** vs. actual `MTUM_KA` =
+  **-76,907 Nmm** (~134x off) -- and the same order-of-magnitude
+  failure repeats identically across all 4 beam members in the
+  dataset (5, 6, 7, 8). `V(x)` itself and both `M` endpoints (taken
+  directly from `moment_z_a`/`moment_z_b`, no formula involved) remain
+  exactly correct -- only the *integration* of the verified `V(x)` from
+  the verified `M_start` is broken. The magnitude of the error (`MLAP`
+  itself is only ~96 N·m -- far too small for a beam nominally carrying
+  `w*L^2/8 ≈ 163 kN·m` under its own stated 36200 N/m over 6m -- while
+  `shear_y_a` is ~108,000 N, an enormous shear for a barely-bending
+  member) indicates `shear_y_a`/`w_total_n_per_m` are **not actually the
+  conjugate pair driving `moment_z`'s variation** in this codebase's real
+  local-axis convention -- i.e. the AC's own prescribed formula (which
+  the code faithfully implements) does not hold for this port's actual
+  rotation-matrix/local-axis setup. Root cause still not identified;
+  candidates from the original 2026-08-16 investigation (self-weight
+  timing, a resolved/rotated load component) remain unconfirmed and
+  should be revisited by `coder`, not assumed correct. **N(x)/T(x)
+  (direct constant copies) remain solid; only M(x)'s interior shape is
+  broken** -- do not remove or soften this flag without a fresh,
+  reproducible numeric re-check (the exact repro: instrument
+  `CmdOptimize()` to print `sd.MLAP`/`MTUM_KI`/`MTUM_KA`/`EL` alongside
+  `ComputeForceDiagram()`'s own output for a real run).
 - **Verification status:** compiled cleanly (zero warnings). GUI launch
   confirmed, "Force Diagrams" dock tab (with its own hand-drawn icon)
   renders correctly and shows the right disabled-state placeholder text
@@ -2806,8 +2820,12 @@ or trusting the moment diagram's interior shape:**
   **The actual populated ImPlot rendering (BeginPlot/PlotShaded/PlotLine/
   DragLineX with real diagram data) was not visually confirmed this
   session** -- blocked by issue #63 (RunPanel hang), the same blocker
-  #60 hit. Re-verify both the rendering and the M(x) discrepancy above
-  once #63 is fixed (details: `CHANGE_HISTORY.md`, 2026-08-16).
+  #60 hit. **`tester` (2026-08-17) confirmed the M(x) bug above via a
+  CLI-only repro (no GUI needed) -- this is now a known FAIL, not
+  merely unverified; do not treat it as "probably fine, just unseen."**
+  Re-verify the actual pixel rendering once #63 is fixed, but the
+  interior-shape bug must be fixed first regardless of #63 (details:
+  `CHANGE_HISTORY.md`, 2026-08-16 and 2026-08-17).
 
 **Results tables + CSV export (issue #62, part of epic #58) — read
 before touching `ResultsPanel.{h,cpp}` or

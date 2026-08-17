@@ -4296,3 +4296,80 @@ once #63 no longer blocks it.
   `src/engine/include/engine/AnalysisResults.h`,
   `src/engine/src/AnalysisResults.cpp`,
   `src/engine/tools/orcisf_cli.cpp`, `src/CMakeLists.txt`, `AGENTS.md`
+
+## [2026-08-17] — chore(test): tester pass on epic #58's overnight work (#59-#63)
+
+`/tester` (user: "check last night coder works") against issues #59-#62,
+plus a re-check of #63. Binary: `src/build.ps1` windows-release preset,
+HEAD `ea44006` (ninja reported "no work to do" -- already current from
+the overnight session, confirmed by binary mtimes matching last night).
+
+**#59 — 6/6 PASS.** Directly re-verified, not just re-reading last
+night's evidence: ran a fresh `orcisf_cli optimize` (different seed/
+params than any run used overnight) against the scratch `Apl1-1`
+dataset, diffed `ANALYSIS_RESULTS` against that same run's own `.str`
+file -- member 1's 12 end-force values and joint 1's 6 reaction values
+matched exactly. `equilibrium` residual still ~0. Source confirms
+`ComputeRestraintSummary()` reuse, restrained-joints-only reactions,
+`const StructureData&` signature, and the `orcisf_cli` refactor to the
+shared accessor.
+
+**#60 — 6/7 source-verified PASS, 1 UNVERIFIED.** Toggle, scale slider
+(applied at draw time, not baked into the scene), distinct additive
+cyan rendering, translational-only displacement math, no view-plane
+special-casing, and `has_deformation` gating all directly confirmed in
+`ViewportPanel.cpp`/`SceneRenderer.cpp`/`SceneModel.h`. The one
+interactive criterion (spot-check a displaced joint against real `DJ`
+values with a completed run loaded) is UNVERIFIED -- the session's
+foreground window was the user's own active VS Code
+(`GetForegroundWindow()` checked before any automation attempt, per
+this project's established GUI-automation safety rule), so no
+click/keystroke automation was attempted rather than risk disrupting
+it. Issue #63 would have blocked a completed run through the GUI
+regardless.
+
+**#61 — 4 PASS, 1 FAIL (confirmed, not merely unverified).** The
+formula/ImPlot wiring/station-slider/gating criteria match spec. But
+the "verified against a real dataset, matches `MLAP`/`MTUM_KI`/
+`MTUM_KA`" criterion was directly, mechanically checked -- and fails
+outright, with hard numbers, not just the "unresolved discrepancy" note
+left overnight. Built a temporary instrumented `orcisf_cli` (printed
+`ComputeForceDiagram()`'s exact formula's `M(0)`/`M(L/2)`/`M(L)`
+alongside real `sd.MTUM_KI`/`MLAP`/`MTUM_KA`/`EL` for every beam;
+reverted via `git checkout` before finishing, never committed) against
+a fresh run of the `Apl1-1` scratch dataset. Batang 5: `M(0)` matches
+`MTUM_KI` exactly (**-66645.8 Nmm**, trivial by construction), but
+`M(L/2)` computed = **157,702,651 Nmm** vs. real `MLAP` = **96,254
+Nmm** (~1638x off), `M(L)` computed = **-10,328,052 Nmm** vs. real
+`MTUM_KA` = **-76,907 Nmm** (~134x off) -- and the identical
+order-of-magnitude failure repeats across all 4 beam members in the
+dataset (5, 6, 7, 8), ruling out a one-off. `V(x)` and both moment
+endpoints (direct field copies) remain exactly correct; only the
+integration is broken. Full numbers and analysis in `AGENTS.md`'s #61
+section. **Recommendation: back to `coder`**, not a fix attempted here
+per this skill's scope (verify, don't fix).
+
+**#62 — 4 PASS, 1 UNVERIFIED (high indirect confidence).** Table
+structure (`BeginTableView`/`TableRowSelectable`), the equilibrium
+summary table, CSV export wiring (`Toolbar` menu item +
+`WriteResultsCsv()`), and run-gating all confirmed in source. The
+"verified: panel's total-reactions matches `orcisf_cli equilibrium`"
+criterion reduces to the exact same `TotalReaction()`/
+`total_applied_load` calls already directly re-verified correct under
+#59 today -- `ResultsPanel` applies no further transformation, just
+`%.6g`-formats them -- so the *data* is proven correct by code-path
+identity, but the CSV file and the rendered panel itself were not
+exercised (same foreground-window constraint as #60).
+
+**#63 — re-confirmed, still open, still blocking.** One more
+`orcisf_cli optimize` run against the same dataset/class of parameters:
+instant, no hang. Consistent with last night's finding that this is
+isolated to the GUI's Run path, not the engine.
+
+**GUI screenshots were not taken this pass** (unlike prior `tester`
+sessions) -- the standing rule to check `GetForegroundWindow()` before
+grabbing focus, and stop if it's the user's own active window, applied
+throughout; VS Code stayed foreground the entire session.
+
+- Files: `AGENTS.md` (Tracked Issues table + #61's section rewritten
+  with confirmed numbers, `CHANGE_HISTORY.md`)
