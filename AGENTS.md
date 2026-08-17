@@ -2696,6 +2696,9 @@ later, different one (e.g. closing an issue or cutting a release).
 | #69 | feat(src): per-member manual dimension input panel for Analyze mode | ready-for-review (tester: GUI-rendering/interaction ACs UNVERIFIED, blocked by automation hazard -- underlying AnalyzeFixedDesign() call target independently confirmed correct via #68) | 2026-08-17 |
 | #70 | feat(src): Analyze-mode design-check results display (demand vs. capacity, safe/unsafe) | ready-for-review (tester: demand-vs-capacity + viewport-coloring data flow PASS via standalone program (undersized-vs-adequate column test); on-screen table/badge/viewport-pixel ACs UNVERIFIED, blocked by automation hazard) | 2026-08-17 |
 | #71 | feat(src): 3D-viewport force diagram overlay (N/V/M/T ribbons on the structure) | ready-for-review (coder: implemented + compiled overnight, see AGENTS.md's own section; GUI not interactively exercised yet -- not tested this pass, user asked for #66/#67 only) | 2026-08-17 |
+| #72 | fix(src): loads disappear from Loads panel after a completed optimization run | open | 2026-08-17 |
+| #73 | fix(src): dock tab icon disappears when that panel's tab is not the active one | open | 2026-08-17 |
+| #74 | feat(src): default checkbox for same lapangan/tumpuan bars in Analyze mode's beam input | open | 2026-08-17 |
 
 Epic #67 tracks #68–#70 (manual-dimension "Analyze" mode: engine
 entry point, GUI input panel, GUI results display — reuses the

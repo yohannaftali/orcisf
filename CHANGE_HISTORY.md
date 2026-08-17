@@ -4987,3 +4987,50 @@ constraint this pass. Epic #67 should stay open until then.
   table (not closed/commented on GitHub -- awaiting explicit
   confirmation per this project's standard `reviewer`-stage caution)
 - Files: `AGENTS.md` (Tracked Issues table), `CHANGE_HISTORY.md`
+
+## [2026-08-17] — planner: 3 new bug/feature reports from user testing
+
+User reported three issues found while reviewing last night's overnight
+work at the office. Duplicate-checked all three via GitHub Search API
+first (0 results each), then filed:
+
+- **#72** -- `fix(src): loads disappear from Loads panel after a
+  completed optimization run`. Root cause identified precisely:
+  `Application::OnRunResult()` deliberately zeroes `sd.W`/`AML`/`AJ`
+  post-run (a documented, intentional choice from when this code was
+  first written -- see `AGENTS.md`'s existing note on why: no cheap way
+  back then to separate self-weight-inflated joint actions from raw
+  user loads). That reasoning is now outdated: issue #7's
+  `engine::ReadLoadsRaw()` and the pattern established by #66 (re-read
+  from the still-intact `.bbn` file rather than trust in-memory state)
+  make the fix straightforward -- re-read raw loads from disk instead
+  of zeroing them, since a run never writes back to the dataset's own
+  `.bbn`.
+- **#73** -- `fix(src): dock tab icon disappears when that panel's tab
+  is not the active one`. A plausible root cause is documented in the
+  issue body (not confirmed, flagged as needing investigation): issue
+  #51's fix for icons bleeding through an open menu switched
+  `DockTabIcons.cpp` from `GetForegroundDrawList()` to each window's own
+  `window->DrawList` -- but Dear ImGui's docking system likely only
+  composites the *currently selected* tab's own window draw list each
+  frame, so a background/inactive tab's icon (drawn onto that same
+  per-window draw list) may never render at all. Suggested fix
+  direction: draw onto the dock node's *host* window's draw list
+  (`window->DockNode->HostWindow->DrawList`) instead, since the tab bar
+  chrome itself is owned by that always-rendered host window regardless
+  of which child tab is selected -- explicitly flagged as unconfirmed,
+  for `coder` to verify before assuming it's correct.
+- **#74** -- `feat(src): default checkbox for same lapangan/tumpuan bars
+  in Analyze mode's beam input`. A GUI-only UX simplification for #69's
+  already-implemented input panel (not a change to
+  `engine::AnalyzeFixedDesign()` or the legacy 12-slot-per-beam
+  design-variable layout): a per-beam checkbox, checked by default,
+  collapsing the 8 lapangan/tumpuan reinforcement dropdowns down to 4 by
+  mirroring the lapangan choice into both regions before the
+  `AnalyzeFixedDesign()` call -- matching real construction practice
+  (continuous bars through both regions) as the practical default, while
+  keeping the fully-independent 12-slot behavior available when
+  unchecked.
+
+- Issues #72, #73, #74 created on GitHub (all open)
+- Files: `AGENTS.md` (Tracked Issues table), `CHANGE_HISTORY.md`
