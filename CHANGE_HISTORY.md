@@ -4446,3 +4446,84 @@ attempt, none was made).
   `src/gui/diagrams/ForceDiagram.h`, `src/gui/diagrams/ForceDiagram.cpp`,
   `src/gui/ForceDiagramPanel.cpp`, `src/gui/ResultsPanel.cpp`,
   `src/report/ResultsCsvExport.cpp`, `AGENTS.md`
+
+## [2026-08-17] — chore(test): tester re-verification of #61's fix (commit afc61bf)
+
+`/tester` ("re-verify #61 after coder's fix"). Binary: `src/build.ps1`
+windows-release, HEAD `afc61bf` (ninja: "no work to do" -- current).
+Working tree clean before and after (`git status --short` empty).
+
+Extended the standalone verification program used during the fix
+(links directly against `orcisf_engine.lib` + `gui/diagrams/
+ForceDiagram.cpp`, no GUI toolchain needed) to check every Acceptance
+Criterion mechanically, against a fresh run (`rng_seed=77`, different
+from the fix's own verification run) of the scratch `Apl1-1` dataset:
+
+- **AC1 (formula)** -- PASS, source-confirmed: exact spec formula,
+  evaluated in meters/N*m with no millimeter conversion.
+- **AC2 (member-selection -> ImPlot)** -- PASS, source-confirmed,
+  unchanged from the prior tester pass.
+- **AC3 (station readout + stress)** -- PASS. Hand-checked the printed
+  stress against its own inputs: N=25696N, M=-96224 N*m, a 300x500mm
+  section -> axial 0.171 MPa + bending -7.698 MPa = -7.527 MPa, matching
+  the tool's own `-7.526657104` exactly. Previously this would have
+  been wrong by the same ~1000x factor as the moment bug (the stress
+  calc divides M by the section modulus, so it inherited the same unit
+  error).
+- **AC4 (run-gating)** -- PASS, source-confirmed, unchanged.
+- **AC5a (end-values match `AM` exactly)** -- PASS. `axial_a`/
+  `shear_y_a`/`moment_z_a` bit-identical to the diagram's `N(0)`/`V(0)`/
+  `-M(0)` across all 4 beam members (5, 6, 7, 8).
+  `AC5b (endpoints match MTUM_KI/MTUM_KA)` -- PASS. Float32-precision
+  match across all 4 beams, e.g. batang 7: real `MTUM_KA=-63380.76953`
+  vs. computed `M(L)=-63380.75`.
+- **AC5c (midspan matches `MLAP`)** -- **not exact, and structurally
+  can't be**. Relative differences across the 4 beams: batang 6 0.82%,
+  batang 8 2.00%, batang 7 10.73%, batang 5 11.43%. A dramatic
+  improvement from pre-fix (134x-1638x off), but `MLAP` is a documented
+  simplified design shortcut (`M_start + w*L^2/8`, see `Hasil()`), not
+  the rigorous free-body-integrated interior moment this fixed formula
+  now correctly computes -- the two are genuinely different physics
+  approximations that happen to land in the same ballpark. Forcing an
+  exact match would mean deliberately reproducing `MLAP`'s
+  simplification instead of a physically correct diagram, which would
+  be a regression, not a fix. **Flagged as a question for the user/
+  planner about the AC's own wording, not routed back to `coder` as a
+  bug** -- the AC was written (2026-08-16) before this MLAP-vs-rigorous
+  distinction was understood.
+- **GUI pixel rendering** -- still UNVERIFIED. The user's own VS Code
+  was the foreground window throughout this session (checked before
+  concluding, no automation attempted); issue #63 also still separately
+  blocks a completed run through the GUI itself.
+
+**Recommendation**: AC1-AC5b are solid, direct passes (including two
+independent bit-exact/float32-exact numeric confirmations, not just
+"it compiles"). AC5c is not a defect to fix -- it's a mismatch between
+the issue's original wording and what `MLAP` actually represents,
+needing a human call (accept as close enough + revise the AC wording,
+or leave open) rather than further coder work.
+
+- Files: `AGENTS.md` (Tracked Issues table), `CHANGE_HISTORY.md`
+
+## [2026-08-17] — docs: revise issue #61's AC5 wording per user decision
+
+User reviewed the `tester` re-verification above and decided: accept
+AC5c (midspan-vs-`MLAP`) as close enough, revise the criterion's
+wording rather than leave it open or send more work back to `coder`.
+
+Edited issue #61 on GitHub directly (`PATCH /issues/61`): all 5
+Acceptance Criteria checked off; the last criterion's text rewritten to
+require an *exact* match against `MTUM_KI`/`MTUM_KA` (already true) and
+demote the midspan-vs-`MLAP` comparison to a sanity check, not an
+exact-match requirement, with a dated note explaining why (`MLAP` is
+`Hasil()`'s own simplified design shortcut, not the same calculation as
+the rigorous free-body-integrated interior moment this diagram now
+correctly computes -- discovered while root-causing the units bug this
+same day).
+
+Not closed -- GUI pixel rendering is still unverified (issue #63 blocks
+a completed run through the GUI), which a `reviewer` pass should weigh
+before actually closing this issue.
+
+- Issue #61 updated on GitHub (body edited, not closed)
+- Files: `AGENTS.md` (Tracked Issues table), `CHANGE_HISTORY.md`
