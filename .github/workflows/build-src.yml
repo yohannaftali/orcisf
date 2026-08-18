@@ -103,6 +103,37 @@ jobs:
             choco install ninja -y --no-progress
           fi
 
+      # vcpkg has no binary cache configured otherwise, so every run
+      # re-downloads and rebuilds every dependency's source tarball from
+      # codeload.github.com from scratch. That endpoint is aggressively
+      # rate-limited and shared across every GitHub Actions runner
+      # globally -- with three OS legs hitting it in parallel, sustained
+      # 429/502/503s are expected under load, not a one-off fluke (this is
+      # what caused the opengl-registry/imgui download failures reported
+      # against this exact workflow). The Ninja-not-found errors that
+      # follow in that failure mode are a downstream symptom: vcpkg's
+      # install step fails first, so `cmake --preset` never reaches
+      # toolchain detection.
+      #
+      # Fix: enable vcpkg's GitHub Actions binary cache (the documented
+      # `x-gha` binary source -- see https://learn.microsoft.com/vcpkg/
+      # users/binarycaching#gha). ACTIONS_CACHE_URL/ACTIONS_RUNTIME_TOKEN
+      # are only exposed to actions/github-script, not directly to `run`
+      # steps, hence the export step below. Once a package has been built
+      # once on any branch, later runs fetch the built binary from the
+      # GHA cache instead of re-downloading source/rebuilding -- avoiding
+      # the flaky download entirely on a cache hit, not just retrying it.
+      - name: Export GitHub Actions cache credentials for vcpkg
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Enable vcpkg GHA binary cache
+        shell: bash
+        run: echo "VCPKG_BINARY_SOURCES=clear;x-gha,readwrite" >> "$GITHUB_ENV"
+
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:

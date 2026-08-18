@@ -5526,3 +5526,29 @@ tests already covered.
   a re-verification pass.
 - Files: `AGENTS.md` (Tracked Issues table -- #58, #63-#74, #67 rows
   updated to `closed`), `CHANGE_HISTORY.md`.
+
+## [2026-08-18] — chore(ci): fix intermittent vcpkg dependency-download failures (issue #76)
+
+- User reported a CI run failing across all three build-src.yml legs
+  with vcpkg unable to download opengl-registry/imgui/egl-registry
+  source tarballs from codeload.github.com (429/502/503 after 3
+  retries), followed by Ninja-not-found/CMAKE_CXX_COMPILER-not-set
+  errors (a downstream symptom of the failed vcpkg install, not a
+  separate bug).
+- Root cause: no vcpkg binary cache was configured, so every run
+  re-downloads and rebuilds every dependency from source on every leg
+  in parallel, hitting a rate-limited endpoint shared across every
+  GitHub Actions runner globally. Same underlying cause as issue #56's
+  Linux ninja-zip download flakiness, different dependency-fetch path.
+- Fix: enabled vcpkg's GitHub Actions binary cache (`x-gha`) via
+  `VCPKG_BINARY_SOURCES=clear;x-gha,readwrite`, set right before the
+  `Setup vcpkg` step (with `ACTIONS_CACHE_URL`/`ACTIONS_RUNTIME_TOKEN`
+  exported first via `actions/github-script`, since plain `run` steps
+  can't see them). A package built once on any branch is now fetched
+  from cache on later runs instead of re-downloaded/rebuilt.
+- Filed as issue #76 (workflow-only change, no src/ code touched, so no
+  release warranted). Two of its three acceptance criteria are met by
+  inspection; the third (a real post-merge CI run staying green under
+  load) can only be confirmed by watching the next actual run.
+- Files: `.github/workflows/build-src.yml`, `AGENTS.md` (new CI bullet
+  + #76 Tracked Issues row), `CHANGE_HISTORY.md`.

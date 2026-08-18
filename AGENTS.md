@@ -2557,6 +2557,22 @@ later, different one (e.g. closing an issue or cutting a release).
   windows-latest/macos-latest/ubuntu-latest for every push/PR touching
   `src/**`. Nothing else in the repo has CI (no build step applies to the
   legacy archive or the docs).
+  - **vcpkg's GitHub Actions binary cache (`x-gha`) is enabled** (issue
+    #76) via `VCPKG_BINARY_SOURCES=clear;x-gha,readwrite`, set right
+    before the `Setup vcpkg` step (needs `ACTIONS_CACHE_URL`/
+    `ACTIONS_RUNTIME_TOKEN` exported first via `actions/github-script`,
+    since those aren't visible to plain `run` steps). Without this, every
+    run re-downloads and rebuilds every dependency's source tarball from
+    `codeload.github.com` from scratch on all three legs in parallel --
+    that endpoint is aggressively rate-limited and shared across every
+    Actions runner globally, so sustained 429/502/503 failures (observed
+    for `opengl-registry`/`imgui`/`egl-registry`) are expected under load,
+    not a fluke. With caching, a package built once on any branch is
+    fetched from the GHA cache on later runs instead of re-downloaded/
+    rebuilt, avoiding the flaky download entirely on a cache hit rather
+    than just retrying it. Same underlying cause as issue #56's Linux
+    ninja-zip flakiness (unauthenticated `codeload.github.com`/release-
+    asset rate limiting), different dependency-fetch mechanism.
   - **Ninja on the Linux leg comes from `apt-get install ninja-build`
     (folded into the existing `Install Linux GL/X11 dev packages` step),
     not `seanmiddleditch/gha-setup-ninja`** (issue #56) — that action
@@ -2762,6 +2778,7 @@ later, different one (e.g. closing an issue or cutting a release).
 | #73 | fix(src): dock tab icon disappears when that panel's tab is not the active one | closed (tester: interactively CONFIRMED live in two separate tab groups -- inactive-tab icons visible, #51 regression check passed; DPI-forced-scale re-check not done this pass) | 2026-08-18 |
 | #74 | feat(src): default checkbox for same lapangan/tumpuan bars in Analyze mode's beam input | closed (tester: interactively CONFIRMED live -- checkbox checked by default, 8-column layout when checked, reverts to full 12-slot layout when unchecked, Run Analyze works with no crash) | 2026-08-18 |
 | #75 | bug(src): JSTD can exceed kMak (825), causing OOB heap write / segfault for large fak_kali | closed (coder: fixed at both engine (RunOptimization() throws instead of OOB write) and GUI (RunPanel clamp) layers; verified via orcisf_cli -- the exact repro that segfaulted before the fix now fails with a clear error message, and a regression run with RunPanel's own defaults + worker_threads=15 still completes correctly) | 2026-08-17 |
+| #76 | chore(ci): vcpkg dependency downloads fail intermittently on GitHub rate-limit (429/502/503) | ready-for-review (coder: enabled vcpkg's GHA binary cache (x-gha) in build-src.yml so a package built once is fetched from cache on later runs instead of re-downloaded/rebuilt from codeload.github.com every leg, every run; workflow-only change, no src/ code touched; final criterion -- a real post-merge CI run staying green under load -- can only be confirmed by watching the next run) | 2026-08-18 |
 
 Epic #67 tracks #68–#70 (manual-dimension "Analyze" mode: engine
 entry point, GUI input panel, GUI results display — reuses the
