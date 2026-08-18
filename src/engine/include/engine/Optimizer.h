@@ -71,6 +71,37 @@ struct OptimizationOptions {
     bool seed_from_previous_best = false;
     std::vector<int> seed_var_b; // flat, 0-based, [jsum + 12*isum] layout matching StructureData::var_b's row
     std::vector<int> seed_var_k; // flat, 0-based, [jsum + 5*isum] layout matching StructureData::var_k's row
+
+    // Issue #77: practically, a beam is almost always built with the same
+    // bar diameter/count at midspan (lapangan) and support (tumpuan) --
+    // the same simplification a column already gets via one N_DIA/DIA
+    // shared across all four sides. When true (default), every candidate
+    // design's tumpuan bar slots (var_b indices 6-9 per beam: DIA1tum/
+    // NL1tum/DIA2tum/NL2tum) are forced to mirror the lapangan slots
+    // (indices 2-5) right before each fitness evaluation -- see
+    // Optimizer.cpp's MirrorBeamTumpuan(). This does NOT shrink JVD/the
+    // 12-slot beam layout (that's load-bearing throughout the optimizer,
+    // see AGENTS.md's "Discrete design variables" section) -- the tumpuan
+    // slots are still generated/searched like any other variable, but
+    // always overwritten before they can affect a design's evaluated
+    // fitness, so they have zero effect on the optimization outcome and
+    // every kept design ends up symmetric. Matches the same "mirror at
+    // evaluate time" pattern issue #74 already established for Analyze
+    // mode's own "same lapangan/tumpuan" checkbox.
+    bool symmetric_beam_reinforcement = true;
+
+    // Issue #78: real construction practice runs an even number of
+    // longitudinal bars (bars come in symmetric pairs), minimum 4 -- odd
+    // counts are unusual/impractical, and 1-3 bars is not a valid
+    // beam/column reinforcement choice at all. When true (default), every
+    // candidate design's bar-count slots (beam var_b indices 3/5/7/9,
+    // reading the shared NL_d discrete table; column var_k index 2) are
+    // snapped to the nearest table index whose resolved value is even and
+    // >= 4, right before each fitness evaluation (same two call sites as
+    // symmetric_beam_reinforcement above -- see Optimizer.cpp's
+    // SnapBarCountIndex()). When false, odd counts become reachable too,
+    // but the >= 4 floor still applies either way.
+    bool even_bar_count_only = true;
 };
 
 struct ProgressInfo {

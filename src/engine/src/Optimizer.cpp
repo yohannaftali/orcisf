@@ -179,12 +179,97 @@ void AcakVariabel(StructureData& sd, Rng& rng, const OptimizationOptions& option
     }
 }
 
+// Issue #77: forces every beam's tumpuan bar slots (indices 6-9: DIA1tum/
+// NL1tum/DIA2tum/NL2tum) to mirror its lapangan slots (indices 2-5:
+// DIA1lap/NL1lap/DIA2lap/NL2lap) in-place. `Arr` is either
+// `LegacyArray<int>&` (sd.var_b[no_struktur]) or `int*` (var_b_cb, the
+// trial-search scratch buffer) -- both support operator[]. Deliberately a
+// pure function of (arr, jum_balok): calling it twice on values that
+// already match is a no-op, which is what lets #78's snap below run after
+// this without breaking the mirror (see OptimizationOptions::
+// symmetric_beam_reinforcement's header comment).
+template <typename Arr>
+void MirrorBeamTumpuan(Arr& var_b, int jum_balok) {
+    for (int i = 0; i < jum_balok; ++i) {
+        var_b[6 + 12 * i] = var_b[2 + 12 * i];
+        var_b[7 + 12 * i] = var_b[3 + 12 * i];
+        var_b[8 + 12 * i] = var_b[4 + 12 * i];
+        var_b[9 + 12 * i] = var_b[5 + 12 * i];
+    }
+}
+
+// Issue #78: nearest table index to `idx` (within [0, count)) whose
+// resolved value is >= 4, and -- when `even_only` -- also even. Assumes
+// `table` is ascending by value (the convention every discrete table in
+// this port already relies on, e.g. the adaptive stirrup-tightening loop
+// in EvaluateCandidateFull below counting `cari_S` down while comparing
+// values). Linear scan is deliberate: these tables are always small
+// (typically well under 20 entries), and this runs on a hot path
+// (EvaluateTrial, once per search trial per generation), so simplicity
+// beats a binary-search-with-eligibility-mask that would only pay off on
+// tables orders of magnitude larger than any real dataset uses. Falls
+// back to the highest-value eligible index if `idx` itself is out of
+// range, and to index 0 if the table has no entry >= 4 at all (a
+// malformed/too-small discrete table -- not this function's job to
+// validate, just to not crash).
+int SnapBarCountIndex(const LegacyArray<float>& table, int count, int idx, bool even_only) {
+    auto eligible = [&](int i) {
+        float v = Isi(i, table);
+        if (v < 4.f) return false;
+        if (!even_only) return true;
+        int iv = static_cast<int>(v + 0.5f);
+        return iv % 2 == 0;
+    };
+    if (idx >= 0 && idx < count && eligible(idx)) return idx;
+
+    int best = -1;
+    int best_dist = count + 1;
+    for (int i = 0; i < count; ++i) {
+        if (!eligible(i)) continue;
+        int dist = (i > idx) ? (i - idx) : (idx - i);
+        if (dist < best_dist) {
+            best_dist = dist;
+            best = i;
+        }
+    }
+    return best >= 0 ? best : 0;
+}
+
+// Applies #78's min-4 (and, when `even_only`, even-only) bar-count snap
+// to every beam bar-count slot (3/5/7/9, all reading the shared NL_d
+// table -- see AGENTS.md's "Discrete design variables") and every column
+// bar-count slot (2). Unlike symmetric_beam_reinforcement's mirror, this
+// always runs (min-4 applies regardless of the option) -- only the
+// evenness half is conditional on `even_only`.
+template <typename ArrB, typename ArrK>
+void SnapBarCounts(const StructureData& sd, ArrB& var_b, int jum_balok, ArrK& var_k, int jum_kolom, bool even_only) {
+    for (int i = 0; i < jum_balok; ++i) {
+        for (int slot : {3, 5, 7, 9}) {
+            int& v = var_b[slot + 12 * i];
+            v = SnapBarCountIndex(sd.NL_d, sd.nNL, v, even_only);
+        }
+    }
+    for (int i = 0; i < jum_kolom; ++i) {
+        int& v = var_k[2 + 5 * i];
+        v = SnapBarCountIndex(sd.NL_d, sd.nNL, v, even_only);
+    }
+}
+
 // ---- Shared per-candidate evaluation body (Polyhedron.hpp's inline
 // first-generation / end-of-generation loop body). See CostConstraint.h's
 // header comment for why this deliberately differs from KendalaHarga(). ----
 
-void EvaluateCandidateFull(StructureData& sd, int no_struktur) {
+void EvaluateCandidateFull(StructureData& sd, int no_struktur, const OptimizationOptions& options) {
     sd.no_struktur = no_struktur;
+    // LegacyArray2D::operator[] returns a temporary `int*` prvalue, which
+    // can't bind directly to Arr& below -- name it first so it's an
+    // lvalue the template can take by reference.
+    int* row_b = sd.var_b[no_struktur];
+    int* row_k = sd.var_k[no_struktur];
+    if (options.symmetric_beam_reinforcement) {
+        MirrorBeamTumpuan(row_b, sd.jum_balok);
+    }
+    SnapBarCounts(sd, row_b, sd.jum_balok, row_k, sd.jum_kolom, options.even_bar_count_only);
     sd.kendalastr[no_struktur] = 0.f;
     sd.hargastr[no_struktur] = 0.f;
     sd.fitstr[no_struktur] = 0.f;
@@ -424,7 +509,7 @@ struct TrialResult {
     float fitcb = 0.f;
 };
 
-TrialResult EvaluateTrial(StructureData& sd, int iterasi_var) {
+TrialResult EvaluateTrial(StructureData& sd, int iterasi_var, const OptimizationOptions& options) {
     sd.varplus[sd.no_TS_terjauh] = iterasi_var + 1.f;
     sd.varnew_f[sd.no_TS_terjauh] =
         sd.varnew_asli[sd.no_TS_terjauh] + sd.varplus[sd.no_TS_terjauh] * sd.arah[sd.no_TS_terjauh];
@@ -458,6 +543,10 @@ TrialResult EvaluateTrial(StructureData& sd, int iterasi_var) {
 
     PeriksaBatas(sd);
     Unnormalisasi(sd, sd.varnew, sd.var_b_cb, sd.var_k_cb);
+    if (options.symmetric_beam_reinforcement) {
+        MirrorBeamTumpuan(sd.var_b_cb, sd.jum_balok);
+    }
+    SnapBarCounts(sd, sd.var_b_cb, sd.jum_balok, sd.var_k_cb, sd.jum_kolom, options.even_bar_count_only);
     float fitcb = KendalaHarga(sd, sd.var_b_cb, sd.var_k_cb);
     return {true, fitcb};
 }
@@ -471,7 +560,7 @@ int TrialCount(const StructureData& sd) {
     return std::max(1, static_cast<int>(std::ceil(x)));
 }
 
-void CariBaru(StructureData& sd) {
+void CariBaru(StructureData& sd, const OptimizationOptions& options) {
     sd.iterasi_var = 0;
     NormalisasiInt(sd, sd.varnew_asli, sd.var_b_jelek, sd.var_k_jelek);
     sd.fitcb_best = 0.f;
@@ -479,7 +568,7 @@ void CariBaru(StructureData& sd) {
     int n_trials = TrialCount(sd);
     for (int iterasi_var = 0; iterasi_var < n_trials; ++iterasi_var) {
         sd.iterasi_var = iterasi_var;
-        TrialResult result = EvaluateTrial(sd, iterasi_var);
+        TrialResult result = EvaluateTrial(sd, iterasi_var, options);
         if (result.valid && result.fitcb > sd.fitcb_best) {
             sd.fitcb_best = result.fitcb;
             for (int icb = 0; icb < sd.jum_balok; ++icb) {
@@ -580,10 +669,11 @@ void CopyCandidateSlot(StructureData& dst, const StructureData& src, int slot) {
 }
 
 // Parallel version of `for (iop = lo; iop < hi; ++iop) EvaluateCandidateFull(sd, iop);`.
-void EvaluatePopulationParallel(StructureData& sd, std::vector<StructureData>& workers, int lo, int hi) {
+void EvaluatePopulationParallel(StructureData& sd, std::vector<StructureData>& workers, int lo, int hi,
+                                 const OptimizationOptions& options) {
     if (workers.empty() || hi - lo <= 1) {
         for (int iop = lo; iop < hi; ++iop) {
-            EvaluateCandidateFull(sd, iop);
+            EvaluateCandidateFull(sd, iop, options);
         }
         return;
     }
@@ -592,8 +682,9 @@ void EvaluatePopulationParallel(StructureData& sd, std::vector<StructureData>& w
         w = sd; // full sync: problem definition + current population state
     }
 
-    auto ranges =
-        RunOnLanes(sd, workers, hi - lo, [lo](StructureData& local, int i) { EvaluateCandidateFull(local, lo + i); });
+    auto ranges = RunOnLanes(sd, workers, hi - lo, [lo, &options](StructureData& local, int i) {
+        EvaluateCandidateFull(local, lo + i, options);
+    });
 
     // ranges[0] was computed by `sd` itself -- nothing to merge for it.
     for (size_t lane = 1; lane < ranges.size(); ++lane) {
@@ -651,12 +742,12 @@ void SyncSearchState(StructureData& dst, const StructureData& src) {
 // to the sequential path (identical result either way).
 constexpr int kMinTrialsPerWorker = 8;
 
-void CariBaruParallel(StructureData& sd, std::vector<StructureData>& workers) {
+void CariBaruParallel(StructureData& sd, std::vector<StructureData>& workers, const OptimizationOptions& options) {
     int n_trials = TrialCount(sd);
     int n_lanes = 1 + static_cast<int>(workers.size());
 
     if (workers.empty() || n_trials < n_lanes * kMinTrialsPerWorker) {
-        CariBaru(sd); // identical result, no threading overhead worth paying
+        CariBaru(sd, options); // identical result, no threading overhead worth paying
         return;
     }
 
@@ -673,9 +764,9 @@ void CariBaruParallel(StructureData& sd, std::vector<StructureData>& workers) {
     // (fitcb_best/var_b_cb_best/var_k_cb_best, already zeroed by the sync
     // above), exactly like the sequential path -- no shared mutable state
     // touched during dispatch.
-    RunOnLanes(sd, workers, n_trials, [](StructureData& local, int iterasi_var) {
+    RunOnLanes(sd, workers, n_trials, [&options](StructureData& local, int iterasi_var) {
         local.iterasi_var = iterasi_var;
-        TrialResult result = EvaluateTrial(local, iterasi_var);
+        TrialResult result = EvaluateTrial(local, iterasi_var, options);
         if (result.valid && result.fitcb > local.fitcb_best) {
             local.fitcb_best = result.fitcb;
             for (int icb = 0; icb < local.jum_balok; ++icb) {
@@ -876,7 +967,7 @@ void RunOptimization(StructureData& sd, const OptimizationOptions& options, cons
         workers.assign(options.worker_threads - 1, sd);
     }
 
-    EvaluatePopulationParallel(sd, workers, 0, sd.JSTD);
+    EvaluatePopulationParallel(sd, workers, 0, sd.JSTD, options);
     Sort(sd, sd.JSTD);
     if (on_detail) {
         on_detail(0, sd);
@@ -889,7 +980,7 @@ void RunOptimization(StructureData& sd, const OptimizationOptions& options, cons
 
     do {
         Penelusuran(sd);
-        CariBaruParallel(sd, workers);
+        CariBaruParallel(sd, workers, options);
 
         if (sd.fitcb_best > sd.fitstr[0]) {
             sd.jum_susut = 0;
@@ -902,7 +993,7 @@ void RunOptimization(StructureData& sd, const OptimizationOptions& options, cons
             }
         }
 
-        EvaluateCandidateFull(sd, 0);
+        EvaluateCandidateFull(sd, 0, options);
         Sort(sd, sd.JSTD);
 
         if (on_detail) {

@@ -5591,3 +5591,43 @@ tests already covered.
 - Both filed as regular feat(src) issues, no duplicates found via
   GitHub search first. Not implemented yet -- next step is `coder`.
 - Files: `AGENTS.md` (#77/#78 Tracked Issues rows), `CHANGE_HISTORY.md`.
+
+## [2026-08-18] — feat(src): symmetric beam reinforcement + even-bar-count options (issues #77, #78)
+
+- #77: added `OptimizationOptions::symmetric_beam_reinforcement`
+  (default true) -- forces a beam's tumpuan bar slots to mirror its
+  lapangan slots right before every fitness evaluation
+  (`EvaluateCandidateFull`/`EvaluateTrial` in Optimizer.cpp), so real
+  optimization Runs (not just Analyze mode, which already had this via
+  #74) always produce symmetric lapangan/tumpuan reinforcement. Does
+  NOT shrink JVD/the fixed 12-slot beam layout -- see AGENTS.md's
+  #77/#78 section for why that was rejected as too risky, and what
+  "reduces optimization variables" actually means here (a design's
+  tumpuan choice has zero effect on its evaluated fitness, not a
+  literal search-dimensionality cut).
+- #78: added `OptimizationOptions::even_bar_count_only` (default true)
+  -- snaps every bar-count design-variable slot (beam NL_d indices
+  3/5/7/9, column index 2) to the nearest table entry whose value is
+  even and >= 4, at the same two evaluation points. The >= 4 floor is
+  unconditional; only evenness is gated on the option.
+- Both wired into `RunPanel`'s new "Reinforcement practice" checkbox
+  section (default checked) and `AnalyzePanel`'s existing/new checkboxes
+  (`same_lap_tum_` already existed from #74; new `even_bar_count_`
+  filters the bar-count dropdowns' visible choices the same way).
+  `AnalyzeFixedDesign()` itself is untouched -- its documented
+  never-alter-without-the-caller-knowing contract means Analyze mode
+  enforces both constraints GUI-side (filtered dropdowns), not
+  engine-side.
+- Real compile bug caught and fixed: `LegacyArray2D::operator[]`
+  returns a temporary `int*` prvalue, which can't bind to the new
+  helper templates' `Arr&` parameter directly -- fixed by naming it
+  into a local variable first at the one call site that hit it.
+- Verified via `orcisf_cli optimize` against a scratch `Apl1-1` copy:
+  every beam's lapangan/tumpuan reinforcement came out identical, and
+  every beam/column bar count in the output was 4 (even, at the floor).
+  `orcisf_gui` launch confirmed, zero-warning build. The two new GUI
+  checkboxes themselves were not interactively clicked through this
+  pass.
+- Files: `src/engine/include/engine/Optimizer.h`,
+  `src/engine/src/Optimizer.cpp`, `src/gui/RunPanel.{h,cpp}`,
+  `src/gui/AnalyzePanel.{h,cpp}`, `AGENTS.md`, `CHANGE_HISTORY.md`.

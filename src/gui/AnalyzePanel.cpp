@@ -26,13 +26,45 @@ constexpr ImVec4 kViolatedColor(0.85f, 0.28f, 0.24f, 1.f);
 // anonymous-namespace LoadBatasAtas() mapping exactly -- see
 // AnalyzePanel.h's header comment). Returns true if the user picked a
 // different index this frame.
+// Issue #78: a bar-count table entry is eligible when its resolved value
+// is >= 4 (always) and, if `even_only`, also even. Mirrors
+// Optimizer.cpp's SnapBarCountIndex() eligibility predicate exactly
+// (kept as a separate small copy here since that one lives in an
+// anonymous namespace in the engine's .cpp, not part of its public API) --
+// keep both in sync if the rule ever changes.
+bool BarCountEligible(const engine::LegacyArray<float>& table, int i, bool even_only) {
+    float v = engine::Isi(i, table);
+    if (v < 4.f) return false;
+    if (!even_only) return true;
+    int iv = static_cast<int>(v + 0.5f);
+    return iv % 2 == 0;
+}
+
 bool DesignVarCombo(const char* str_id, int& index, const engine::LegacyArray<float>& table, int count,
-                     const char* fmt) {
+                     const char* fmt, bool even_only = false) {
     if (count <= 0) {
         ImGui::TextDisabled("--");
         return false;
     }
     if (index < 0 || index >= count) index = 0; // guard against a stale index from a shrunk table
+
+    // If the current index no longer qualifies (table shrank, or
+    // even_only was just turned on), snap to the nearest eligible entry
+    // -- same reasoning as Optimizer.cpp's SnapBarCountIndex(), applied
+    // here so Analyze mode's dropdown never displays/sends a value it
+    // wouldn't itself offer.
+    if (even_only && !BarCountEligible(table, index, even_only)) {
+        int best = -1, best_dist = count + 1;
+        for (int i = 0; i < count; ++i) {
+            if (!BarCountEligible(table, i, even_only)) continue;
+            int dist = (i > index) ? (i - index) : (index - i);
+            if (dist < best_dist) {
+                best_dist = dist;
+                best = i;
+            }
+        }
+        if (best >= 0) index = best;
+    }
 
     char preview[32];
     std::snprintf(preview, sizeof(preview), fmt, engine::Isi(index, table));
@@ -41,6 +73,7 @@ bool DesignVarCombo(const char* str_id, int& index, const engine::LegacyArray<fl
     ImGui::SetNextItemWidth(-FLT_MIN);
     if (ImGui::BeginCombo(str_id, preview)) {
         for (int i = 0; i < count; ++i) {
+            if (even_only && !BarCountEligible(table, i, even_only)) continue;
             bool selected = (i == index);
             char item[32];
             std::snprintf(item, sizeof(item), fmt, engine::Isi(i, table));
@@ -59,7 +92,8 @@ bool DesignVarCombo(const char* str_id, int& index, const engine::LegacyArray<fl
 
 void DrawInputTable(const engine::StructureData& sd, const SceneModel& scene,
                      std::unordered_map<int, std::array<int, 12>>& beam_choices,
-                     std::unordered_map<int, std::array<int, 5>>& column_choices, bool same_lap_tum) {
+                     std::unordered_map<int, std::array<int, 5>>& column_choices, bool same_lap_tum,
+                     bool even_bar_count) {
     // Slot table indexed by the beam's own 12-slot layout (see
     // AGENTS.md's "Discrete design variables"). `is_tumpuan` marks the 4
     // slots [74]'s "same" toggle hides/mirrors -- kept as a plain lookup
@@ -126,7 +160,9 @@ void DrawInputTable(const engine::StructureData& sd, const SceneModel& scene,
                 ImGui::TableSetColumnIndex(col++);
                 ImGui::PushID(j);
                 auto [table, count] = slot_table(kBeamSlots[j].table_id);
-                DesignVarCombo("##v", c[static_cast<size_t>(j)], *table, count, kBeamSlots[j].fmt);
+                bool is_bar_count = kBeamSlots[j].table_id == 3; // NL_d
+                DesignVarCombo("##v", c[static_cast<size_t>(j)], *table, count, kBeamSlots[j].fmt,
+                                is_bar_count && even_bar_count);
                 ImGui::PopID();
             }
             ImGui::PopID();
@@ -160,7 +196,9 @@ void DrawInputTable(const engine::StructureData& sd, const SceneModel& scene,
             for (int j = 0; j < 5; ++j) {
                 ImGui::TableSetColumnIndex(j + 1);
                 ImGui::PushID(j);
-                DesignVarCombo("##v", c[static_cast<size_t>(j)], *kSlots[j].table, kSlots[j].count, kSlots[j].fmt);
+                bool is_bar_count = (j == 2); // N_Dia, reads the shared NL_d table
+                DesignVarCombo("##v", c[static_cast<size_t>(j)], *kSlots[j].table, kSlots[j].count, kSlots[j].fmt,
+                                is_bar_count && even_bar_count);
                 ImGui::PopID();
             }
             ImGui::PopID();
@@ -283,7 +321,13 @@ void AnalyzePanel::Draw(bool* open, const engine::StructureData* sd, const Scene
             "both regions. Uncheck only for the rare/theoretical case of independently-chosen lapangan and "
             "tumpuan reinforcement.");
     }
-    DrawInputTable(*sd, scene, beam_choices_, column_choices_, same_lap_tum_);
+    ImGui::Checkbox("Even bar count only (min 4)", &even_bar_count_);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(
+            "Practical default: bars come in symmetric pairs, so real construction uses an even bar count "
+            "(4, 6, 8, ...). Uncheck to allow odd counts too -- the minimum of 4 still applies either way.");
+    }
+    DrawInputTable(*sd, scene, beam_choices_, column_choices_, same_lap_tum_, even_bar_count_);
 
     ImGui::Spacing();
     bool has_members = !scene.members.empty();

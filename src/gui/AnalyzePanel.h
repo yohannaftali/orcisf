@@ -78,6 +78,16 @@ private:
     // shown/edited independently per beam (the rare/theoretical case).
     bool same_lap_tum_ = true;
 
+    // Issue #78: default true (real construction uses even bar counts,
+    // minimum 4). When true, the beam Dia+/N+/Dia-/N- and column "N"
+    // dropdowns only list even values >= 4 from the shared NL_d table;
+    // when false, odd values become selectable too, but the minimum stays
+    // 4 either way. GUI-side filtering only (the same discrete NL_d table
+    // is used either way, just with a narrower/wider visible choice set)
+    // -- matches engine::OptimizationOptions::even_bar_count_only's own
+    // default and semantics for a real optimization Run.
+    bool even_bar_count_ = true;
+
     // Run configuration -- mirrors RunPanel's own fields/defaults (unit
     // prices, cover thickness) since ComputeMemberResults()'s cost/design
     // calculations need them even with no cost-minimization search

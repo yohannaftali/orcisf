@@ -62,6 +62,8 @@ void RunPanel::StartRun() {
     options.fak_kali = fak_kali_;
     options.worker_threads = static_cast<unsigned int>(std::max(1, worker_threads_));
     options.rng_seed = rng_seed_;
+    options.symmetric_beam_reinforcement = symmetric_beam_reinforcement_;
+    options.even_bar_count_only = even_bar_count_only_;
 
     // Issue #16: extract the previous run's best design (population slot
     // JSTD-1, always the best after the last Sort() -- see Optimizer.h's
@@ -194,6 +196,21 @@ void RunPanel::Draw(bool* open) {
     // engine's own guard remains the one that's always correct.
     fak_kali_ = std::min(fak_kali_, 100);
     fak_plus_ = std::min(fak_plus_, engine::kMak);
+
+    ImGui::SeparatorText("Reinforcement practice");
+    ImGui::Checkbox("Same bars at lapangan (midspan) and tumpuan (support)", &symmetric_beam_reinforcement_);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(
+            "Practical default: real construction almost always runs the same bar diameter/count through "
+            "both regions. Uncheck only for the rare/theoretical case of independently-optimized lapangan and "
+            "tumpuan reinforcement.");
+    }
+    ImGui::Checkbox("Even bar count only (min 4)", &even_bar_count_only_);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(
+            "Practical default: bars come in symmetric pairs, so real construction uses an even bar count "
+            "(4, 6, 8, ...). Uncheck to allow odd counts too -- the minimum of 4 still applies either way.");
+    }
 
     ImGui::SeparatorText("Performance");
     int max_threads = static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));

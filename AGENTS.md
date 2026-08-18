@@ -2779,8 +2779,8 @@ later, different one (e.g. closing an issue or cutting a release).
 | #74 | feat(src): default checkbox for same lapangan/tumpuan bars in Analyze mode's beam input | closed (tester: interactively CONFIRMED live -- checkbox checked by default, 8-column layout when checked, reverts to full 12-slot layout when unchecked, Run Analyze works with no crash) | 2026-08-18 |
 | #75 | bug(src): JSTD can exceed kMak (825), causing OOB heap write / segfault for large fak_kali | closed (coder: fixed at both engine (RunOptimization() throws instead of OOB write) and GUI (RunPanel clamp) layers; verified via orcisf_cli -- the exact repro that segfaulted before the fix now fails with a clear error message, and a regression run with RunPanel's own defaults + worker_threads=15 still completes correctly) | 2026-08-17 |
 | #76 | chore(ci): vcpkg dependency downloads fail intermittently on GitHub rate-limit (429/502/503) | closed (all 3 criteria confirmed: enabled vcpkg's GHA binary cache (x-gha) in build-src.yml; workflow-only change; run 32128755251 on commit 18a17d2 -- the fix's own trigger -- completed success on all three legs (windows-release/macos-release/linux-release), no rate-limit failures) | 2026-08-18 |
-| #77 | feat(src): symmetric beam reinforcement option (same bar diameter/count at midspan and support), reduces optimization variables | open | 2026-08-18 |
-| #78 | feat(src): even-bar-count option (default) for beam/column reinforcement, minimum 4 | open | 2026-08-18 |
+| #77 | feat(src): symmetric beam reinforcement option (same bar diameter/count at midspan and support), reduces optimization variables | ready-for-review (coder: implemented + verified via orcisf_cli -- see AGENTS.md's #77/#78 section) | 2026-08-18 |
+| #78 | feat(src): even-bar-count option (default) for beam/column reinforcement, minimum 4 | ready-for-review (coder: implemented + verified via orcisf_cli -- see AGENTS.md's #77/#78 section) | 2026-08-18 |
 
 Epic #67 tracks #68–#70 (manual-dimension "Analyze" mode: engine
 entry point, GUI input panel, GUI results display — reuses the
@@ -3528,6 +3528,93 @@ touching `AnalyzePanel.cpp`'s `DrawInputTable()`/`same_lap_tum_`:**
   column-count change, the checkbox's default state, and a real "Run
   Analyze" producing matching lapangan/tumpuan reinforcement in the
   results table all still need a `tester`/interactive pass.
+
+**Symmetric beam reinforcement + even-bar-count options (issues #77/#78,
+real-optimization follow-ups to #74) — read before touching
+`OptimizationOptions::symmetric_beam_reinforcement`/`even_bar_count_only`,
+`Optimizer.cpp`'s `MirrorBeamTumpuan()`/`SnapBarCountIndex()`/
+`SnapBarCounts()`, or `AnalyzePanel.cpp`'s bar-count dropdown filtering:**
+- **Neither option shrinks `JVD`/the fixed 12-slot beam design-variable
+  layout.** #77's own issue text asked for the optimizer to search fewer
+  *independent* variables per beam; a literal variable-count reduction
+  (variable-width design vectors per member) was rejected as far too
+  risky given how load-bearing the fixed 12-slot layout is throughout
+  this port (population sizing via `JVD`, per-member indexing
+  everywhere -- see the "Discrete design variables" section above).
+  Instead, both options are enforced as a **snap-before-evaluation**
+  step, applied at the exact two places a candidate design's fitness is
+  actually computed: `EvaluateCandidateFull()` (initial population +
+  the one extra candidate evaluated per later generation) and
+  `EvaluateTrial()` (the trial-search loop inside `CariBaru`/
+  `CariBaruParallel`, right after `Unnormalisasi()` produces
+  `var_b_cb`/`var_k_cb`, before `KendalaHarga()` is called). The tumpuan
+  slots (and, independently, out-of-range bar-count slots) are still
+  generated/perturbed by the search like any other variable -- they're
+  just always overwritten before they can affect a design's evaluated
+  fitness, so they have zero effect on which design ends up chosen, and
+  every kept/reported design is symmetric (and even-bar-count-compliant)
+  by construction. This is a smaller, safer claim than "the search
+  literally explores fewer dimensions" -- documented here so it isn't
+  overclaimed again.
+- **`MirrorBeamTumpuan(var_b, jum_balok)`** forces indices 6-9 (DIA1tum/
+  NL1tum/DIA2tum/NL2tum) to equal indices 2-5 (DIA1lap/NL1lap/DIA2lap/
+  NL2lap) for every beam -- templated on `Arr` (works for both
+  `sd.var_b[no_struktur]`'s `int*` and `var_b_cb`'s `LegacyArray<int>&`,
+  both support `operator[]`). **`LegacyArray2D::operator[]` returns a
+  temporary `int*` prvalue**, which can't bind directly to a `Arr&`
+  template parameter -- `EvaluateCandidateFull()` names it into a local
+  `int* row_b`/`row_k` first (a real compile error caught and fixed
+  during this session, not a hypothetical).
+- **`SnapBarCountIndex(table, count, idx, even_only)`** finds the
+  nearest table index to `idx` whose resolved value is >= 4 (always)
+  and, if `even_only`, also even -- assumes the discrete table is
+  ascending by value (the same convention every other discrete-table
+  consumer in this port already relies on, e.g. the adaptive
+  stirrup-tightening loop's `cari_S` countdown). Applied to beam slots
+  3/5/7/9 (all reading the shared `NL_d` table) and column slot 2, via
+  `SnapBarCounts()`. **The >= 4 floor is unconditional** (applies even
+  with `even_bar_count_only=false`) -- only the evenness half is gated
+  on the option, matching the issue's own "minimum 4 either way"
+  requirement.
+- **`AnalyzeFixedDesign()` (Analyze mode's engine entry point,
+  issue #68) is deliberately untouched by either option.** Its own
+  documented contract is "never alter a manually-chosen design without
+  the caller knowing" (throws on an invalid index rather than silently
+  clamping) -- forcing a mirror/snap inside it would violate that.
+  Instead, `AnalyzePanel.cpp`'s `DesignVarCombo()` gained an `even_only`
+  parameter that filters which dropdown entries are shown/selectable
+  (and snaps an already-chosen-but-now-ineligible index using the exact
+  same nearest-eligible-index logic as the engine's own
+  `SnapBarCountIndex()`, kept as a small separate copy since that one
+  lives in `Optimizer.cpp`'s anonymous namespace, not part of the
+  engine's public API) -- whatever the user picks from the already-
+  filtered list is what gets sent to `AnalyzeFixedDesign()`, so the
+  contract holds. Symmetric reinforcement in Analyze mode was already
+  handled this same GUI-side way by issue #74 (its "same lapangan/
+  tumpuan" checkbox already mirrors tumpuan to lapangan at Run-Analyze
+  time) -- #77 only needed to extend that concept to real optimization,
+  not to Analyze mode, which already had it.
+- **Both options default to `true`** (`OptimizationOptions::
+  symmetric_beam_reinforcement`/`even_bar_count_only`, `RunPanel`'s
+  matching checkboxes under a new "Reinforcement practice" section,
+  `AnalyzePanel`'s `even_bar_count_`), matching real construction
+  practice per the user's own stated reasoning. `orcisf_cli` uses
+  default-constructed `OptimizationOptions` for its `optimize` command,
+  so both apply there too with no new CLI flag needed.
+- **Verification status:** compiled cleanly (zero warnings) after fixing
+  the `LegacyArray2D::operator[]` prvalue-binding error above. Verified
+  via `orcisf_cli optimize` against a scratch `Apl1-1` copy (default
+  options, both new fields true): every beam's `MEMBER_RESULTS` line
+  shows identical `lap_tarik`/`tum_tarik` and `lap_tekan`/`tum_tekan`
+  (e.g. batang 7: `lap_tarik=4D25 ... tum_tarik=4D25`, `lap_tekan=4D32
+  ... tum_tekan=4D32`), and every beam/column bar count in the output is
+  4 (even, at the minimum floor) -- confirming both constraints hold in
+  a real optimization run, not just by code inspection. `orcisf_gui`
+  launch confirmed (no crash). **Not interactively confirmed on
+  screen** -- the two new `RunPanel`/`AnalyzePanel` checkboxes
+  themselves (toggling them, watching the dropdown/column-count reflow
+  live) still need a `tester`/interactive pass, same caveat as #74's
+  own still-open item above.
 
 ---
 

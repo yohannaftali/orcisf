@@ -107,6 +107,13 @@ private:
     std::string result_output_path_;  // issue #25: the generic output path that run actually wrote to
     bool reoptimize_from_last_ = false;
 
+    // Issue #77/#78: default ON, matching real construction practice --
+    // see OptimizationOptions::symmetric_beam_reinforcement/
+    // even_bar_count_only's own header comments for what each actually
+    // constrains during the search.
+    bool symmetric_beam_reinforcement_ = true;
+    bool even_bar_count_only_ = true;
+
     // Issue #63: true only for the one-shot completion transition (set in
     // the was_running_->!running edge, cleared the moment a new run starts)
     // -- see Draw()'s Progress section for why this exists. `progress_`
