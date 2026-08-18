@@ -5564,3 +5564,30 @@ tests already covered.
   URL, per the user's standing confirmation in this session to close
   verified issues.
 - Files: `AGENTS.md` (#76 Tracked Issues row -> closed), `CHANGE_HISTORY.md`.
+
+## [2026-08-18] — planner: filed #77 and #78, follow-ups on #74's reinforcement-input work
+
+- User feedback on issue #74: the "same lapangan/tumpuan bars" checkbox
+  only went partway -- it ties left/right tumpuan (and top/bottom
+  within each), but lapangan and tumpuan themselves stay independent,
+  and the option only existed in Analyze mode, not real optimization.
+  Decided this is out of #74's already-closed scope (a much bigger,
+  engine-touching change -- reducing the optimizer's actual design
+  variable count, not just a GUI input layout) and filed as a new issue
+  rather than reopening/amending #74.
+- Issue #77: symmetric beam reinforcement (one bar diameter + count for
+  the whole beam, matching the column convention), default ON, wired
+  into both Analyze mode and a real optimization Run, with the
+  variable-count reduction happening for real during search (not just
+  displayed). Flags the key architectural risk up front: don't shrink
+  JVD/the 12-slot beam layout itself (that's load-bearing throughout
+  the optimizer per AGENTS.md's "Discrete design variables" section) --
+  prefer tying the redundant slots' values together during
+  search/evaluation instead.
+- Issue #78: separate, independent option -- even-only bar counts
+  (default ON, starting at 4: 4/6/8/10/12/.../ minimum 4 regardless of
+  the setting) for both beams and columns, in Analyze mode and real
+  optimization.
+- Both filed as regular feat(src) issues, no duplicates found via
+  GitHub search first. Not implemented yet -- next step is `coder`.
+- Files: `AGENTS.md` (#77/#78 Tracked Issues rows), `CHANGE_HISTORY.md`.

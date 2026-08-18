@@ -2779,6 +2779,8 @@ later, different one (e.g. closing an issue or cutting a release).
 | #74 | feat(src): default checkbox for same lapangan/tumpuan bars in Analyze mode's beam input | closed (tester: interactively CONFIRMED live -- checkbox checked by default, 8-column layout when checked, reverts to full 12-slot layout when unchecked, Run Analyze works with no crash) | 2026-08-18 |
 | #75 | bug(src): JSTD can exceed kMak (825), causing OOB heap write / segfault for large fak_kali | closed (coder: fixed at both engine (RunOptimization() throws instead of OOB write) and GUI (RunPanel clamp) layers; verified via orcisf_cli -- the exact repro that segfaulted before the fix now fails with a clear error message, and a regression run with RunPanel's own defaults + worker_threads=15 still completes correctly) | 2026-08-17 |
 | #76 | chore(ci): vcpkg dependency downloads fail intermittently on GitHub rate-limit (429/502/503) | closed (all 3 criteria confirmed: enabled vcpkg's GHA binary cache (x-gha) in build-src.yml; workflow-only change; run 32128755251 on commit 18a17d2 -- the fix's own trigger -- completed success on all three legs (windows-release/macos-release/linux-release), no rate-limit failures) | 2026-08-18 |
+| #77 | feat(src): symmetric beam reinforcement option (same bar diameter/count at midspan and support), reduces optimization variables | open | 2026-08-18 |
+| #78 | feat(src): even-bar-count option (default) for beam/column reinforcement, minimum 4 | open | 2026-08-18 |
 
 Epic #67 tracks #68–#70 (manual-dimension "Analyze" mode: engine
 entry point, GUI input panel, GUI results display — reuses the
