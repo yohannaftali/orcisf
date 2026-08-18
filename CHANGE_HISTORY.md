@@ -5500,3 +5500,29 @@ tests already covered.
   the criterion now confirmed live.
 - Files: `AGENTS.md` (#63 and #72 Tracked Issues rows updated),
   `CHANGE_HISTORY.md`
+
+## [2026-08-18] — chore: reviewer pass -- closed all ready-for-review issues (#58, #63-#74, #67) on GitHub
+
+- With the user's explicit confirmation to close them, performed a
+  reviewer-style close pass on every issue that was sitting in
+  `ready-for-review` (or, for the two epics, blocked only on its own
+  sub-issues) per the tester/coder verification already recorded in
+  AGENTS.md and CHANGE_HISTORY.md from the 2026-08-17 overnight session.
+- Closed with a summarizing comment each: #63 (RunPanel hang root-cause
+  fix), #64 (Nmm->N*m label fix), #65 (JSTD<=JVD OOB guard), #66 (.str
+  reload on Open Data), #68/#69/#70 (Analyze mode engine/panel/results),
+  #71 (3D force diagram overlay), #72 (loads-disappear-after-run fix),
+  #73 (dock-tab-icon-on-inactive-tab fix), #74 (same lapangan/tumpuan
+  bars checkbox).
+- Closed the two epics once their own blockers cleared: #67 (all three
+  sub-issues #68/#69/#70 now closed) and #58 (blocker #63 fixed, all
+  four sub-issues #59-#62 already closed).
+- #75 was already closed (unintentionally, via a GitHub commit-message
+  keyword) earlier in the 2026-08-17 session -- left as-is, no action
+  needed.
+- Verified via GitHub API before acting: live issue state for every
+  tracked non-closed issue matched what AGENTS.md already recorded (no
+  surprise drift), so this was a close-what's-already-verified pass, not
+  a re-verification pass.
+- Files: `AGENTS.md` (Tracked Issues table -- #58, #63-#74, #67 rows
+  updated to `closed`), `CHANGE_HISTORY.md`.
