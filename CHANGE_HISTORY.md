@@ -5552,3 +5552,15 @@ tests already covered.
   load) can only be confirmed by watching the next actual run.
 - Files: `.github/workflows/build-src.yml`, `AGENTS.md` (new CI bullet
   + #76 Tracked Issues row), `CHANGE_HISTORY.md`.
+
+## [2026-08-18] — chore(ci): confirmed issue #76's fix with a real CI run, closed
+
+- The vcpkg GHA binary-cache fix's own trigger run (32128755251, commit
+  18a17d2) completed with conclusion "success" on all three matrix legs
+  (windows-release, macos-release, linux-release) -- no rate-limit
+  download failures, confirming the third and final acceptance
+  criterion that could only be checked against a real post-merge run.
+- Closed issue #76 on GitHub with a comment citing the successful run
+  URL, per the user's standing confirmation in this session to close
+  verified issues.
+- Files: `AGENTS.md` (#76 Tracked Issues row -> closed), `CHANGE_HISTORY.md`.
